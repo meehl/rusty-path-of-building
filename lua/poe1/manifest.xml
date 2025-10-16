@@ -1,6 +1,6 @@
 <PoBVersion>
 	<Version number="2.56.0" branch="master" platform="any" />
-	<Source part="default" url="https://raw.githubusercontent.com/meehl/RustyPathOfBuilding/main/manifest/poe1/" />
+	<Source part="default" url="https://raw.githubusercontent.com/meehl/RustyPathOfBuilding/main/lua/poe1/" />
 	<Source part="origin" url="https://raw.githubusercontent.com/PathOfBuildingCommunity/PathOfBuilding/{branch}/" />
 	<Source part="runtime" url="https://raw.githubusercontent.com/PathOfBuildingCommunity/PathOfBuilding/{branch}/runtime/" />
 	<Source part="program" url="https://raw.githubusercontent.com/PathOfBuildingCommunity/PathOfBuilding/{branch}/src/" />

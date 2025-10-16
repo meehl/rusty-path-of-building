@@ -60,7 +60,7 @@ def main():
             if child.get("name") == "UpdateCheck.lua":
                 child.set("part", "default")
 
-                path = Path(f"../manifest/{args.game}/UpdateCheck.lua")
+                path = Path(f"./{args.game}/UpdateCheck.lua")
                 data = path.read_bytes()
                 sha1 = hashlib.sha1(data).hexdigest()
                 child.set("sha1", sha1)
