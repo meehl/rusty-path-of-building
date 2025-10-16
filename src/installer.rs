@@ -25,7 +25,7 @@ pub fn run_installer() -> anyhow::Result<()> {
 
 /// Download latest release of Path of Building
 fn download_path_of_building<P: AsRef<Path>>(target_dir: P) -> anyhow::Result<()> {
-    log::info!("Downloading latest release of Path of Building...");
+    println!("Downloading latest release of Path of Building...");
 
     let repo = match Game::current() {
         Game::Poe1 => "PathOfBuildingCommunity/PathOfBuilding",
