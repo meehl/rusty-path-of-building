@@ -36,11 +36,10 @@ fn download_path_of_building<P: AsRef<Path>>(target_dir: P) -> anyhow::Result<()
         repo
     );
 
-    let response = ureq::get(url).call()?;
+    let mut response = ureq::get(url).call()?;
+    let body_reader = response.body_mut().as_reader();
 
-    let body_reader = response.into_body().into_reader();
-    let gz_decoder = GzDecoder::new(body_reader);
-    let mut archive = tar::Archive::new(gz_decoder);
+    let mut archive = tar::Archive::new(GzDecoder::new(body_reader));
 
     for file in archive.entries()? {
         let mut file = file?;
@@ -122,12 +121,12 @@ fn replace_manifest<P: AsRef<Path>>(target_dir: P) -> anyhow::Result<()> {
 }
 
 fn download_file<P: AsRef<Path>>(url: &str, file_path: P) -> anyhow::Result<()> {
-    let response = ureq::get(url).call()?;
+    let mut response = ureq::get(url).call()?;
 
     if response.status().is_success() {
-        let body = response.into_body();
+        let body = response.body_mut();
         let mut file = fs::File::create(file_path)?;
-        copy(&mut body.into_reader(), &mut file)?;
+        copy(&mut body.as_reader(), &mut file)?;
         Ok(())
     } else {
         bail!("Unable to download: {}", url);
