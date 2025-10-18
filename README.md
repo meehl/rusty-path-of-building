@@ -1,36 +1,42 @@
 # Rusty Path of Building
 
-Rusty Path of Building is a cross-platform runtime for [Path of Building](https://github.com/PathOfBuildingCommunity/PathOfBuilding) and [Path of Building 2](https://github.com/PathOfBuildingCommunity/PathOfBuilding-PoE2). It implements the API used by PoB's Lua code and handles rendering, window management, and input. It essentially provides the same functionality as PoB's official runtime, [SimpleGraphic.dll](https://github.com/PathOfBuildingCommunity/PathOfBuilding-SimpleGraphic).
+Rusty Path of Building is a cross-platform runtime for [Path of Building](https://github.com/PathOfBuildingCommunity/PathOfBuilding) and [Path of Building 2](https://github.com/PathOfBuildingCommunity/PathOfBuilding-PoE2). It implements the API used by PoB and handles rendering, window management, and input, essentially serving as a drop-in replacement for the [official runtime](https://github.com/PathOfBuildingCommunity/PathOfBuilding-SimpleGraphic).
 
-The main motivation behind this project was to enable Path of Building to run natively on Linux. It is written in Rust (in case you couldn't already tell from the unimaginative name) and should work on all platforms (though actual testing has only been done on Linux so far).
+This project was primarily created to allow Path of Building to run natively on Linux. It is written in Rust (in case you couldn't already tell from the unimaginative name) and is designed to work across all platforms, though it has only been tested on Linux so far.
 
-## Running
+## Usage
 
 ```bash
-./rusty-path-of-building [poe1|poe2]
+rusty-path-of-building [poe1|poe2]
 ```
 
-The first run takes a bit longer as PoB's assets need to be downloaded. (NOTE: The whole installation process was hacked together and needs a lot of improvement)
+NOTE: The first run takes a bit longer because Path of Building's assets need to be downloaded.
 
-## Dependencies
+## Installation
 
-Most runtime dependencies are handled automatically by `cargo`. [LuaJIT](https://github.com/LuaJIT/LuaJIT) needs to be installed on your system for `mlua` to work and to compile the libraries mentioned below.
+### Arch (AUR)
 
-Path of Building's Lua code also requires a few dynamic libraries:
+- [![Stable version badge](https://img.shields.io/aur/version/rusty-path-of-building?style=flat&label=rusty-path-of-building)](https://aur.archlinux.org/packages/rusty-path-of-building)
 
-- [Lua-cURLv3](https://github.com/Lua-cURL/Lua-cURLv3)
-- [luautf8](https://github.com/starwing/luautf8)
-- [zlib](https://www.zlib.net/) - The Lua module source is included in this repo under `lua/libs/lzip` and requires `zlib` to compile. Build it with `make LUA_IMPL=luajit`.
+Please check [the Arch Wiki](https://wiki.archlinux.org/title/Arch_User_Repository) on how to install packages from the AUR.
 
-These libraries (`.dll` on Windows, `.so` on Linux) should be placed either in the same directory as the executable or in a `lua` subdirectory alongside it.
+### Building from source
 
-## Building
+`LuaJIT` needs to be installed on your system for the `mlua` crate to compile.
 
 ```bash
 cargo build --release
 ```
 
-COMING SOON: PKGBUILD for Arch Linux
+## Runtime Dependencies
+
+Path of Building's Lua code requires the following dynamic c libraries:
+
+- [Lua-cURLv3](https://github.com/Lua-cURL/Lua-cURLv3)
+- [luautf8](https://github.com/starwing/luautf8)
+- [zlib](https://www.zlib.net/) - The Lua module source is included in this repo under `lua/libs/lzip` and requires `zlib` to compile. Build it with `make LUA_IMPL=luajit` (or `lua51`).
+
+These libraries (`.dll` on Windows, `.so` on Linux) should be placed either in the same directory as the executable or in a `lua` subdirectory alongside it.
 
 ## Known Issues
 
