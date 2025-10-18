@@ -12,7 +12,7 @@ from pathlib import Path
 # - remove font files
 # - use modified UpdateCheck.lua from this repo, which is compatible with unix paths and disables the 'basic' update mode
 
-repo = "meehl/RustyPathOfBuilding"
+repo = "meehl/rusty-path-of-building"
 
 
 def is_font_file(name: str) -> bool:

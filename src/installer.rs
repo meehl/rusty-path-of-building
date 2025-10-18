@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const REPO_NAME: &str = "meehl/RustyPathOfBuilding";
+const REPO_NAME: &str = "meehl/rusty-path-of-building";
 
 pub fn run_installer() -> anyhow::Result<()> {
     let script_dir = Game::script_dir();
@@ -90,7 +90,7 @@ fn download_path_of_building<P: AsRef<Path>>(target_dir: P) -> anyhow::Result<()
     Ok(())
 }
 
-/// Replace manifest and UpdateCheck with RustyPathOfBuilding's modified versions
+/// Replace manifest and UpdateCheck with rusty-path-of-building's modified versions
 /// This is needed to make updating work without writing our own update system.
 fn replace_manifest<P: AsRef<Path>>(target_dir: P) -> anyhow::Result<()> {
     log::info!("Replacing manifest...");

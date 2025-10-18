@@ -2,7 +2,7 @@
 name = "rusty-path-of-building"
 authors = ["meehl"]
 description = "Cross-platform runtime for Path of Building"
-repository = "https://github.com/meehl/RustyPathOfBuilding"
+repository = "https://github.com/meehl/rusty-path-of-building"
 license = "MIT"
 version = "0.1.0"
 edition = "2024"
