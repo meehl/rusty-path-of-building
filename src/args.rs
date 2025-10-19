@@ -33,8 +33,8 @@ impl Game {
 
     pub fn script_dir() -> PathBuf {
         let directory_name = match Self::current() {
-            Game::Poe1 => "PathOfBuilding1",
-            Game::Poe2 => "PathOfBuilding2",
+            Game::Poe1 => "RustyPathOfBuilding1",
+            Game::Poe2 => "RustyPathOfBuilding2",
         };
         BaseDirs::new().unwrap().data_dir().join(directory_name)
     }
