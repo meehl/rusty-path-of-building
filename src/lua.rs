@@ -8,7 +8,7 @@ use crate::{
     api::{self, get_callback},
     args::Args,
     subscript::{NativeMultiValue, SubscriptManager, SubscriptResult, register_subscript_globals},
-    util::{change_working_directory, get_executable_dir},
+    util::change_working_directory,
 };
 
 pub struct LuaInstance {
@@ -135,15 +135,6 @@ impl LuaInstance {
         package_path.push(';');
         package_path.push_str(script_dir.join("lua/?/init.lua").to_str().unwrap());
         package.set("path", package_path)?;
-
-        let mut package_cpath: String = package.get("cpath")?;
-        let exe_dir = get_executable_dir()?;
-        package_cpath.push(';');
-        #[cfg(target_os = "linux")]
-        package_cpath.push_str(exe_dir.join("lua/?.so").to_str().unwrap());
-        #[cfg(target_os = "windows")]
-        package_cpath.push_str(exe_dir.join("lua/?.dll").to_str().unwrap());
-        package.set("cpath", package_cpath)?;
 
         Ok(())
     }
