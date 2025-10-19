@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const REPO_NAME: &str = "meehl/rusty-path-of-building";
+const REPO_NAME: &str = "meehl/rusty-pob-manifest";
 
 pub fn run_installer() -> anyhow::Result<()> {
     let script_dir = Game::script_dir();
@@ -96,8 +96,8 @@ fn replace_manifest<P: AsRef<Path>>(target_dir: P) -> anyhow::Result<()> {
     log::info!("Replacing manifest...");
 
     let game_path = match Game::current() {
-        Game::Poe1 => "lua/poe1",
-        Game::Poe2 => "lua/poe2",
+        Game::Poe1 => "poe1",
+        Game::Poe2 => "poe2",
     };
 
     // Download on overwrite files
