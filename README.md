@@ -16,7 +16,7 @@ NOTE: The first run takes a bit longer because Path of Building's assets need to
 
 ### Arch (AUR)
 
-- [![Stable version badge](https://img.shields.io/aur/version/rusty-path-of-building?style=flat&label=rusty-path-of-building)](https://aur.archlinux.org/packages/rusty-path-of-building)
+[![Stable version badge](https://img.shields.io/aur/version/rusty-path-of-building?style=flat&label=rusty-path-of-building)](https://aur.archlinux.org/packages/rusty-path-of-building)
 
 Please check [the Arch Wiki](https://wiki.archlinux.org/title/Arch_User_Repository) on how to install packages from the AUR.
 
@@ -30,13 +30,13 @@ cargo build --release
 
 ## Runtime Dependencies
 
-Path of Building's Lua code requires the following dynamic c libraries:
+Path of Building's Lua code requires the following C libraries:
 
 - [Lua-cURLv3](https://github.com/Lua-cURL/Lua-cURLv3)
 - [luautf8](https://github.com/starwing/luautf8)
-- [zlib](https://www.zlib.net/) - The Lua module source is included in this repo under `lua/libs/lzip` and requires `zlib` to compile. Build it with `make LUA_IMPL=luajit` (or `lua51`).
+- `lzip` - The source is included in this repo under `lua/libs/lzip` and requires [zlib](https://www.zlib.net/) to compile. Build it with `make LUA_IMPL=luajit`.
 
-These libraries (`.dll` on Windows, `.so` on Linux) should be placed either in the same directory as the executable or in a `lua` subdirectory alongside it.
+Please refer to the [Lua documentation](https://www.lua.org/manual/5.1/manual.html#pdf-package.cpath) to see how it locates libraries.
 
 ## Known Issues
 
