@@ -2,6 +2,21 @@
 
 ## [Unreleased] - ReleaseDate
 
+### Added
+
+- Add install target to lzip Makefile
+- Setup `cargo-release`
+
+### Fixed
+
+- Fix problem caused by wrong buffer type in inflate and deflate (#1)
+
+### Changed
+
+- Move manifests into separate repo
+- Change script directory name to avoid conflicts with official PoB
+- Remove modification of lua `package.cpath`. Libraries installed outside of the default path can be specified with the `LUA_CPATH` env variable.
+
 ## [0.1.0] - 2025-10-18
 
 ### Added
