@@ -50,7 +50,6 @@ COMMONFLAGS       = -O2 -g -pipe -fPIC $(OS_FLAGS) $(DBG)
 LF                = $(LIBS) $(LDFLAGS)
 CF                = $(INCLUDES) $(DEFINES) $(COMMONFLAGS) $(WARN) -DPTHREADS $(CFLAGS)
 
-#SCR               = src/lua/*.lua src/lua/cURL/*.lua src/lua/cURL/impl/*.lua
 SRCS              = src/*.cpp
 OBJS              = $(subst src/,,$(subst .c,.o,$(SRCS)))
 
@@ -68,13 +67,9 @@ $(OBJS): $(SRCS)
 $(STATIC_LIB): $(OBJS)
 	ar rcs $@ $^
 
-#install: all
-#	$(INSTALL) -d $(DESTDIR)$(LUA_CMOD) $(DESTDIR)$(LUA_LMOD)/cURL/impl
-#	$(INSTALL) $(BIN) $(DESTDIR)$(LUA_CMOD)
-#	$(INSTALL) src/lua/cURL.lua $(DESTDIR)$(LUA_LMOD)
-#	$(INSTALL) src/lua/cURL/safe.lua $(DESTDIR)$(LUA_LMOD)/cURL
-#	$(INSTALL) src/lua/cURL/utils.lua $(DESTDIR)$(LUA_LMOD)/cURL
-#	$(INSTALL) src/lua/cURL/impl/cURL.lua $(DESTDIR)$(LUA_LMOD)/cURL/impl
+install: all
+	$(INSTALL) -d $(DESTDIR)$(LUA_CMOD)
+	$(INSTALL) $(BIN) $(DESTDIR)$(LUA_CMOD)
 
 clean:
 	$(RM) -f $(BIN) $(OBJS) $(STATIC_LIB)
