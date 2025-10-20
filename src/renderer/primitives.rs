@@ -188,5 +188,5 @@ impl Hash for TextPrimitive {
 
 fn hash_pos<H: Hasher, U>(pos: &Point<f32, U>, state: &mut H) {
     OrderedFloat(pos.x).hash(state);
-    OrderedFloat(pos.x).hash(state);
+    OrderedFloat(pos.y).hash(state);
 }
