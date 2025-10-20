@@ -95,12 +95,19 @@ pub struct Subscript {
     receiver: Receiver<SubscriptCall>,
 }
 
-// Subscripts are lua scripts that are executed in their own instance on a separate thread.
+// Subscripts are lua scripts that are executed in their own instance on a separate
+// thread.
 //
-// When a subscript needs to call a function defined in the main instance, a `SubscriptCall` message is send over a channel. At the beginning of each frame, the main thread checks for messages and executes the requested function with the provided arguments on behalf of the subscript.
-// For `BlockingCall`, the main thread sends the return values of the function back to the subscript which is waiting on them.
-// For `NonBlockingCall`, the subscript doesn't wait on any return values and keeps executing the script after sending the message.
-// Subscripts are required to explicitly specify the names of all (non)-blocking function calls that appear in the script.
+// When a subscript needs to call a function defined in the main instance, a
+// `SubscriptCall` message is send over a channel. At the beginning of each frame,
+// the main thread checks for messages and executes the requested function with the
+// provided arguments on behalf of the subscript.
+// For `BlockingCall`, the subscript waits for the main thread to send the return
+// values of the function back over another channel.
+// For `NonBlockingCall`, the subscript doesn't wait on any return values and keeps
+// executing the script after sending the message.
+// Subscripts are required to explicitly specify the names of all (non)-blocking
+// function calls that appear in the script.
 impl Subscript {
     pub fn new(
         id: u64,
