@@ -13,9 +13,9 @@ pub struct Vertex {
     pub pos: LogicalPoint<f32>,
     pub uv: NormalizedPoint,
     pub color: Srgba,
-    // TODO: layer_idx is the same for all vertices. use a uniform buffer
-    // and bind it along with the texture. move into Mesh or make part of
-    // TextureId (change into tuple)
+    /// Index into texture array
+    /// TODO: Remove from Vertex and put into Mesh. Use push constant to set index
+    /// before each draw call. Not sure if actually faster, profiling needed.
     pub layer_idx: u32,
 }
 
