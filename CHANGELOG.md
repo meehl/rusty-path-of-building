@@ -2,6 +2,8 @@
 
 ## [Unreleased] - ReleaseDate
 
+## [0.1.2] - 2025-10-20
+
 ### Fixed
 
 - Fix problem that causes non-identical frames to be elided.
@@ -31,7 +33,8 @@
 - First release
 
 <!-- next-url -->
+[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.1.2...HEAD
 
-[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.1.1...HEAD
+[0.1.2]: https://github.com/meehl/rusty-path-of-building/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/meehl/rusty-path-of-building/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/meehl/rusty-path-of-building/releases/tag/v0.1.0
