@@ -99,9 +99,11 @@ impl Context {
             self.previous_layers_hash = layers_hash;
 
             let primitives = self.layers.consume_layers();
-            let meshes = self
-                .tessellator
-                .convert_clipped_primitives(primitives, font_atlas_size);
+            let meshes = self.tessellator.convert_clipped_primitives(
+                primitives,
+                font_atlas_size,
+                self.pixels_per_point,
+            );
 
             RenderJob::Render {
                 meshes,

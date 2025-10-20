@@ -5,6 +5,7 @@
 ### Fixed
 
 - Fix problem that causes non-identical frames to be elided.
+- Correctly align layout origins with physical pixel grid for sharper text rendering.
 
 ## [0.1.1] - 2025-10-19
 

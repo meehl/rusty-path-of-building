@@ -1,5 +1,5 @@
 use crate::{
-    dpi::{Normalize, NormalizedQuad, NormalizedRect, Uv},
+    dpi::{ConvertToLogical, ConvertToPhysical, Normalize, NormalizedQuad, NormalizedRect, Uv},
     fonts::FontAtlasSize,
     renderer::{
         mesh::{ClippedMesh, Mesh},
@@ -22,13 +22,19 @@ impl Tessellator {
         &mut self,
         clipped_primitives: impl Iterator<Item = ClippedPrimitive>,
         font_atlas_size: FontAtlasSize,
+        pixels_per_point: f32,
     ) -> Vec<ClippedMesh> {
         profiling::scope!("convert_primitives");
 
         let mut clipped_meshes = Vec::with_capacity(self.last_clipped_meshes_size);
 
         for clipped_primitive in clipped_primitives {
-            self.convert_clipped_primitive(clipped_primitive, font_atlas_size, &mut clipped_meshes);
+            self.convert_clipped_primitive(
+                clipped_primitive,
+                font_atlas_size,
+                pixels_per_point,
+                &mut clipped_meshes,
+            );
         }
 
         self.last_clipped_meshes_size = clipped_meshes.len();
@@ -39,6 +45,7 @@ impl Tessellator {
         &mut self,
         clipped_primitive: ClippedPrimitive,
         font_atlas_size: FontAtlasSize,
+        pixels_per_point: f32,
         out_clipped_meshes: &mut Vec<ClippedMesh>,
     ) {
         let ClippedPrimitive {
@@ -79,6 +86,7 @@ impl Tessellator {
             DrawPrimitive::Text(text_primitive) => self.convert_text_primitive(
                 text_primitive,
                 font_atlas_size,
+                pixels_per_point,
                 &mut last_clipped_mesh.mesh,
             ),
         }
@@ -134,6 +142,7 @@ impl Tessellator {
         &self,
         text_primitive: TextPrimitive,
         font_atlas_size: FontAtlasSize,
+        pixels_per_point: f32,
         out: &mut Mesh,
     ) {
         let TextPrimitive {
@@ -148,7 +157,14 @@ impl Tessellator {
         out.vertices.reserve(layout.num_of_vertices);
         out.indices.reserve(layout.num_of_indices);
 
-        // TODO: align to pixel grid?
+        // Make sure the layout origin aligns with the physical pixel grid so
+        // that each glyph aligns correctly. Glyphs are positioned relative
+        // to the layout origin and assume that it ends up on the start of
+        // a physical pixel.
+        let layout_pos = layout_pos
+            .to_physical::<f32, _>(pixels_per_point)
+            .round()
+            .to_logical(pixels_per_point);
 
         for row in &layout.rows {
             for glyph in &row.glyphs {

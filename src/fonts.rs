@@ -155,7 +155,7 @@ impl Fonts {
         };
         let mut builder =
             self.layout_context
-                .tree_builder(&mut self.font_context, 1.0, true, &style);
+                .tree_builder(&mut self.font_context, 1.0, false, &style);
         builder.push_text(text);
 
         let (mut layout, _) = builder.build();
@@ -204,13 +204,9 @@ impl Fonts {
             ..default_style
         };
 
-        let mut builder = self.layout_context.tree_builder(
-            &mut self.font_context,
-            1.0,
-            // TODO: quantize true or false?
-            true,
-            &style,
-        );
+        let mut builder =
+            self.layout_context
+                .tree_builder(&mut self.font_context, 1.0, false, &style);
 
         for segment in job.segments {
             let brush_style = StyleProperty::Brush(segment.color);
