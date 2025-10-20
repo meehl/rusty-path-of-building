@@ -40,4 +40,4 @@ Please refer to the [Lua documentation](https://www.lua.org/manual/5.1/manual.ht
 
 ## Known Issues
 
-- Clipboard might not work on some Wayland compositors. Check this for compositor support and temporary workaround: https://github.com/1Password/arboard?tab=readme-ov-file#backend-support
+- The clipboard doesn't work with Wayland compositors that don't support the data-control extension(s). It is recommended to fall back to `Xwayland` in these cases. This can be done by unsetting `WAYLAND_DISPLAY`. More info here: https://github.com/1Password/arboard?tab=readme-ov-file#backend-support
