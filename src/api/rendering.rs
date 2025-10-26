@@ -1,9 +1,9 @@
 use crate::{
     api::image_handle::ImageHandle,
     color::Srgba,
-    context::CONTEXT,
     dpi::Uv,
     fonts::{Alignment, LayoutJob},
+    lua::ContextSocket,
     math::{Point, Quad, Rect, Size},
 };
 use core::ffi::{c_int, c_void};
@@ -16,6 +16,17 @@ use std::sync::LazyLock;
 
 pub fn register_globals(lua: &Lua) -> LuaResult<()> {
     let globals = lua.globals();
+
+    // unused functions
+    let get_draw_layer = |_: &Lua, ()| -> LuaResult<()> { unimplemented!() };
+    let set_blend_mode = |_: &Lua, ()| -> LuaResult<()> { unimplemented!() };
+    let get_async_count = |_: &Lua, ()| -> LuaResult<()> { unimplemented!() };
+    let set_clear_color = |_: &Lua, ()| -> LuaResult<()> { unimplemented!() };
+    globals.set("GetDrawLayer", lua.create_function(get_draw_layer)?)?;
+    globals.set("SetBlendMode", lua.create_function(set_blend_mode)?)?;
+    globals.set("GetAsyncCount", lua.create_function(get_async_count)?)?;
+    globals.set("SetClearColor", lua.create_function(set_clear_color)?)?;
+
     // rendering functions
     // NOTE: unfortunately, mlua's conversion of function arguments adds a lot of
     // overhead. this is very noticeable for the draw functions which can be called
@@ -114,6 +125,10 @@ unsafe extern "C" fn lua_toimghandle(state: *mut ffi::lua_State, idx: c_int) -> 
 
 unsafe extern "C-unwind" fn set_draw_color(state: *mut ffi::lua_State) -> c_int {
     //profiling::scope!("set_draw_color");
+    let lua_instance = unsafe { Lua::get_or_init_from_ptr(state) };
+    let socket = lua_instance
+        .app_data_ref::<&'static ContextSocket>()
+        .unwrap();
 
     let nargs = unsafe { ffi::lua_gettop(state) };
     match nargs {
@@ -121,7 +136,7 @@ unsafe extern "C-unwind" fn set_draw_color(state: *mut ffi::lua_State) -> c_int 
         1 => {
             let esc_str = str_from_stack!(state, -nargs);
             let color = Srgba::from_escape_code(esc_str);
-            CONTEXT.with_borrow_mut(|ctx| ctx.set_draw_color(color));
+            socket.layers().set_draw_color(color);
         }
         // rgb
         3 => {
@@ -129,7 +144,7 @@ unsafe extern "C-unwind" fn set_draw_color(state: *mut ffi::lua_State) -> c_int 
             let g = f32_from_stack!(state, -nargs + 1);
             let b = f32_from_stack!(state, -nargs + 2);
             let color = Srgba::new_f32(r, g, b, 1.0);
-            CONTEXT.with_borrow_mut(|ctx| ctx.set_draw_color(color));
+            socket.layers().set_draw_color(color);
         }
         // rgba
         4 => {
@@ -138,7 +153,7 @@ unsafe extern "C-unwind" fn set_draw_color(state: *mut ffi::lua_State) -> c_int 
             let b = f32_from_stack!(state, -nargs + 2);
             let a = f32_from_stack!(state, -nargs + 3);
             let color = Srgba::new_f32(r, g, b, a);
-            CONTEXT.with_borrow_mut(|ctx| ctx.set_draw_color(color));
+            socket.layers().set_draw_color(color);
         }
         _ => panic!("Unexpected number of arguments"),
     };
@@ -148,17 +163,23 @@ unsafe extern "C-unwind" fn set_draw_color(state: *mut ffi::lua_State) -> c_int 
 
 unsafe extern "C-unwind" fn set_viewport(state: *mut ffi::lua_State) -> c_int {
     //profiling::scope!("set_viewport");
+    let lua_instance = unsafe { Lua::get_or_init_from_ptr(state) };
+    let socket = lua_instance
+        .app_data_ref::<&'static ContextSocket>()
+        .unwrap();
 
     let nargs = unsafe { ffi::lua_gettop(state) };
     match nargs {
-        0 => CONTEXT.with_borrow_mut(|ctx| ctx.reset_viewport()),
+        0 => socket
+            .layers()
+            .set_viewport_from_size(socket.window().logical_size()),
         4 => {
             let x = f32_from_stack!(state, -nargs);
             let y = f32_from_stack!(state, -nargs + 1);
             let w = f32_from_stack!(state, -nargs + 2);
             let h = f32_from_stack!(state, -nargs + 3);
             let rect = Rect::from_origin_and_size(Point::new(x, y), Size::new(w, h));
-            CONTEXT.with_borrow_mut(|ctx| ctx.set_viewport(rect));
+            socket.layers().set_viewport(rect);
         }
         _ => panic!("Unexpected number of arguments"),
     };
@@ -168,13 +189,17 @@ unsafe extern "C-unwind" fn set_viewport(state: *mut ffi::lua_State) -> c_int {
 
 unsafe extern "C-unwind" fn set_draw_layer(state: *mut ffi::lua_State) -> c_int {
     //profiling::scope!("set_draw_layer");
+    let lua_instance = unsafe { Lua::get_or_init_from_ptr(state) };
+    let socket = lua_instance
+        .app_data_ref::<&'static ContextSocket>()
+        .unwrap();
 
     let nargs = unsafe { ffi::lua_gettop(state) };
 
     match nargs {
         1 => {
             let layer = i32_from_stack!(state, -nargs);
-            CONTEXT.with_borrow_mut(|ctx| ctx.set_draw_layer(layer, 0));
+            socket.layers().set_draw_layer(layer, 0);
         }
         2 => {
             let layer = match unsafe { ffi::lua_type(state, -nargs) } {
@@ -187,9 +212,9 @@ unsafe extern "C-unwind" fn set_draw_layer(state: *mut ffi::lua_State) -> c_int 
             };
             let sublayer = i32_from_stack!(state, -nargs + 1);
             if let Some(layer) = layer {
-                CONTEXT.with_borrow_mut(|ctx| ctx.set_draw_layer(layer, sublayer));
+                socket.layers().set_draw_layer(layer, sublayer);
             } else {
-                CONTEXT.with_borrow_mut(|ctx| ctx.set_draw_sublayer(sublayer));
+                socket.layers().set_draw_sublayer(sublayer);
             }
         }
         _ => panic!("Unexpected number of arguments"),
@@ -200,6 +225,10 @@ unsafe extern "C-unwind" fn set_draw_layer(state: *mut ffi::lua_State) -> c_int 
 
 unsafe extern "C-unwind" fn draw_image(state: *mut ffi::lua_State) -> c_int {
     //profiling::scope!("draw_image");
+    let lua_instance = unsafe { Lua::get_or_init_from_ptr(state) };
+    let socket = lua_instance
+        .app_data_ref::<&'static ContextSocket>()
+        .unwrap();
 
     let nargs = unsafe { ffi::lua_gettop(state) };
     if !matches!(nargs, 5 | 6 | 7 | 9 | 10 | 11) {
@@ -239,13 +268,17 @@ unsafe extern "C-unwind" fn draw_image(state: *mut ffi::lua_State) -> c_int {
         0
     };
 
-    CONTEXT.with_borrow_mut(|ctx| ctx.draw_rect(texture_id, rect, uv, layer_idx));
+    socket.layers().draw_rect(texture_id, rect, uv, layer_idx);
 
     0
 }
 
 unsafe extern "C-unwind" fn draw_image_quad(state: *mut ffi::lua_State) -> c_int {
     //profiling::scope!("draw_image_quad", format!("args: {:?}", args));
+    let lua_instance = unsafe { Lua::get_or_init_from_ptr(state) };
+    let socket = lua_instance
+        .app_data_ref::<&'static ContextSocket>()
+        .unwrap();
 
     let nargs = unsafe { ffi::lua_gettop(state) };
     if !matches!(nargs, 9 | 10 | 11 | 17 | 18 | 19) {
@@ -303,13 +336,17 @@ unsafe extern "C-unwind" fn draw_image_quad(state: *mut ffi::lua_State) -> c_int
         0
     };
 
-    CONTEXT.with_borrow_mut(|ctx| ctx.draw_quad(texture_id, quad, uv, layer_idx));
+    socket.layers().draw_quad(texture_id, quad, uv, layer_idx);
 
     0
 }
 
 unsafe extern "C-unwind" fn draw_string(state: *mut ffi::lua_State) -> c_int {
     //profiling::scope!("draw_string");
+    let lua_instance = unsafe { Lua::get_or_init_from_ptr(state) };
+    let socket = lua_instance
+        .app_data_ref::<&'static ContextSocket>()
+        .unwrap();
 
     let nargs = unsafe { ffi::lua_gettop(state) };
 
@@ -331,48 +368,53 @@ unsafe extern "C-unwind" fn draw_string(state: *mut ffi::lua_State) -> c_int {
 
     let mut position = Point::new(x, y);
     let mut is_absolute_position = false;
-    CONTEXT.with_borrow_mut(|ctx| {
-        // the position needs to be adjusted for some alignments to match PoBs behavior
-        let screen_size = ctx.screen_size_logical();
-        let halign = match alignment {
-            PoBTextAlignment::Left => Alignment::Min,
-            PoBTextAlignment::Center => {
-                position.x += screen_size.width as f32 / 2.0;
-                is_absolute_position = true;
-                Alignment::Center
-            }
-            PoBTextAlignment::Right => {
-                position.x = screen_size.width as f32 - position.x;
-                is_absolute_position = true;
-                Alignment::Max
-            }
-            PoBTextAlignment::CenterX => Alignment::Center,
-            PoBTextAlignment::RightX => Alignment::Max,
-        };
-
-        let current_draw_color = ctx.get_draw_color();
-        let job = build_layout_job(
-            text,
-            current_draw_color,
-            font_type,
-            line_height,
-            Some(halign),
-        );
-
-        // NOTE: color escape codes modify the current draw color.
-        // set current draw color to color of last segment to match PoB's behavior
-        if let Some(last_segment) = job.segments.last() {
-            ctx.set_draw_color(last_segment.color);
+    // the position needs to be adjusted for some alignments to match PoBs behavior
+    let screen_size = socket.window().logical_size();
+    let halign = match alignment {
+        PoBTextAlignment::Left => Alignment::Min,
+        PoBTextAlignment::Center => {
+            position.x += screen_size.width as f32 / 2.0;
+            is_absolute_position = true;
+            Alignment::Center
         }
+        PoBTextAlignment::Right => {
+            position.x = screen_size.width as f32 - position.x;
+            is_absolute_position = true;
+            Alignment::Max
+        }
+        PoBTextAlignment::CenterX => Alignment::Center,
+        PoBTextAlignment::RightX => Alignment::Max,
+    };
 
-        ctx.draw_text(position, job, is_absolute_position);
-    });
+    let current_draw_color = socket.layers().get_draw_color();
+    let job = build_layout_job(
+        text,
+        current_draw_color,
+        font_type,
+        line_height,
+        Some(halign),
+    );
+
+    // NOTE: color escape codes modify the current draw color.
+    // set current draw color to color of last segment to match PoB's behavior
+    if let Some(last_segment) = job.segments.last() {
+        socket.layers().set_draw_color(last_segment.color);
+    }
+
+    let layout = socket.fonts().layout(job, socket.window().scale_factor);
+    socket
+        .layers()
+        .draw_text(position, layout, is_absolute_position);
 
     0
 }
 
 unsafe extern "C-unwind" fn get_string_width(state: *mut ffi::lua_State) -> c_int {
     //profiling::scope!("get_string_width");
+    let lua_instance = unsafe { Lua::get_or_init_from_ptr(state) };
+    let socket = lua_instance
+        .app_data_ref::<&'static ContextSocket>()
+        .unwrap();
 
     let nargs = unsafe { ffi::lua_gettop(state) };
 
@@ -386,23 +428,29 @@ unsafe extern "C-unwind" fn get_string_width(state: *mut ffi::lua_State) -> c_in
     };
 
     let job = build_layout_job(text, Srgba::WHITE, font_type, line_height, None);
-    let width = CONTEXT.with_borrow_mut(|ctx| ctx.get_text_width(job));
+    let width = socket
+        .fonts()
+        .get_text_width(job, socket.window().scale_factor);
 
     unsafe { ffi::lua_pushnumber(state, width as f64) };
     1
 }
 
 fn get_index_at_cur(
-    _: &Lua,
+    l: &Lua,
     (line_height, font_type, text, cur_x, cur_y): (i32, String, String, f32, f32),
 ) -> LuaResult<usize> {
     //profiling::scope!("get_char_index_at_cur");
+    let socket = l.app_data_ref::<&'static ContextSocket>().unwrap();
 
     let font_type = font_type.parse::<PoBFontType>()?;
 
     let job = build_layout_job(&text, Srgba::WHITE, font_type, line_height, None);
-    let index =
-        CONTEXT.with_borrow_mut(|ctx| ctx.get_text_index_at_cursor(job, Point::new(cur_x, cur_y)));
+    let index = socket.fonts().get_text_index_at_cursor(
+        job,
+        Point::new(cur_x, cur_y),
+        socket.window().scale_factor,
+    );
 
     // convert to lua's 1-based indexing
     Ok(index + 1)

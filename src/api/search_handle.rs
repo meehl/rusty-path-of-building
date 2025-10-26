@@ -1,9 +1,27 @@
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::time::SystemTime;
+use glob::{Paths, glob};
+use mlua::{IntoLua, Lua, Result as LuaResult, UserData, Value};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    time::SystemTime,
+};
 
-use glob::Paths;
-use mlua::{IntoLua, UserData};
+pub fn new_search_handle(
+    l: &Lua,
+    (pattern, find_directories): (String, Option<bool>),
+) -> LuaResult<Value> {
+    if let Ok(paths) = glob(&pattern) {
+        let directories_only = find_directories.is_some_and(|x| x);
+        let mut handle = SearchHandle::new(paths, directories_only);
+        // try to get the first result
+        handle.next();
+        // only return a handle if at least one file/directory is found
+        if handle.current.is_some() {
+            return handle.into_lua(l);
+        }
+    };
+    Ok(Value::Nil)
+}
 
 pub struct SearchHandle {
     paths: Paths,

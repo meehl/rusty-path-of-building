@@ -1,6 +1,6 @@
 use crate::{
     color::Srgba,
-    dpi::LogicalVector,
+    dpi::{LogicalPoint, LogicalVector},
     fonts::{
         atlas::FontAtlas, glyph_key::SubpixelBin, layout::LayoutRow, rasterizer::GlyphRasterizer,
     },
@@ -286,6 +286,23 @@ impl Fonts {
         self.atlas.clear();
         self.glyph_rasterizer.clear();
         self.layout_cache.clear();
+    }
+
+    /// Width of laid out text
+    pub fn get_text_width(&mut self, job: LayoutJob, pixels_per_point: f32) -> i32 {
+        let layout = self.layout(job, pixels_per_point);
+        layout.width() as i32
+    }
+
+    /// Text index at cursor location
+    pub fn get_text_index_at_cursor(
+        &mut self,
+        job: LayoutJob,
+        cursor: LogicalPoint<f32>,
+        pixels_per_point: f32,
+    ) -> usize {
+        let layout = self.layout(job, pixels_per_point);
+        layout.cursor_index(cursor)
     }
 }
 

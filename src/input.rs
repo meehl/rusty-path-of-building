@@ -1,72 +1,40 @@
-use crate::dpi::PhysicalPoint;
+use crate::dpi::LogicalPoint;
 use ahash::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 use winit::{
-    event::{KeyEvent, MouseButton, WindowEvent},
-    keyboard::{KeyCode, ModifiersState, PhysicalKey},
+    event::MouseButton,
+    keyboard::{KeyCode, ModifiersState},
 };
 
 #[derive(Default)]
 pub struct InputState {
-    key_modifiers: ModifiersState,
+    pub key_modifiers: ModifiersState,
     keys_pressed: HashSet<KeyCode>,
     mouse_pressed: HashSet<MouseButton>,
     mouse_last_pressed: HashMap<MouseButton, Instant>,
-    cursor_pos: PhysicalPoint<f32>,
+    cursor_pos: LogicalPoint<f32>,
 }
 
 impl InputState {
+    pub fn set_key_pressed(&mut self, code: KeyCode, is_pressed: bool) {
+        if is_pressed {
+            self.keys_pressed.insert(code);
+        } else {
+            self.keys_pressed.remove(&code);
+        }
+    }
+
     pub fn key_pressed(&self, code: KeyCode) -> bool {
         self.keys_pressed.contains(&code)
     }
 
-    pub fn mouse_pressed(&self, button: MouseButton) -> bool {
-        self.mouse_pressed.contains(&button)
-    }
-
-    pub fn mouse_pos(&self) -> PhysicalPoint<f32> {
-        self.cursor_pos
-    }
-
-    pub fn modifiers(&self) -> ModifiersState {
-        self.key_modifiers
-    }
-
-    pub fn on_window_event(&mut self, event: &WindowEvent) {
-        match event {
-            WindowEvent::ModifiersChanged(modifiers) => {
-                self.key_modifiers = modifiers.state();
-            }
-            WindowEvent::CursorMoved { position, .. } => {
-                self.cursor_pos = PhysicalPoint::new(position.x as f32, position.y as f32);
-            }
-            WindowEvent::KeyboardInput {
-                event:
-                    KeyEvent {
-                        physical_key: PhysicalKey::Code(code),
-                        state,
-                        ..
-                    },
-                ..
-            } => {
-                if state.is_pressed() {
-                    self.keys_pressed.insert(*code);
-                } else {
-                    self.keys_pressed.remove(code);
-                }
-            }
-            WindowEvent::MouseInput { state, button, .. } => {
-                if state.is_pressed() {
-                    self.mouse_pressed.insert(*button);
-                } else {
-                    self.mouse_pressed.remove(button);
-                }
-            }
-            _ => {}
+    pub fn set_mouse_pressed(&mut self, button: MouseButton, is_pressed: bool) -> bool {
+        if is_pressed {
+            self.mouse_pressed.insert(button);
+        } else {
+            self.mouse_pressed.remove(&button);
         }
-    }
 
-    pub fn is_double_click(&mut self, button: MouseButton) -> bool {
         let now = Instant::now();
         let last = self.mouse_last_pressed.entry(button);
 
@@ -80,6 +48,18 @@ impl InputState {
                 false
             }
         }
+    }
+
+    pub fn mouse_pressed(&self, button: MouseButton) -> bool {
+        self.mouse_pressed.contains(&button)
+    }
+
+    pub fn mouse_pos(&self) -> LogicalPoint<f32> {
+        self.cursor_pos
+    }
+
+    pub fn set_mouse_pos(&mut self, pos: LogicalPoint<f32>) {
+        self.cursor_pos = pos;
     }
 }
 
@@ -169,104 +149,101 @@ pub fn str_as_keycode(s: &str) -> Option<KeyCode> {
     })
 }
 
-pub fn keycode_as_str(code: KeyCode) -> Option<String> {
-    Some(
-        match code {
-            // Letters
-            KeyCode::KeyA => "a",
-            KeyCode::KeyB => "b",
-            KeyCode::KeyC => "c",
-            KeyCode::KeyD => "d",
-            KeyCode::KeyE => "e",
-            KeyCode::KeyF => "f",
-            KeyCode::KeyG => "g",
-            KeyCode::KeyH => "h",
-            KeyCode::KeyI => "i",
-            KeyCode::KeyJ => "j",
-            KeyCode::KeyK => "k",
-            KeyCode::KeyL => "l",
-            KeyCode::KeyM => "m",
-            KeyCode::KeyN => "n",
-            KeyCode::KeyO => "o",
-            KeyCode::KeyP => "p",
-            KeyCode::KeyQ => "q",
-            KeyCode::KeyR => "r",
-            KeyCode::KeyS => "s",
-            KeyCode::KeyT => "t",
-            KeyCode::KeyU => "u",
-            KeyCode::KeyV => "v",
-            KeyCode::KeyW => "w",
-            KeyCode::KeyX => "x",
-            KeyCode::KeyY => "y",
-            KeyCode::KeyZ => "z",
+pub fn keycode_as_str(code: KeyCode) -> Option<&'static str> {
+    Some(match code {
+        // Letters
+        KeyCode::KeyA => "a",
+        KeyCode::KeyB => "b",
+        KeyCode::KeyC => "c",
+        KeyCode::KeyD => "d",
+        KeyCode::KeyE => "e",
+        KeyCode::KeyF => "f",
+        KeyCode::KeyG => "g",
+        KeyCode::KeyH => "h",
+        KeyCode::KeyI => "i",
+        KeyCode::KeyJ => "j",
+        KeyCode::KeyK => "k",
+        KeyCode::KeyL => "l",
+        KeyCode::KeyM => "m",
+        KeyCode::KeyN => "n",
+        KeyCode::KeyO => "o",
+        KeyCode::KeyP => "p",
+        KeyCode::KeyQ => "q",
+        KeyCode::KeyR => "r",
+        KeyCode::KeyS => "s",
+        KeyCode::KeyT => "t",
+        KeyCode::KeyU => "u",
+        KeyCode::KeyV => "v",
+        KeyCode::KeyW => "w",
+        KeyCode::KeyX => "x",
+        KeyCode::KeyY => "y",
+        KeyCode::KeyZ => "z",
 
-            // Digits
-            KeyCode::Digit0 => "0",
-            KeyCode::Digit1 => "1",
-            KeyCode::Digit2 => "2",
-            KeyCode::Digit3 => "3",
-            KeyCode::Digit4 => "4",
-            KeyCode::Digit5 => "5",
-            KeyCode::Digit6 => "6",
-            KeyCode::Digit7 => "7",
-            KeyCode::Digit8 => "8",
-            KeyCode::Digit9 => "9",
+        // Digits
+        KeyCode::Digit0 => "0",
+        KeyCode::Digit1 => "1",
+        KeyCode::Digit2 => "2",
+        KeyCode::Digit3 => "3",
+        KeyCode::Digit4 => "4",
+        KeyCode::Digit5 => "5",
+        KeyCode::Digit6 => "6",
+        KeyCode::Digit7 => "7",
+        KeyCode::Digit8 => "8",
+        KeyCode::Digit9 => "9",
 
-            // Modifiers
-            KeyCode::ShiftLeft => "SHIFT",
-            KeyCode::ControlLeft => "CTRL",
-            KeyCode::AltLeft => "ALT",
+        // Modifiers
+        KeyCode::ShiftLeft => "SHIFT",
+        KeyCode::ControlLeft => "CTRL",
+        KeyCode::AltLeft => "ALT",
 
-            // F Keys
-            KeyCode::F1 => "F1",
-            KeyCode::F2 => "F2",
-            KeyCode::F3 => "F3",
-            KeyCode::F4 => "F4",
-            KeyCode::F5 => "F5",
-            KeyCode::F6 => "F6",
-            KeyCode::F7 => "F7",
-            KeyCode::F8 => "F8",
-            KeyCode::F9 => "F9",
-            KeyCode::F10 => "F10",
-            KeyCode::F11 => "F11",
-            KeyCode::F12 => "F12",
+        // F Keys
+        KeyCode::F1 => "F1",
+        KeyCode::F2 => "F2",
+        KeyCode::F3 => "F3",
+        KeyCode::F4 => "F4",
+        KeyCode::F5 => "F5",
+        KeyCode::F6 => "F6",
+        KeyCode::F7 => "F7",
+        KeyCode::F8 => "F8",
+        KeyCode::F9 => "F9",
+        KeyCode::F10 => "F10",
+        KeyCode::F11 => "F11",
+        KeyCode::F12 => "F12",
 
-            // Rest
-            KeyCode::Space => " ",
-            KeyCode::Backspace => "BACK",
-            KeyCode::Tab => "TAB",
-            KeyCode::Enter => "RETURN",
-            KeyCode::Escape => "ESCAPE",
-            KeyCode::Pause => "PAUSE",
-            KeyCode::PageUp => "PAGEUP",
-            KeyCode::PageDown => "PAGEDOWN",
-            KeyCode::End => "END",
-            KeyCode::Home => "HOME",
-            KeyCode::PrintScreen => "PRINTSCREEN",
-            KeyCode::Insert => "INSERT",
-            KeyCode::Delete => "DELETE",
-            KeyCode::ArrowUp => "UP",
-            KeyCode::ArrowDown => "DOWN",
-            KeyCode::ArrowLeft => "LEFT",
-            KeyCode::ArrowRight => "RIGHT",
-            KeyCode::NumLock => "NUMLOCK",
-            KeyCode::ScrollLock => "SCROLL",
+        // Rest
+        KeyCode::Space => " ",
+        KeyCode::Backspace => "BACK",
+        KeyCode::Tab => "TAB",
+        KeyCode::Enter => "RETURN",
+        KeyCode::Escape => "ESCAPE",
+        KeyCode::Pause => "PAUSE",
+        KeyCode::PageUp => "PAGEUP",
+        KeyCode::PageDown => "PAGEDOWN",
+        KeyCode::End => "END",
+        KeyCode::Home => "HOME",
+        KeyCode::PrintScreen => "PRINTSCREEN",
+        KeyCode::Insert => "INSERT",
+        KeyCode::Delete => "DELETE",
+        KeyCode::ArrowUp => "UP",
+        KeyCode::ArrowDown => "DOWN",
+        KeyCode::ArrowLeft => "LEFT",
+        KeyCode::ArrowRight => "RIGHT",
+        KeyCode::NumLock => "NUMLOCK",
+        KeyCode::ScrollLock => "SCROLL",
 
-            KeyCode::Equal => "+", // This is what PoB does
-            KeyCode::Minus => "-",
-            KeyCode::Comma => ",",
-            KeyCode::Period => ".",
-            KeyCode::Slash => "/",
+        KeyCode::Equal => "+", // This is what PoB does
+        KeyCode::Minus => "-",
+        KeyCode::Comma => ",",
+        KeyCode::Period => ".",
+        KeyCode::Slash => "/",
 
-            KeyCode::NumpadAdd => "+",
-            KeyCode::NumpadSubtract => "-",
-            KeyCode::NumpadEnter => "RETURN",
-            KeyCode::Numpad0 => "0",
+        KeyCode::NumpadAdd => "+",
+        KeyCode::NumpadSubtract => "-",
+        KeyCode::NumpadEnter => "RETURN",
+        KeyCode::Numpad0 => "0",
 
-            _ => return None,
-        }
-        .to_string(),
-    )
+        _ => return None,
+    })
 }
 
 pub fn str_as_mousebutton(s: &str) -> Option<MouseButton> {
@@ -280,16 +257,13 @@ pub fn str_as_mousebutton(s: &str) -> Option<MouseButton> {
     })
 }
 
-pub fn mousebutton_as_str(button: MouseButton) -> Option<String> {
-    Some(
-        match button {
-            MouseButton::Left => "LEFTBUTTON",
-            MouseButton::Right => "RIGHTBUTTON",
-            MouseButton::Middle => "MIDDLEBUTTON",
-            MouseButton::Back => "MOUSE4",
-            MouseButton::Forward => "MOUSE5",
-            _ => return None,
-        }
-        .to_string(),
-    )
+pub fn mousebutton_as_str(button: MouseButton) -> Option<&'static str> {
+    Some(match button {
+        MouseButton::Left => "LEFTBUTTON",
+        MouseButton::Right => "RIGHTBUTTON",
+        MouseButton::Middle => "MIDDLEBUTTON",
+        MouseButton::Back => "MOUSE4",
+        MouseButton::Forward => "MOUSE5",
+        _ => return None,
+    })
 }

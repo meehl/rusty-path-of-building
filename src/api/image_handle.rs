@@ -1,9 +1,12 @@
-use mlua::{MultiValue, UserData};
-
 use crate::{
-    context::CONTEXT,
+    lua::ContextSocket,
     renderer::textures::{TextureHandle, TextureOptions},
 };
+use mlua::{Lua, MultiValue, Result as LuaResult, UserData};
+
+pub fn new_image_handle(_: &Lua, _: ()) -> LuaResult<ImageHandle> {
+    Ok(ImageHandle::Unloaded)
+}
 
 #[derive(Clone)]
 pub enum ImageHandle {
@@ -13,52 +16,7 @@ pub enum ImageHandle {
 
 impl UserData for ImageHandle {
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
-        methods.add_method_mut(
-            "Load",
-            |_, this, (image_path, flags): (String, MultiValue)| {
-                let mut is_async = false;
-                let mut options = TextureOptions::LINEAR_REPEAT;
-
-                for flag in flags.iter() {
-                    if let Some(flag) = flag.as_string() {
-                        match flag.to_string_lossy().as_str() {
-                            "CLAMP" => options.wrap_mode = wgpu::AddressMode::ClampToEdge,
-                            "NEAREST" => options.magnification = wgpu::FilterMode::Nearest,
-                            "ASYNC" => is_async = true,
-                            "MIPMAP" => options.generate_mipmaps = true,
-                            _ => {}
-                        }
-                    }
-                }
-
-                match this {
-                    // replace image data if already allocated
-                    ImageHandle::Loaded(texture_handle) => {
-                        CONTEXT.with_borrow(|ctx| {
-                            // in case of error, stay loaded with current texture
-                            let _ = ctx.texture_manager.update_texture(
-                                texture_handle.id(),
-                                image_path,
-                                options,
-                                is_async,
-                            );
-                        });
-                    }
-                    // create new texture handle
-                    ImageHandle::Unloaded => {
-                        CONTEXT.with_borrow(|ctx| {
-                            if let Ok(handle) = ctx
-                                .texture_manager
-                                .load_texture(image_path, options, is_async)
-                            {
-                                *this = ImageHandle::Loaded(handle);
-                            }
-                        });
-                    }
-                }
-                Ok(())
-            },
-        );
+        methods.add_method_mut("Load", load);
 
         methods.add_method_mut("Unload", |_, this, ()| {
             match this {
@@ -91,4 +49,49 @@ impl UserData for ImageHandle {
             ImageHandle::Unloaded => Ok((0, 0)),
         });
     }
+}
+
+fn load(
+    lua: &Lua,
+    handle: &mut ImageHandle,
+    (image_path, flags): (String, MultiValue),
+) -> LuaResult<()> {
+    let socket = lua.app_data_ref::<&'static ContextSocket>().unwrap();
+    let mut is_async = false;
+    let mut options = TextureOptions::LINEAR_REPEAT;
+
+    for flag in flags.iter() {
+        if let Some(flag) = flag.as_string() {
+            match flag.to_string_lossy().as_str() {
+                "CLAMP" => options.wrap_mode = wgpu::AddressMode::ClampToEdge,
+                "NEAREST" => options.magnification = wgpu::FilterMode::Nearest,
+                "ASYNC" => is_async = true,
+                "MIPMAP" => options.generate_mipmaps = true,
+                _ => {}
+            }
+        }
+    }
+
+    match handle {
+        // replace image data if already allocated
+        ImageHandle::Loaded(texture_handle) => {
+            // in case of error, stay loaded with current texture
+            let _ = socket.texture_manager().update_texture(
+                texture_handle.id(),
+                image_path,
+                options,
+                is_async,
+            );
+        }
+        // create new texture handle
+        ImageHandle::Unloaded => {
+            if let Ok(tex_handle) = socket
+                .texture_manager()
+                .load_texture(image_path, options, is_async)
+            {
+                *handle = ImageHandle::Loaded(tex_handle);
+            }
+        }
+    }
+    Ok(())
 }

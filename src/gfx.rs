@@ -1,7 +1,18 @@
-use crate::{context::RenderJob, dpi::PhysicalSize, renderer::Renderer};
+use crate::{
+    dpi::PhysicalSize,
+    renderer::{Renderer, mesh::ClippedMesh, textures::TexturesDelta},
+};
 use std::sync::Arc;
 use wgpu::{Texture, TextureFormat, TextureView};
 use winit::window::Window;
+
+pub enum RenderJob {
+    Render {
+        meshes: Vec<ClippedMesh>,
+        textures_delta: TexturesDelta,
+    },
+    Skip,
+}
 
 pub struct GraphicsContext {
     surface: wgpu::Surface<'static>,

@@ -1,6 +1,7 @@
-use crate::app::App;
-use crate::args::{Args, Game};
-use crate::installer::run_installer;
+use crate::{
+    app::App,
+    args::{Args, Game},
+};
 use clap::Parser;
 use winit::event_loop::EventLoop;
 
@@ -8,7 +9,6 @@ mod api;
 mod app;
 mod args;
 mod color;
-mod context;
 mod dpi;
 mod fonts;
 mod gfx;
@@ -17,9 +17,12 @@ mod installer;
 mod layers;
 mod lua;
 mod math;
+mod mode;
+mod pob;
 mod renderer;
 mod subscript;
 mod util;
+mod window;
 mod worker_pool;
 
 fn main() -> anyhow::Result<()> {
@@ -37,8 +40,6 @@ fn main() -> anyhow::Result<()> {
 
     let args = Args::parse();
     Game::init(args.game);
-
-    run_installer()?;
 
     let mut app = App::new()?;
 
