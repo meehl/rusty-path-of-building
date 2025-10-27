@@ -9,9 +9,10 @@ use crate::{
 };
 use anyhow::bail;
 use flate2::read::GzDecoder;
+use regex::Regex;
 use std::{
     fs::{self},
-    io::copy,
+    io::{Write, copy},
     path::{Path, PathBuf},
     sync::mpsc::{self, Receiver, TryRecvError},
     thread,
@@ -20,12 +21,12 @@ use std::{
 const REPO_NAME: &str = "meehl/rusty-pob-manifest";
 
 enum DownloadProgress {
-    Percentage(f32),
-    TotalBytes(u64),
+    Percentage(f32), // percentage of total size (between 0 and 1)
+    TotalBytes(u64), // amount of bytes downloaded
 }
 
 enum Progress {
-    Download(DownloadProgress), // download progress as a percentage (between 0 and 1)
+    Download(DownloadProgress),
     Complete,
     Error(anyhow::Error),
 }
@@ -50,17 +51,10 @@ impl InstallMode {
         let (progress_tx, progress_rx) = mpsc::channel();
 
         thread::spawn(move || {
-            // Launch already exists meaning assets have already been downloaded
-            if script_dir.join("Launch.lua").exists() {
-                progress_tx.send(Progress::Complete).unwrap();
+            if let Err(err) = install(script_dir.as_path(), &progress_tx) {
+                progress_tx.send(Progress::Error(err)).unwrap();
                 return;
             }
-
-            if let Err(err) = download_path_of_building(script_dir.as_path(), &progress_tx) {
-                progress_tx.send(Progress::Error(err)).unwrap();
-            }
-
-            replace_manifest(script_dir.as_path()).unwrap();
             progress_tx.send(Progress::Complete).unwrap();
         });
 
@@ -157,6 +151,28 @@ impl InstallMode {
     }
 }
 
+fn install<P: AsRef<Path>>(
+    target_dir: P,
+    progress_tx: &mpsc::Sender<Progress>,
+) -> anyhow::Result<()> {
+    // Skip installation if version file exists
+    let version_file_path = target_dir.as_ref().join("rpob.version");
+    if version_file_path.exists() {
+        return Ok(());
+    }
+
+    download_path_of_building(&target_dir, progress_tx)?;
+    replace_updatecheck(&target_dir)?;
+    set_branch_and_platform(&target_dir)?;
+
+    // write version file
+    let mut version_file = fs::File::create(version_file_path)?;
+    let pkg_version = env!("CARGO_PKG_VERSION");
+    version_file.write_all(pkg_version.as_bytes())?;
+
+    Ok(())
+}
+
 /// Downloads latest release of Path of Building
 fn download_path_of_building<P: AsRef<Path>>(
     target_dir: P,
@@ -241,32 +257,37 @@ fn download_path_of_building<P: AsRef<Path>>(
     Ok(())
 }
 
-/// Replace manifest and UpdateCheck with rusty-path-of-building's modified versions
-/// This is needed to make updating work without writing our own update system.
-fn replace_manifest<P: AsRef<Path>>(target_dir: P) -> anyhow::Result<()> {
-    log::info!("Downloading modified manifest...");
-
-    let game_path = match Game::current() {
-        Game::Poe1 => "poe1",
-        Game::Poe2 => "poe2",
-    };
-
-    // Download on overwrite files
-    download_file(
-        &format!(
-            "https://raw.githubusercontent.com/{REPO_NAME}/master/{}/{}",
-            game_path, "manifest.xml"
-        ),
-        target_dir.as_ref().join("manifest.xml"),
-    )?;
+/// Replaces UpdateCheck with rusty-path-of-building's custom version of it.
+fn replace_updatecheck<P: AsRef<Path>>(target_dir: P) -> anyhow::Result<()> {
+    log::info!("Downloading custom UpdateCheck.lua script...");
 
     download_file(
         &format!(
-            "https://raw.githubusercontent.com/{REPO_NAME}/master/{}/{}",
-            game_path, "UpdateCheck.lua"
+            "https://raw.githubusercontent.com/{REPO_NAME}/main/{}",
+            "UpdateCheck.lua"
         ),
         target_dir.as_ref().join("UpdateCheck.lua"),
     )?;
+
+    Ok(())
+}
+
+/// Sets branch and platform in manifest.xml
+fn set_branch_and_platform<P: AsRef<Path>>(target_dir: P) -> anyhow::Result<()> {
+    let filename = target_dir.as_ref().join("manifest.xml");
+    let manifest = fs::read_to_string(&filename)?;
+
+    #[cfg(not(target_os = "windows"))]
+    let platform = std::env::consts::OS;
+    #[cfg(target_os = "windows")]
+    let platform = "win32";
+
+    let new_version = format!(r#"<Version branch="master" platform="{}""#, platform);
+
+    let version_regex = Regex::new(r"<Version").unwrap();
+    let new_manifest = version_regex.replace(&manifest, new_version);
+
+    fs::write(&filename, new_manifest.as_ref())?;
 
     Ok(())
 }
