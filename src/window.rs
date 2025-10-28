@@ -42,4 +42,10 @@ impl WindowState {
     pub fn logical_size(&self) -> LogicalSize<u32> {
         self.size.to_logical(self.scale_factor)
     }
+
+    pub fn focus(&self) {
+        if let Some(ref window) = self.window {
+            window.focus_window();
+        }
+    }
 }

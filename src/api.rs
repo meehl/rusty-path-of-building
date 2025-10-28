@@ -13,7 +13,7 @@ use crate::{
         },
         rendering::PoBString,
         search_handle::new_search_handle,
-        window::{get_screen_scale, get_screen_size, set_window_title},
+        window::{get_screen_scale, get_screen_size, set_foreground, set_window_title},
     },
     lua::ContextSocket,
 };
@@ -84,6 +84,7 @@ pub fn register_globals(lua: &Lua) -> LuaResult<()> {
     globals.set("GetScreenSize", lua.create_function(get_screen_size)?)?;
     globals.set("GetScreenScale", lua.create_function(get_screen_scale)?)?;
     globals.set("SetWindowTitle", lua.create_function(set_window_title)?)?;
+    globals.set("SetForeground", lua.create_function(set_foreground)?)?;
 
     // lua
     globals.set("PCall", lua.create_function(protected_call)?)?;

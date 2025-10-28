@@ -26,3 +26,9 @@ pub fn set_window_title(l: &Lua, title: String) -> LuaResult<()> {
     socket.window().set_window_title(&title);
     Ok(())
 }
+
+pub fn set_foreground(l: &Lua, _: ()) -> LuaResult<()> {
+    let socket = l.app_data_ref::<&'static ContextSocket>().unwrap();
+    socket.window().focus();
+    Ok(())
+}
