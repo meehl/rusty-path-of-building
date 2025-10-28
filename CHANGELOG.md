@@ -2,6 +2,10 @@
 
 ## [Unreleased] - ReleaseDate
 
+### Added
+
+- Add stub for `TakeScreenshot` api function
+
 ### Fixed
 
 - Fix crash caused by missing `SetForeground` api function

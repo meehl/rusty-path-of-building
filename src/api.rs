@@ -62,6 +62,9 @@ pub fn register_globals(lua: &Lua) -> LuaResult<()> {
     globals.set("OpenURL", lua.create_function(open_url)?)?;
     globals.set("RenderInit", lua.create_function(render_init)?)?;
 
+    let take_screenshot = |_: &Lua, ()| -> LuaResult<()> { Ok(()) }; // stub
+    globals.set("TakeScreenshot", lua.create_function(take_screenshot)?)?;
+
     // compression
     globals.set("Inflate", lua.create_function(inflate)?)?;
     globals.set("Deflate", lua.create_function(deflate)?)?;
