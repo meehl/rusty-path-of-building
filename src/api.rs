@@ -126,7 +126,12 @@ fn open_url(l: &Lua, url: String) -> LuaResult<MultiValue> {
     }
 }
 
-// TODO: handle "DPI_AWARE" flag
-fn render_init(_: &Lua, _features: Variadic<String>) -> LuaResult<()> {
+fn render_init(l: &Lua, features: Variadic<String>) -> LuaResult<()> {
+    let socket = l.app_data_ref::<&'static ContextSocket>().unwrap();
+    for feature in features {
+        if feature == "DPI_AWARE" {
+            *socket.is_dpi_aware() = true;
+        }
+    }
     Ok(())
 }

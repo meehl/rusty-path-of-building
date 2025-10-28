@@ -12,6 +12,7 @@ pub struct PoBState {
     pub layers: Layers,
     pub current_working_dir: PathBuf,
     pub needs_restart: bool,
+    pub is_dpi_aware: bool,
 }
 
 /// Execution mode in which PoB's application code is run.
@@ -30,6 +31,7 @@ impl PoBMode {
             layers: Layers::default(),
             current_working_dir: PathBuf::default(),
             needs_restart: false,
+            is_dpi_aware: false,
         };
 
         let lua_instance = LuaInstance::new()?;

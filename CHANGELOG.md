@@ -5,6 +5,7 @@
 ### Added
 
 - Add visual indicator for download progress in installer
+- Handle dpi awareness feature flag
 
 ### Changed
 

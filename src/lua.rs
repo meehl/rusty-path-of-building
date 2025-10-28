@@ -53,6 +53,7 @@ pub struct ContextSocket {
     current_working_dir: Cell<*mut PathBuf>,
     layers: Cell<*mut Layers>,
     needs_restart: Cell<*mut bool>,
+    is_dpi_aware: Cell<*mut bool>,
 }
 
 impl ContextSocket {
@@ -66,6 +67,7 @@ impl ContextSocket {
             current_working_dir: Cell::new(std::ptr::null_mut()),
             layers: Cell::new(std::ptr::null_mut()),
             needs_restart: Cell::new(std::ptr::null_mut()),
+            is_dpi_aware: Cell::new(std::ptr::null_mut()),
         }))
     }
 
@@ -79,6 +81,7 @@ impl ContextSocket {
             .set(&mut ctx.pob.current_working_dir);
         self.layers.set(&mut ctx.pob.layers);
         self.needs_restart.set(&mut ctx.pob.needs_restart);
+        self.is_dpi_aware.set(&mut ctx.pob.is_dpi_aware);
     }
 
     pub fn clear(&self) {
@@ -90,6 +93,7 @@ impl ContextSocket {
         self.current_working_dir.set(std::ptr::null_mut());
         self.layers.set(std::ptr::null_mut());
         self.needs_restart.set(std::ptr::null_mut());
+        self.is_dpi_aware.set(std::ptr::null_mut());
     }
 
     socket_accessor!(window: &WindowState);
@@ -100,6 +104,7 @@ impl ContextSocket {
     socket_accessor!(current_working_dir: &mut PathBuf);
     socket_accessor!(layers: &mut Layers);
     socket_accessor!(needs_restart: &mut bool);
+    socket_accessor!(is_dpi_aware: &mut bool);
 }
 
 pub enum PoBEvent {
