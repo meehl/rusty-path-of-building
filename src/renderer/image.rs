@@ -107,65 +107,84 @@ impl std::fmt::Debug for ImageData {
     }
 }
 
-// TODO: clean this up
 pub fn load_image_file<P: AsRef<Path>>(path: P) -> anyhow::Result<ImageData> {
-    // PoB2 assumes a case insensitive filesystem is used. This can lead to some
-    // files not being found on case sensitive systems.
-    // As a workaround, try using a lower-cased path if the original path doesn't
-    // exist.
-    let path = if path.as_ref().exists() {
-        path.as_ref().to_owned()
-    } else {
-        let mut path = path.as_ref().to_owned();
-        let lowercase_filename = path.file_name().unwrap().to_ascii_lowercase();
-        path.set_file_name(lowercase_filename);
-        path
-    };
+    let path = resolve_path(path);
 
-    // special handling for compressed dds files
-    if path.extension().and_then(|s| s.to_str()) == Some("zst")
+    if is_compressed_dds(&path) {
+        load_compressed_dds(&path)
+    } else {
+        // let image crate deal with other file types
+        let image = image::ImageReader::open(&path)?.decode()?;
+        Ok(image.into())
+    }
+}
+
+/// Attempts to find the file, trying lowercase filename if it doesn't exist.
+///
+/// NOTE: PoB2 assumes a case insensitive filesystem, so checking the lowercase name
+/// helps on case sensitive systems in some cases (no pun intended).
+fn resolve_path<P: AsRef<Path>>(path: P) -> std::path::PathBuf {
+    let path_ref = path.as_ref();
+    if path_ref.exists() {
+        return path_ref.to_owned();
+    }
+
+    let mut lowercase_path = path_ref.to_owned();
+    if let Some(filename) = path_ref.file_name() {
+        lowercase_path.set_file_name(filename.to_ascii_lowercase());
+    }
+    lowercase_path
+}
+
+/// Checks if file is a compressed DDS file (.dds.zst)
+fn is_compressed_dds<P: AsRef<Path>>(path: P) -> bool {
+    let path = path.as_ref();
+    path.extension().and_then(|s| s.to_str()) == Some("zst")
         && path
             .file_stem()
             .and_then(|s| s.to_str())
-            .map(|s| s.ends_with(".dds"))
-            .unwrap_or(false)
-    {
-        let f = std::fs::File::open(&path)?;
-        let file_len = f.metadata().ok().map(|m| m.len());
-        let mut zstd_decoder = zstd::Decoder::new(f)?;
+            .is_some_and(|s| s.ends_with(".dds"))
+}
 
-        let parse_option = dds::header::ParseOptions::new_permissive(file_len);
-        let header = dds::header::Header::read(&mut zstd_decoder, &parse_option)?;
-        let dxgi_format = dds::Format::from_header(&header)?;
-        // zstd_decoder will now be at start of pixel data
-        let non_data_len = dds::header::Header::MAGIC.len() + header.byte_len();
-        let data_len = file_len.and_then(|l| (l as usize).checked_sub(non_data_len));
-        let mut pixel_data = Vec::with_capacity(data_len.unwrap_or(0));
-        zstd_decoder.read_to_end(&mut pixel_data)?;
+fn dds_format_to_wgpu(format: dds::Format) -> anyhow::Result<wgpu::TextureFormat> {
+    Ok(match format {
+        dds::Format::BC1_UNORM => wgpu::TextureFormat::Bc1RgbaUnorm,
+        dds::Format::BC2_UNORM => wgpu::TextureFormat::Bc2RgbaUnorm,
+        dds::Format::BC3_UNORM => wgpu::TextureFormat::Bc3RgbaUnorm,
+        dds::Format::BC7_UNORM => wgpu::TextureFormat::Bc7RgbaUnorm,
+        dds::Format::R8G8B8A8_UNORM => wgpu::TextureFormat::Rgba8Unorm,
+        _ => anyhow::bail!("Unsupported DDS format: {:?}", format),
+    })
+}
 
-        let format = match dxgi_format {
-            dds::Format::BC1_UNORM => wgpu::TextureFormat::Bc1RgbaUnorm,
-            dds::Format::BC2_UNORM => wgpu::TextureFormat::Bc2RgbaUnorm,
-            dds::Format::BC3_UNORM => wgpu::TextureFormat::Bc3RgbaUnorm,
-            dds::Format::BC7_UNORM => wgpu::TextureFormat::Bc7RgbaUnorm,
-            dds::Format::R8G8B8A8_UNORM => wgpu::TextureFormat::Rgba8Unorm,
-            _ => anyhow::bail!("Unsupported dxgi format"),
-        };
+/// Loads a compressed DDS file (.dds.zst)
+fn load_compressed_dds<P: AsRef<Path>>(path: P) -> anyhow::Result<ImageData> {
+    let file = std::fs::File::open(path.as_ref())?;
+    let file_len = file.metadata().ok().map(|m| m.len());
 
-        let image_data = ImageData {
-            format,
-            width: header.width(),
-            height: header.height(),
-            array_layers: header.array_size(),
-            mipmap_count: header.mipmap_count(),
-            data_order: DataOrder::LayerMajor,
-            bytes: pixel_data,
-        };
+    let mut decoder = zstd::Decoder::new(file)?;
 
-        return Ok(image_data);
-    }
+    let parse_options = dds::header::ParseOptions::new_permissive(file_len);
+    let header = dds::header::Header::read(&mut decoder, &parse_options)?;
+    let dxgi_format = dds::Format::from_header(&header)?;
+    // zstd_decoder will now be at start of pixel data
 
-    // let image crate deal with other file types
-    let image = image::ImageReader::open(&path)?.decode()?;
-    Ok(image.into())
+    // Read pixel data
+    let non_data_len = dds::header::Header::MAGIC.len() + header.byte_len();
+    let expected_data_len = file_len
+        .and_then(|len| (len as usize).checked_sub(non_data_len))
+        .unwrap_or(0);
+
+    let mut pixel_data = Vec::with_capacity(expected_data_len);
+    decoder.read_to_end(&mut pixel_data)?;
+
+    Ok(ImageData {
+        format: dds_format_to_wgpu(dxgi_format)?,
+        width: header.width(),
+        height: header.height(),
+        array_layers: header.array_size(),
+        mipmap_count: header.mipmap_count(),
+        data_order: DataOrder::LayerMajor,
+        bytes: pixel_data,
+    })
 }

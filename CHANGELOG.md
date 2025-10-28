@@ -11,6 +11,7 @@
 
 - Remove global context
 - Notify windowing system before presenting
+- Cleanup image loading
 
 ## [0.1.2] - 2025-10-20
 
