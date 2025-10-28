@@ -231,6 +231,8 @@ impl GraphicsContext {
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
+
+        self.window.pre_present_notify();
         output.present();
 
         if suboptimal {
