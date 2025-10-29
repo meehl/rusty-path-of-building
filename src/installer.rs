@@ -10,6 +10,7 @@ use crate::{
 use anyhow::bail;
 use flate2::read::GzDecoder;
 use regex::Regex;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::{
     fs::{self},
     io::{Write, copy},
@@ -17,6 +18,7 @@ use std::{
     sync::mpsc::{self, Receiver, TryRecvError},
     thread,
 };
+use ureq::http::Response;
 
 const REPO_NAME: &str = "meehl/rusty-pob-manifest";
 
@@ -189,7 +191,7 @@ fn download_path_of_building<P: AsRef<Path>>(
         repo
     );
 
-    let mut response = ureq::get(url).call()?;
+    let mut response = http_get_with_backoff(&url)?;
     let total_size = response
         .headers()
         .get("Content-Length")
@@ -293,7 +295,7 @@ fn set_branch_and_platform<P: AsRef<Path>>(target_dir: P) -> anyhow::Result<()> 
 }
 
 fn download_file<P: AsRef<Path>>(url: &str, file_path: P) -> anyhow::Result<()> {
-    let mut response = ureq::get(url).call()?;
+    let mut response = http_get_with_backoff(url)?;
 
     if response.status().is_success() {
         let body = response.body_mut();
@@ -318,5 +320,103 @@ fn format_bytes(size_in_bytes: u64) -> String {
         format!("{:.2} KB", size_in_bytes as f64 / KB as f64)
     } else {
         format!("{} bytes", size_in_bytes)
+    }
+}
+
+/// Performs a GET request with exponential backoff aware of GitHub rate limit headers.
+fn http_get_with_backoff(url: &str) -> anyhow::Result<Response<ureq::Body>> {
+    const MAX_ATTEMPTS: usize = 6;
+    let mut attempt = 0;
+    let mut backoff_secs: u64 = 2;
+
+    loop {
+        attempt += 1;
+        let resp_result = ureq::get(url)
+            .header("User-Agent", "rusty-path-of-building")
+            .call();
+
+        let resp = match resp_result {
+            Ok(r) => r,
+            Err(err) => {
+                log::warn!(
+                    "Transport error: {} (attempt {}/{})",
+                    err,
+                    attempt,
+                    MAX_ATTEMPTS
+                );
+                if attempt >= MAX_ATTEMPTS {
+                    return Err(anyhow::Error::new(err));
+                }
+                thread::sleep(Duration::from_secs(backoff_secs));
+                backoff_secs = (backoff_secs * 2).min(60);
+                continue;
+            }
+        };
+
+        let status = resp.status();
+        if status == 403 || status == 429 {
+            let headers = resp.headers();
+            let remaining = headers
+                .get("x-ratelimit-remaining")
+                .and_then(|v| v.to_str().ok());
+            let reset = headers
+                .get("x-ratelimit-reset")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|s| s.parse::<u64>().ok());
+            let retry_after = headers
+                .get("retry-after")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|s| s.parse::<u64>().ok());
+
+            let wait = if let Some(retry) = retry_after {
+                retry
+            } else if let Some(rem) = remaining {
+                if rem == "0" {
+                    if let Some(reset_epoch) = reset {
+                        let now_epoch = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs();
+                        if reset_epoch > now_epoch {
+                            reset_epoch - now_epoch
+                        } else {
+                            backoff_secs
+                        }
+                    } else {
+                        backoff_secs
+                    }
+                } else {
+                    backoff_secs
+                }
+            } else {
+                backoff_secs
+            };
+
+            log::warn!(
+                "Rate limited (status {}). Waiting {}s before retry (attempt {}/{})",
+                status,
+                wait,
+                attempt,
+                MAX_ATTEMPTS
+            );
+            if attempt >= MAX_ATTEMPTS {
+                return Err(anyhow::anyhow!(
+                    "HTTP {} after {} attempts for {}",
+                    status,
+                    attempt,
+                    url
+                ));
+            }
+            thread::sleep(Duration::from_secs(wait));
+            backoff_secs = (backoff_secs * 2).min(60);
+            continue;
+        }
+
+        if status.as_u16() >= 400 {
+            // Non-retryable error - just return an error.
+            return Err(anyhow::anyhow!("http status: {} for {}", status, url));
+        }
+
+        return Ok(resp);
     }
 }
