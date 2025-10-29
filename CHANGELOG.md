@@ -2,6 +2,8 @@
 
 ## [Unreleased] - ReleaseDate
 
+## [0.2.2] - 2025-10-29
+
 ### Fixed
 
 - Fix version file
@@ -60,8 +62,9 @@
 - First release
 
 <!-- next-url -->
+[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.2...HEAD
 
-[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.1...HEAD
+[0.2.2]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/meehl/rusty-path-of-building/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/meehl/rusty-path-of-building/compare/v0.1.1...v0.1.2
