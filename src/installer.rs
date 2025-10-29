@@ -12,7 +12,7 @@ use flate2::read::GzDecoder;
 use regex::Regex;
 use std::{
     fs::{self},
-    io::{Write, copy},
+    io::copy,
     path::{Path, PathBuf},
     sync::mpsc::{self, Receiver, TryRecvError},
     thread,
@@ -158,6 +158,14 @@ fn install<P: AsRef<Path>>(
     // Skip installation if version file exists
     let version_file_path = target_dir.as_ref().join("rpob.version");
     if version_file_path.exists() {
+        let old_version = fs::read_to_string(&version_file_path).unwrap();
+        let current_version = env!("CARGO_PKG_VERSION");
+
+        if old_version != current_version {
+            log::info!("New version detected: {old_version} -> {current_version}");
+            fs::write(&version_file_path, current_version).unwrap();
+        }
+
         return Ok(());
     }
 
@@ -166,9 +174,7 @@ fn install<P: AsRef<Path>>(
     set_branch_and_platform(&target_dir)?;
 
     // write version file
-    let mut version_file = fs::File::create(version_file_path)?;
-    let pkg_version = env!("CARGO_PKG_VERSION");
-    version_file.write_all(pkg_version.as_bytes())?;
+    fs::write(&version_file_path, env!("CARGO_PKG_VERSION")).unwrap();
 
     Ok(())
 }
