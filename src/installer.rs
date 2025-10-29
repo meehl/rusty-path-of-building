@@ -10,6 +10,7 @@ use crate::{
 use anyhow::bail;
 use flate2::read::GzDecoder;
 use regex::Regex;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::{
     fs::{self},
     io::copy,
@@ -17,6 +18,7 @@ use std::{
     sync::mpsc::{self, Receiver, TryRecvError},
     thread,
 };
+use ureq::http::Response;
 
 const REPO_NAME: &str = "meehl/rusty-pob-manifest";
 
@@ -195,7 +197,7 @@ fn download_path_of_building<P: AsRef<Path>>(
         repo
     );
 
-    let mut response = ureq::get(url).call()?;
+    let mut response = http_get_with_backoff(&url)?;
     let total_size = response
         .headers()
         .get("Content-Length")
@@ -299,7 +301,7 @@ fn set_branch_and_platform<P: AsRef<Path>>(target_dir: P) -> anyhow::Result<()> 
 }
 
 fn download_file<P: AsRef<Path>>(url: &str, file_path: P) -> anyhow::Result<()> {
-    let mut response = ureq::get(url).call()?;
+    let mut response = http_get_with_backoff(url)?;
 
     if response.status().is_success() {
         let body = response.body_mut();
@@ -324,5 +326,107 @@ fn format_bytes(size_in_bytes: u64) -> String {
         format!("{:.2} KB", size_in_bytes as f64 / KB as f64)
     } else {
         format!("{} bytes", size_in_bytes)
+    }
+}
+
+/// Calculates wait time based on rate limit headers or falls back to default backoff.
+fn calculate_wait_time(resp: &Response<ureq::Body>, default_backoff: u64) -> u64 {
+    let headers = resp.headers();
+
+    // Wait for time specified in retry-after response header if present
+    if let Some(retry_after) = headers
+        .get("retry-after")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.parse::<u64>().ok())
+    {
+        return retry_after;
+    }
+
+    // The number of requests remaining in the current rate limit window
+    let remaining = headers
+        .get("x-ratelimit-remaining")
+        .and_then(|v| v.to_str().ok());
+
+    if remaining == Some("0") {
+        // Calculate time until rate limit reset
+        if let Some(reset_epoch) = headers
+            .get("x-ratelimit-reset")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.parse::<u64>().ok())
+        {
+            let now_epoch = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+
+            if reset_epoch > now_epoch {
+                return reset_epoch - now_epoch;
+            }
+        }
+    }
+
+    default_backoff
+}
+
+/// Performs a GET request with exponential backoff aware of GitHub rate limit headers.
+fn http_get_with_backoff(url: &str) -> anyhow::Result<Response<ureq::Body>> {
+    const MAX_ATTEMPTS: usize = 6;
+    const MAX_BACKOFF_SECS: u64 = 60;
+    let mut attempt = 0;
+    let mut backoff_secs: u64 = 2;
+
+    loop {
+        attempt += 1;
+        let resp_result = ureq::get(url)
+            .header("User-Agent", "rusty-path-of-building")
+            .call();
+
+        let resp = match resp_result {
+            Ok(r) => r,
+            Err(err) => {
+                log::warn!(
+                    "Transport error: {} (attempt {}/{})",
+                    err,
+                    attempt,
+                    MAX_ATTEMPTS
+                );
+                if attempt >= MAX_ATTEMPTS {
+                    return Err(anyhow::Error::new(err));
+                }
+                thread::sleep(Duration::from_secs(backoff_secs));
+                backoff_secs = (backoff_secs * 2).min(MAX_BACKOFF_SECS);
+                continue;
+            }
+        };
+
+        let status = resp.status();
+        if status == 403 || status == 429 {
+            let wait = calculate_wait_time(&resp, backoff_secs);
+
+            log::warn!(
+                "Rate limited (status {}). Waiting {}s before retry (attempt {}/{})",
+                status,
+                wait,
+                attempt,
+                MAX_ATTEMPTS
+            );
+            if attempt >= MAX_ATTEMPTS {
+                return Err(anyhow::anyhow!(
+                    "HTTP {} after {} attempts for {}",
+                    status,
+                    attempt,
+                    url
+                ));
+            }
+            thread::sleep(Duration::from_secs(wait));
+            backoff_secs = (backoff_secs * 2).min(MAX_BACKOFF_SECS);
+            continue;
+        }
+
+        if status.is_client_error() || status.is_server_error() {
+            return Err(anyhow::anyhow!("http status: {} for {}", status, url));
+        }
+
+        return Ok(resp);
     }
 }
