@@ -475,6 +475,12 @@ fn build_layout_job<'a>(
             font_weight = Some(700.0);
             FontFamily::Named(Cow::Borrowed("Liberation Sans"))
         }
+        PoBFontType::FontinItalic => FontFamily::Named(Cow::Borrowed("Fontin")),
+        PoBFontType::FontinSmallcaps => FontFamily::Named(Cow::Borrowed("Fontin SmallCaps")),
+        PoBFontType::FontinSmallcapsItalic => {
+            // TODO: use regular Smallcaps for now, add "faux italics" later
+            FontFamily::Named(Cow::Borrowed("Fontin SmallCaps"))
+        }
     };
 
     // TODO: check how PoB determines font size
@@ -623,6 +629,9 @@ enum PoBFontType {
     Fixed,
     Var,
     VarBold,
+    FontinSmallcaps,
+    FontinSmallcapsItalic,
+    FontinItalic,
 }
 
 impl std::str::FromStr for PoBFontType {
@@ -633,6 +642,9 @@ impl std::str::FromStr for PoBFontType {
             "FIXED" => Ok(Self::Fixed),
             "VAR" => Ok(Self::Var),
             "VAR BOLD" => Ok(Self::VarBold),
+            "FONTIN SC" => Ok(Self::FontinSmallcaps),
+            "FONTIN SC ITALIC" => Ok(Self::FontinSmallcapsItalic),
+            "FONTIN ITALIC" => Ok(Self::FontinItalic),
             _ => Err(anyhow::anyhow!(
                 "'{}' is not a valid TextFontType variant",
                 s

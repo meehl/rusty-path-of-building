@@ -5,6 +5,7 @@
 ### Added
 
 - Add support for loading webp images
+- Add support for new 'fontin' fonts
 
 ### Fixed
 

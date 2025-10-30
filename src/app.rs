@@ -299,6 +299,18 @@ fn pob_font_definitions() -> FontDefinitions {
             "../fonts/LiberationSans-Bold.ttf"
         ))),
     );
+    definitions.font_data.insert(
+        "fontin-italic".to_owned(),
+        Arc::new(FontData::from_static(include_bytes!(
+            "../fonts/fontin-italic.ttf"
+        ))),
+    );
+    definitions.font_data.insert(
+        "fontin-smallcaps".to_owned(),
+        Arc::new(FontData::from_static(include_bytes!(
+            "../fonts/fontin-smallcaps.ttf"
+        ))),
+    );
 
     definitions.generic_families.insert(
         parley::GenericFamily::Monospace,
@@ -311,6 +323,11 @@ fn pob_font_definitions() -> FontDefinitions {
             "liberation-sans".to_owned(),
             "liberation-sans-bold".to_owned(),
         ],
+    );
+
+    definitions.generic_families.insert(
+        parley::GenericFamily::Serif,
+        vec!["fontin-italic".to_owned(), "fontin-smallcaps".to_owned()],
     );
 
     definitions
