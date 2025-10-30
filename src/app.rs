@@ -300,6 +300,12 @@ fn pob_font_definitions() -> FontDefinitions {
         ))),
     );
     definitions.font_data.insert(
+        "fontin-regular".to_owned(),
+        Arc::new(FontData::from_static(include_bytes!(
+            "../fonts/fontin-regular.ttf"
+        ))),
+    );
+    definitions.font_data.insert(
         "fontin-italic".to_owned(),
         Arc::new(FontData::from_static(include_bytes!(
             "../fonts/fontin-italic.ttf"
@@ -327,7 +333,11 @@ fn pob_font_definitions() -> FontDefinitions {
 
     definitions.generic_families.insert(
         parley::GenericFamily::Serif,
-        vec!["fontin-italic".to_owned(), "fontin-smallcaps".to_owned()],
+        vec![
+            "fontin-regular".to_owned(),
+            "fontin-italic".to_owned(),
+            "fontin-smallcaps".to_owned(),
+        ],
     );
 
     definitions
