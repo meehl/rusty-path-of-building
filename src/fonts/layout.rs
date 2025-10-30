@@ -1,6 +1,6 @@
 use crate::{color::Srgba, dpi::LogicalPoint, fonts::rasterizer::RasterizedGlyph};
 use ordered_float::OrderedFloat;
-use parley::GenericFamily;
+use parley::FontFamily;
 
 #[derive(Copy, Clone, Debug, Hash)]
 pub enum Alignment {
@@ -15,10 +15,10 @@ pub struct LayoutSegment<'s> {
     pub color: Srgba,
 }
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug)]
 pub struct LayoutJob<'s> {
     pub segments: Vec<LayoutSegment<'s>>,
-    pub font_family: GenericFamily,
+    pub font_family: FontFamily<'static>,
     pub font_size: OrderedFloat<f32>,
     pub line_height: OrderedFloat<f32>,
     pub alignment: Option<Alignment>,
@@ -27,7 +27,7 @@ pub struct LayoutJob<'s> {
 
 impl<'s> LayoutJob<'s> {
     pub fn new(
-        font_family: GenericFamily,
+        font_family: FontFamily<'static>,
         font_size: f32,
         line_height: f32,
         alignment: Option<Alignment>,
@@ -45,6 +45,24 @@ impl<'s> LayoutJob<'s> {
 
     pub fn append(&mut self, text: &'s str, color: Srgba) {
         self.segments.push(LayoutSegment { text, color });
+    }
+}
+
+impl std::hash::Hash for LayoutJob<'_> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.segments.hash(state);
+        match &self.font_family {
+            FontFamily::Named(cow) => {
+                cow.hash(state);
+            }
+            FontFamily::Generic(generic_family) => {
+                generic_family.hash(state);
+            }
+        }
+        self.font_size.hash(state);
+        self.line_height.hash(state);
+        self.alignment.hash(state);
+        self.font_weight.hash(state);
     }
 }
 

@@ -7,9 +7,11 @@ use crate::{
     renderer::image::ImageDelta,
     util::calculate_hash,
 };
+use ahash::HashMap;
 use ordered_float::OrderedFloat;
 use parley::{
-    FontContext, FontWeight, GenericFamily, LayoutContext, StyleProperty, TextStyle, fontique::Blob,
+    FontContext, FontFamily, FontStack, FontWeight, GenericFamily, LayoutContext, StyleProperty,
+    TextStyle, fontique::Blob,
 };
 use std::sync::Arc;
 
@@ -21,10 +23,8 @@ mod glyph_key;
 mod layout;
 mod rasterizer;
 
-pub const BITSTREAM_VERA_SANS_MONO: &[u8] = include_bytes!("../fonts/VeraMono.ttf");
-pub const LIBERATION_SANS: &[u8] = include_bytes!("../fonts/LiberationSans-Regular.ttf");
-pub const LIBERATION_SANS_BOLD: &[u8] = include_bytes!("../fonts/LiberationSans-Bold.ttf");
-
+/// Data of a .ttf or .otf file
+#[derive(Clone, Debug)]
 pub struct FontData {
     data: std::borrow::Cow<'static, [u8]>,
 }
@@ -43,13 +43,14 @@ impl AsRef<[u8]> for FontData {
     }
 }
 
-pub struct FontDefinition {
-    pub generic_families: Vec<GenericFamily>,
-    pub data: Arc<FontData>,
+#[derive(Clone, Debug, Default)]
+pub struct FontDefinitions {
+    pub font_data: HashMap<String, Arc<FontData>>,
+    pub generic_families: HashMap<GenericFamily, Vec<String>>,
 }
 
 pub struct Fonts {
-    font_definitions: Vec<FontDefinition>,
+    definitions: FontDefinitions,
     font_context: FontContext,
     layout_context: LayoutContext<Srgba>,
     atlas: FontAtlas,
@@ -58,25 +59,9 @@ pub struct Fonts {
 }
 
 impl Fonts {
-    pub fn new() -> Self {
-        // add fonts used by PoB
-        let font_definitions = vec![
-            FontDefinition {
-                generic_families: vec![GenericFamily::Monospace],
-                data: Arc::new(FontData::from_static(BITSTREAM_VERA_SANS_MONO)),
-            },
-            FontDefinition {
-                generic_families: vec![GenericFamily::SansSerif],
-                data: Arc::new(FontData::from_static(LIBERATION_SANS)),
-            },
-            FontDefinition {
-                generic_families: vec![GenericFamily::SansSerif],
-                data: Arc::new(FontData::from_static(LIBERATION_SANS_BOLD)),
-            },
-        ];
-
+    pub fn new(definitions: FontDefinitions) -> Self {
         let mut fonts = Self {
-            font_definitions,
+            definitions,
             font_context: FontContext::new(),
             layout_context: LayoutContext::new(),
             atlas: FontAtlas::new(1024),
@@ -92,14 +77,20 @@ impl Fonts {
     }
 
     fn register_fonts(&mut self) {
-        for definition in &self.font_definitions {
-            let blob = Blob::new(Arc::new(definition.data.data.clone()));
-            let registered_fonts = self.font_context.collection.register_fonts(blob, None);
-            for generic_family in &definition.generic_families {
-                self.font_context
-                    .collection
-                    .append_generic_families(*generic_family, registered_fonts.iter().map(|f| f.0));
-            }
+        for data in self.definitions.font_data.values() {
+            let blob = Blob::new(Arc::new(data.data.clone()));
+            self.font_context.collection.register_fonts(blob, None);
+        }
+
+        for (generic_family, family_fonts) in &self.definitions.generic_families {
+            let family_ids: Vec<_> = family_fonts
+                .iter()
+                .filter_map(|family_name| self.font_context.collection.family_id(family_name))
+                .collect();
+
+            self.font_context
+                .collection
+                .set_generic_families(*generic_family, family_ids.into_iter());
         }
     }
 
@@ -128,12 +119,22 @@ impl Fonts {
             common_chars.push(c as char);
         }
 
-        self.preload_text(&common_chars, font_size, GenericFamily::Monospace, None);
-        self.preload_text(&common_chars, font_size, GenericFamily::SansSerif, None);
         self.preload_text(
             &common_chars,
             font_size,
-            GenericFamily::SansSerif,
+            FontFamily::Generic(GenericFamily::Monospace),
+            None,
+        );
+        self.preload_text(
+            &common_chars,
+            font_size,
+            FontFamily::Generic(GenericFamily::SansSerif),
+            None,
+        );
+        self.preload_text(
+            &common_chars,
+            font_size,
+            FontFamily::Generic(GenericFamily::SansSerif),
             Some(FontWeight::BOLD),
         );
     }
@@ -142,13 +143,13 @@ impl Fonts {
         &mut self,
         text: &str,
         font_size: f32,
-        generic_family: GenericFamily,
+        font_family: FontFamily,
         font_weight: Option<FontWeight>,
     ) {
         profiling::scope!("preload_text");
 
         let style = TextStyle {
-            font_stack: parley::FontStack::Single(parley::FontFamily::Generic(generic_family)),
+            font_stack: FontStack::Single(font_family),
             font_weight: font_weight.unwrap_or(FontWeight::NORMAL),
             font_size,
             ..Default::default()
@@ -194,7 +195,7 @@ impl Fonts {
 
         let default_style = TextStyle::default();
         let style = TextStyle {
-            font_stack: parley::FontStack::Single(parley::FontFamily::Generic(job.font_family)),
+            font_stack: parley::FontStack::Single(job.font_family),
             font_size: job.font_size.into(),
             line_height: parley::LineHeight::Absolute(job.line_height.into()),
             font_weight: job

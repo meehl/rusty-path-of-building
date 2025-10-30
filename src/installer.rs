@@ -9,6 +9,7 @@ use crate::{
 };
 use anyhow::bail;
 use flate2::read::GzDecoder;
+use parley::{FontFamily, GenericFamily};
 use regex::Regex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::{
@@ -114,7 +115,7 @@ impl InstallMode {
         app_state: &mut AppState,
     ) -> Box<dyn Iterator<Item = ClippedPrimitive>> {
         let mut job = LayoutJob::new(
-            parley::GenericFamily::SansSerif,
+            FontFamily::Generic(GenericFamily::SansSerif),
             32.0,
             34.0,
             Some(Alignment::Center),

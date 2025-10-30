@@ -1,6 +1,6 @@
 use crate::{
     dpi::{ConvertToLogical, PhysicalPoint, PhysicalSize},
-    fonts::Fonts,
+    fonts::{FontData, FontDefinitions, Fonts},
     gfx::{GraphicsContext, RenderJob},
     input::InputState,
     installer::InstallMode,
@@ -54,7 +54,7 @@ impl App {
             state: AppState {
                 window: WindowState::default(),
                 input: InputState::default(),
-                fonts: Fonts::new(),
+                fonts: Fonts::new(pob_font_definitions()),
                 texture_manager: WrappedTextureManager::new(),
                 clipboard: arboard::Clipboard::new()?,
             },
@@ -276,4 +276,42 @@ impl ApplicationHandler<GraphicsContext> for App {
             _ => {}
         }
     }
+}
+
+fn pob_font_definitions() -> FontDefinitions {
+    let mut definitions = FontDefinitions::default();
+
+    definitions.font_data.insert(
+        "bitstream-vera-sans-mono".to_owned(),
+        Arc::new(FontData::from_static(include_bytes!(
+            "../fonts/VeraMono.ttf"
+        ))),
+    );
+    definitions.font_data.insert(
+        "liberation-sans".to_owned(),
+        Arc::new(FontData::from_static(include_bytes!(
+            "../fonts/LiberationSans-Regular.ttf"
+        ))),
+    );
+    definitions.font_data.insert(
+        "liberation-sans-bold".to_owned(),
+        Arc::new(FontData::from_static(include_bytes!(
+            "../fonts/LiberationSans-Bold.ttf"
+        ))),
+    );
+
+    definitions.generic_families.insert(
+        parley::GenericFamily::Monospace,
+        vec!["bitstream-vera-sans-mono".to_owned()],
+    );
+
+    definitions.generic_families.insert(
+        parley::GenericFamily::SansSerif,
+        vec![
+            "liberation-sans".to_owned(),
+            "liberation-sans-bold".to_owned(),
+        ],
+    );
+
+    definitions
 }

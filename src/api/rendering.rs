@@ -11,8 +11,9 @@ use mlua::{
     LightUserData, Lua, Result as LuaResult, UserDataRefMut, Value,
     ffi::{self},
 };
+use parley::FontFamily;
 use regex::Regex;
-use std::sync::LazyLock;
+use std::{borrow::Cow, sync::LazyLock};
 
 pub fn register_globals(lua: &Lua) -> LuaResult<()> {
     let globals = lua.globals();
@@ -468,11 +469,11 @@ fn build_layout_job<'a>(
 ) -> LayoutJob<'a> {
     let mut font_weight = None;
     let font_family = match font_type {
-        PoBFontType::Fixed => parley::GenericFamily::Monospace,
-        PoBFontType::Var => parley::GenericFamily::SansSerif,
+        PoBFontType::Fixed => FontFamily::Named(Cow::Borrowed("Bitstream Vera Sans Mono")),
+        PoBFontType::Var => FontFamily::Named(Cow::Borrowed("Liberation Sans")),
         PoBFontType::VarBold => {
             font_weight = Some(700.0);
-            parley::GenericFamily::SansSerif
+            FontFamily::Named(Cow::Borrowed("Liberation Sans"))
         }
     };
 
