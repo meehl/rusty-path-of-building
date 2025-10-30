@@ -21,7 +21,7 @@ euclid = { version = "0.22.11", features = ["bytemuck"] }
 fast_image_resize = { version = "5.3.0", features = ["image"] }
 flate2 = "1.1.2"
 glob = "0.3.3"
-image = { version = "0.25.8", default-features = false, features = ["rayon", "jpeg", "png"] }
+image = { version = "0.25.8", default-features = false, features = ["rayon", "jpeg", "png", "webp"] }
 log = "0.4"
 mlua = { version = "0.11.2", features = ["luajit", "anyhow"] }
 nohash-hasher = "0.2.0"

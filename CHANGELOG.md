@@ -2,6 +2,10 @@
 
 ## [Unreleased] - ReleaseDate
 
+### Added
+
+- Add support for loading webp images
+
 ### Fixed
 
 - Fix scrolling of gem selection dropdown
