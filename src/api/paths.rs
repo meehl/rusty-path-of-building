@@ -1,5 +1,3 @@
-use anyhow::anyhow;
-use directories::UserDirs;
 use mlua::{IntoLuaMulti, Lua, MultiValue, Result as LuaResult, Value};
 use std::{fs, path::PathBuf};
 
@@ -9,18 +7,8 @@ use crate::{
     util::{change_working_directory, get_executable_dir},
 };
 
-pub fn get_user_path(_: &Lua, _: ()) -> LuaResult<anyhow::Result<PathBuf>> {
-    let user_dirs = match UserDirs::new() {
-        Some(user_dirs) => user_dirs,
-        None => return Ok(Err(anyhow!("Failed to retrieve user's home directory"))),
-    };
-
-    match user_dirs.document_dir() {
-        Some(docs_dir) => Ok(Ok(docs_dir.canonicalize().unwrap())),
-        None => Ok(Err(anyhow!(
-            "Failed to retrieve user's documents directory"
-        ))),
-    }
+pub fn get_user_path(_: &Lua, _: ()) -> LuaResult<PathBuf> {
+    Ok(Game::user_data_dir())
 }
 
 // parent directory of Launch.lua script
