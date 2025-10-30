@@ -122,8 +122,12 @@ impl PoBMode {
             AppEvent::MouseWheel { delta } => {
                 if delta > 0.0 {
                     self.lua_instance
+                        .handle_event(PoBEvent::KeyDown("WHEELUP", false), &mut ctx)?;
+                    self.lua_instance
                         .handle_event(PoBEvent::KeyUp("WHEELUP"), &mut ctx)?;
                 } else if delta < 0.0 {
+                    self.lua_instance
+                        .handle_event(PoBEvent::KeyDown("WHEELDOWN", false), &mut ctx)?;
                     self.lua_instance
                         .handle_event(PoBEvent::KeyUp("WHEELDOWN"), &mut ctx)?;
                 }

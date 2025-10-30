@@ -2,6 +2,10 @@
 
 ## [Unreleased] - ReleaseDate
 
+### Fixed
+
+- Fix scrolling of gem selection dropdown
+
 ## [0.2.3] - 2025-10-29
 
 ### Added
@@ -68,8 +72,8 @@
 - First release
 
 <!-- next-url -->
-[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.3...HEAD
 
+[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.3...HEAD
 [0.2.3]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.0...v0.2.1
