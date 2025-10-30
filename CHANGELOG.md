@@ -2,6 +2,8 @@
 
 ## [Unreleased] - ReleaseDate
 
+## [0.2.4] - 2025-10-30
+
 ### Added
 
 - Add support for loading webp images
@@ -81,8 +83,9 @@
 - First release
 
 <!-- next-url -->
+[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.4...HEAD
 
-[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.3...HEAD
+[0.2.4]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.0...v0.2.1
