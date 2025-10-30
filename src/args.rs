@@ -31,11 +31,19 @@ impl Game {
         GAME_CONFIG.get().expect("Game should be initialized")
     }
 
-    pub fn script_dir() -> PathBuf {
+    pub fn data_dir() -> PathBuf {
         let directory_name = match Self::current() {
             Game::Poe1 => "RustyPathOfBuilding1",
             Game::Poe2 => "RustyPathOfBuilding2",
         };
         BaseDirs::new().unwrap().data_dir().join(directory_name)
+    }
+
+    pub fn script_dir() -> PathBuf {
+        Game::data_dir()
+    }
+
+    pub fn user_data_dir() -> PathBuf {
+        Game::data_dir().join("userdata")
     }
 }
