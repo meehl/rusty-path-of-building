@@ -32,3 +32,13 @@ pub fn set_foreground(l: &Lua, _: ()) -> LuaResult<()> {
     socket.window().focus();
     Ok(())
 }
+
+pub fn set_dpi_scale_override(_: &Lua, _percent: i32) -> LuaResult<()> {
+    // TODO:
+    Ok(())
+}
+
+pub fn get_dpi_scale_override(_: &Lua, _: ()) -> LuaResult<i32> {
+    // TODO:
+    Ok(0)
+}
