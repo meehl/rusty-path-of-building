@@ -7,6 +7,10 @@
 - Add support for loading webp images
 - Add support for new 'fontin' fonts
 
+### Changed
+
+- Use `~/.local/share/RustyPathOfBuilding{1,2}/userdata` as default location for settings and build files. Builds files created prior to this change need to be manually copied from the old location in `~/Documents/`. Sorry about the inconvenience.
+
 ### Fixed
 
 - Fix scrolling of gem selection dropdown
