@@ -6,6 +6,10 @@
 
 - Add support for "faux italics"
 
+### Fixed
+
+- Fix crash that occurs due to surface format selection not filtering out formats that require unrequested GPU features
+
 ## [0.2.4] - 2025-10-30
 
 ### Added
