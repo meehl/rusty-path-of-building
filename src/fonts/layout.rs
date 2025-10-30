@@ -2,11 +2,28 @@ use crate::{color::Srgba, dpi::LogicalPoint, fonts::rasterizer::RasterizedGlyph}
 use ordered_float::OrderedFloat;
 use parley::FontFamily;
 
-#[derive(Copy, Clone, Debug, Hash)]
+#[derive(Copy, Clone, Default, Debug, Hash, PartialEq)]
 pub enum Alignment {
+    #[default]
     Min,
     Center,
     Max,
+}
+
+#[derive(Copy, Clone, Default, Debug, Hash, PartialEq)]
+pub enum FontStyle {
+    #[default]
+    Normal,
+    Italic,
+}
+
+impl From<FontStyle> for parley::FontStyle {
+    fn from(value: FontStyle) -> Self {
+        match value {
+            FontStyle::Normal => parley::FontStyle::Normal,
+            FontStyle::Italic => parley::FontStyle::Italic,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Hash)]
@@ -23,6 +40,7 @@ pub struct LayoutJob<'s> {
     pub line_height: OrderedFloat<f32>,
     pub alignment: Option<Alignment>,
     pub font_weight: Option<OrderedFloat<f32>>,
+    pub font_style: FontStyle,
 }
 
 impl<'s> LayoutJob<'s> {
@@ -32,6 +50,7 @@ impl<'s> LayoutJob<'s> {
         line_height: f32,
         alignment: Option<Alignment>,
         font_weight: Option<f32>,
+        font_style: FontStyle,
     ) -> Self {
         Self {
             segments: Vec::new(),
@@ -40,6 +59,7 @@ impl<'s> LayoutJob<'s> {
             line_height: line_height.into(),
             alignment,
             font_weight: font_weight.map(OrderedFloat),
+            font_style,
         }
     }
 
@@ -63,6 +83,7 @@ impl std::hash::Hash for LayoutJob<'_> {
         self.line_height.hash(state);
         self.alignment.hash(state);
         self.font_weight.hash(state);
+        self.font_style.hash(state);
     }
 }
 

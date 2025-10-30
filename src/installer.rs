@@ -3,7 +3,7 @@ use crate::{
     args::Game,
     color::Srgba,
     dpi::{LogicalPoint, LogicalRect},
-    fonts::{Alignment, LayoutJob},
+    fonts::{Alignment, FontStyle, LayoutJob},
     mode::{AppEvent, ModeFrameOutput, ModeTransition},
     renderer::primitives::{ClippedPrimitive, DrawPrimitive, TextPrimitive},
 };
@@ -120,6 +120,7 @@ impl InstallMode {
             34.0,
             Some(Alignment::Center),
             Some(700.0),
+            FontStyle::Normal,
         );
 
         let progress_text = match &self.current_progress {

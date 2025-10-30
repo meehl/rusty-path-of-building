@@ -14,6 +14,7 @@ use image::GenericImage;
 use ordered_float::OrderedFloat;
 use parley::{FontData, GlyphRun};
 use std::borrow::Cow;
+use swash::zeno;
 
 type FontBlobId = u64;
 type FontIndex = u32;
@@ -25,14 +26,21 @@ struct StyleKey<'a> {
     font_blob_id: FontBlobId,
     font_size: OrderedFloat<f32>,
     normalized_coords: Cow<'a, [i16]>,
+    skew: i8,
 }
 
 impl<'a> StyleKey<'a> {
-    fn new(font_blob_id: FontBlobId, font_size: f32, normalized_coords: &'a [i16]) -> Self {
+    fn new(
+        font_blob_id: FontBlobId,
+        font_size: f32,
+        normalized_coords: &'a [i16],
+        skew: i8,
+    ) -> Self {
         Self {
             font_blob_id,
             font_size: font_size.into(),
             normalized_coords: Cow::Borrowed(normalized_coords),
+            skew,
         }
     }
 
@@ -135,8 +143,9 @@ impl GlyphRasterizer {
         font_data: &FontData,
         font_size: f32,
         norm_coords: &[i16],
+        skew: i8,
     ) -> StyleId {
-        let style_key = StyleKey::new(font_data.data.id(), font_size, norm_coords);
+        let style_key = StyleKey::new(font_data.data.id(), font_size, norm_coords, skew);
         match self.style_ids.get(&style_key) {
             Some(key) => *key,
             None => *self
@@ -164,9 +173,16 @@ impl GlyphRasterizer {
         let color = glyph_run.style().brush;
         let font_size = run.font_size() * pixels_per_point;
         let normalized_coords = run.normalized_coords();
+        let skew = run.synthesis().skew(); // skew angle for faux italic
 
         let font_ref = self.get_font_ref(run.font());
-        let style_id = self.get_style_id(run.font(), font_size, normalized_coords);
+        let style_id = self.get_style_id(
+            run.font(),
+            font_size,
+            normalized_coords,
+            // parley stores skew as i8 internally so this conversion is ok
+            skew.unwrap_or_default() as i8,
+        );
 
         let mut scaler = self
             .scale_context
@@ -198,7 +214,10 @@ impl GlyphRasterizer {
                 swash::scale::Source::ColorBitmap(swash::scale::StrikeWith::BestFit),
                 swash::scale::Source::Outline,
             ])
-            .format(swash::zeno::Format::Alpha)
+            .format(zeno::Format::Alpha)
+            .transform(skew.map(|skew| {
+                zeno::Transform::skew(zeno::Angle::from_degrees(skew), zeno::Angle::ZERO)
+            }))
             .offset(fract_offset)
             .render_into(&mut scaler, glyph.id as u16, image);
 

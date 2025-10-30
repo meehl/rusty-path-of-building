@@ -2,7 +2,7 @@ use crate::{
     api::image_handle::ImageHandle,
     color::Srgba,
     dpi::Uv,
-    fonts::{Alignment, LayoutJob},
+    fonts::{Alignment, FontStyle, LayoutJob},
     lua::ContextSocket,
     math::{Point, Quad, Rect, Size},
 };
@@ -468,6 +468,7 @@ fn build_layout_job<'a>(
     alignment: Option<Alignment>,
 ) -> LayoutJob<'a> {
     let mut font_weight = None;
+    let mut font_style = FontStyle::default();
     let font_family = match font_type {
         PoBFontType::Fixed => FontFamily::Named(Cow::Borrowed("Bitstream Vera Sans Mono")),
         PoBFontType::Var => FontFamily::Named(Cow::Borrowed("Liberation Sans")),
@@ -478,7 +479,8 @@ fn build_layout_job<'a>(
         PoBFontType::FontinItalic => FontFamily::Named(Cow::Borrowed("Fontin")),
         PoBFontType::FontinSmallcaps => FontFamily::Named(Cow::Borrowed("Fontin SmallCaps")),
         PoBFontType::FontinSmallcapsItalic => {
-            // TODO: use regular Smallcaps for now, add "faux italics" later
+            font_style = FontStyle::Italic;
+            // use regular Smallcaps with "faux italics"
             FontFamily::Named(Cow::Borrowed("Fontin SmallCaps"))
         }
     };
@@ -492,6 +494,7 @@ fn build_layout_job<'a>(
         line_height as f32,
         alignment,
         font_weight,
+        font_style,
     );
 
     for (color, segment) in PoBString(text).into_iter() {

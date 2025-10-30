@@ -16,7 +16,7 @@ use parley::{
 use std::sync::Arc;
 
 pub use atlas::FontAtlasSize;
-pub use layout::{Alignment, Layout, LayoutJob};
+pub use layout::{Alignment, FontStyle, Layout, LayoutJob};
 
 mod atlas;
 mod glyph_key;
@@ -124,18 +124,21 @@ impl Fonts {
             font_size,
             FontFamily::Generic(GenericFamily::Monospace),
             None,
+            parley::FontStyle::Normal,
         );
         self.preload_text(
             &common_chars,
             font_size,
             FontFamily::Generic(GenericFamily::SansSerif),
             None,
+            parley::FontStyle::Normal,
         );
         self.preload_text(
             &common_chars,
             font_size,
             FontFamily::Generic(GenericFamily::SansSerif),
             Some(FontWeight::BOLD),
+            parley::FontStyle::Normal,
         );
     }
 
@@ -145,12 +148,14 @@ impl Fonts {
         font_size: f32,
         font_family: FontFamily,
         font_weight: Option<FontWeight>,
+        font_style: parley::FontStyle,
     ) {
         profiling::scope!("preload_text");
 
         let style = TextStyle {
             font_stack: FontStack::Single(font_family),
             font_weight: font_weight.unwrap_or(FontWeight::NORMAL),
+            font_style,
             font_size,
             ..Default::default()
         };
@@ -202,6 +207,7 @@ impl Fonts {
                 .font_weight
                 .map(|w| parley::FontWeight::new(w.into()))
                 .unwrap_or(default_style.font_weight),
+            font_style: job.font_style.into(),
             ..default_style
         };
 
