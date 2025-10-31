@@ -5,6 +5,7 @@
 ### Added
 
 - Add regular variant of Fontin font
+- Add stubs for DPI scale overrides
 
 ## [0.2.5] - 2025-10-30
 
