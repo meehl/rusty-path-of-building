@@ -2,6 +2,10 @@
 
 ## [Unreleased] - ReleaseDate
 
+### Fixed
+
+- Fix missing window title during installation step
+
 ## [0.2.6] - 2025-10-31
 
 ### Added
@@ -100,8 +104,8 @@
 - First release
 
 <!-- next-url -->
-[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.6...HEAD
 
+[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.6...HEAD
 [0.2.6]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.3...v0.2.4

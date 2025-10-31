@@ -1,4 +1,5 @@
 use crate::{
+    args::Game,
     dpi::{ConvertToLogical, PhysicalPoint, PhysicalSize},
     fonts::{FontData, FontDefinitions, Fonts},
     gfx::{GraphicsContext, RenderJob},
@@ -131,6 +132,11 @@ impl ApplicationHandler<GraphicsContext> for App {
                 return;
             }
         };
+
+        match Game::current() {
+            Game::Poe1 => window.set_title("Rusty Path of Building 1"),
+            Game::Poe2 => window.set_title("Rusty Path of Building 2"),
+        }
 
         self.state.window.set_window(Arc::clone(&window));
 
