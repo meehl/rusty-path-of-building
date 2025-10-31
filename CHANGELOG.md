@@ -2,6 +2,8 @@
 
 ## [Unreleased] - ReleaseDate
 
+## [0.2.6] - 2025-10-31
+
 ### Added
 
 - Add regular variant of Fontin font
@@ -98,8 +100,9 @@
 - First release
 
 <!-- next-url -->
+[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.6...HEAD
 
-[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.5...HEAD
+[0.2.6]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.2...v0.2.3
