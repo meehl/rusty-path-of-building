@@ -1,8 +1,8 @@
 # Rusty Path of Building
 
-Rusty Path of Building is a cross-platform runtime for [Path of Building](https://github.com/PathOfBuildingCommunity/PathOfBuilding) and [Path of Building 2](https://github.com/PathOfBuildingCommunity/PathOfBuilding-PoE2). Like the [official runtime](https://github.com/PathOfBuildingCommunity/PathOfBuilding-SimpleGraphic), it serves as a host environment for PoB by implementing the API used by the application's Lua logic, as well as rendering, window management, and input handling.
+Rusty Path of Building is a cross-platform runtime environment for [Path of Building](https://github.com/PathOfBuildingCommunity/PathOfBuilding) and [Path of Building 2](https://github.com/PathOfBuildingCommunity/PathOfBuilding-PoE2). Like [SimpleGraphic](https://github.com/PathOfBuildingCommunity/PathOfBuilding-SimpleGraphic), PoB's official runtime environment, it implements the API functions required by PoB's Lua code, handles window management and input, and renders the UI.
 
-This project was primarily created to allow Path of Building to run natively on Linux. It is written in Rust (in case you couldn't already tell from the unimaginative name) and should run on all platforms, though only Linux has been tested so far.
+The primary goal of this project is to provide native Linux support for Path of Building. It is written in Rust with cross-platform compatibility in mind and also runs on Windows, though testing there has been minimal.
 
 ## Usage
 
