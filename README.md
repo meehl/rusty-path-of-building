@@ -14,9 +14,13 @@ rusty-path-of-building [poe1|poe2]
 
 ### Arch (AUR)
 
-[![Stable version badge](https://img.shields.io/aur/version/rusty-path-of-building?style=flat&label=rusty-path-of-building)](https://aur.archlinux.org/packages/rusty-path-of-building)
+[![Stable version badge](https://img.shields.io/aur/version/rusty-path-of-building)](https://aur.archlinux.org/packages/rusty-path-of-building)
 
 Please check [the Arch Wiki](https://wiki.archlinux.org/title/Arch_User_Repository) on how to install packages from the AUR.
+
+### Flathub
+
+[![Stable version badge](https://img.shields.io/flathub/v/community.pathofbuilding.PathOfBuilding)](https://flathub.org/en/apps/community.pathofbuilding.PathOfBuilding)
 
 ### Building from source
 
