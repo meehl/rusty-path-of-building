@@ -2,6 +2,10 @@
 
 ## [Unreleased] - ReleaseDate
 
+### Added
+
+- Add missing window icon. Note for package maintainers: On Wayland, the name of the `.desktop` file entries needs to match RustyPoB's `app_id`. `app_id` is set to either `rusty-path-of-building-1` or `rusty-path-of-building-2`, depending on the game argument.
+
 ### Fixed
 
 - Fix missing window title during installation step

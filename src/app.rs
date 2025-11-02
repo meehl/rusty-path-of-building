@@ -18,6 +18,7 @@ use winit::{
     event::*,
     event_loop::ActiveEventLoop,
     keyboard::{ModifiersState, PhysicalKey},
+    platform::wayland::WindowAttributesExtWayland,
     window::Window,
 };
 
@@ -124,7 +125,19 @@ impl App {
 
 impl ApplicationHandler<GraphicsContext> for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let window = match event_loop.create_window(Window::default_attributes()) {
+        let (title, app_id) = match Game::current() {
+            Game::Poe1 => ("Path of Building 1", "rusty-path-of-building-1"),
+            Game::Poe2 => ("Path of Building 2", "rusty-path-of-building-2"),
+        };
+
+        let window_attributes = Window::default_attributes()
+            .with_title(title)
+            .with_window_icon(load_icon()) // only works on windows and x11
+            // on wayland we need an `app_id` that matches the name of a `.desktop` entry to load
+            // the icon
+            .with_name(app_id, app_id);
+
+        let window = match event_loop.create_window(window_attributes) {
             Ok(window) => Arc::new(window),
             Err(err) => {
                 log::error!("{err}");
@@ -132,11 +145,6 @@ impl ApplicationHandler<GraphicsContext> for App {
                 return;
             }
         };
-
-        match Game::current() {
-            Game::Poe1 => window.set_title("Rusty Path of Building 1"),
-            Game::Poe2 => window.set_title("Rusty Path of Building 2"),
-        }
 
         self.state.window.set_window(Arc::clone(&window));
 
@@ -347,4 +355,11 @@ fn pob_font_definitions() -> FontDefinitions {
     );
 
     definitions
+}
+
+fn load_icon() -> Option<winit::window::Icon> {
+    let image_data = include_bytes!("../assets/icon.png");
+    let image = image::load_from_memory(image_data).ok()?.into_rgba8();
+    let (width, height) = image.dimensions();
+    winit::window::Icon::from_rgba(image.into_raw(), width, height).ok()
 }
