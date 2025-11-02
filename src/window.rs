@@ -28,6 +28,9 @@ impl WindowState {
             window.set_title(&title);
         }
 
+        let winit::dpi::PhysicalSize { width, height } = window.inner_size();
+        self.size = PhysicalSize::new(width, height);
+        self.scale_factor = window.scale_factor() as f32;
         self.window = Some(window);
     }
 

@@ -5,6 +5,7 @@
 ### Fixed
 
 - Fix missing window title during installation step
+- Fix UI scaling factor not being applied at startup on X11
 
 ## [0.2.6] - 2025-10-31
 

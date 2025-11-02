@@ -18,7 +18,8 @@ pub fn get_screen_size(l: &Lua, _: ()) -> LuaResult<(u32, u32)> {
 
 pub fn get_screen_scale(l: &Lua, _: ()) -> LuaResult<f32> {
     let ctx = l.app_data_ref::<&'static Context>().unwrap();
-    Ok(ctx.window().scale_factor)
+    let scale_factor = ctx.window().scale_factor;
+    Ok(scale_factor)
 }
 
 pub fn set_window_title(l: &Lua, title: String) -> LuaResult<()> {
