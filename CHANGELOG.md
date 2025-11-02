@@ -2,6 +2,8 @@
 
 ## [Unreleased] - ReleaseDate
 
+## [0.2.7] - 2025-11-02
+
 ### Added
 
 - Add missing window icon. Note for package maintainers: On Wayland, the name of the `.desktop` file entries needs to match RustyPoB's `app_id`. `app_id` is set to either `rusty-path-of-building-1` or `rusty-path-of-building-2`, depending on the game argument.
@@ -109,8 +111,9 @@
 - First release
 
 <!-- next-url -->
+[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.7...HEAD
 
-[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.6...HEAD
+[0.2.7]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.3...v0.2.4
