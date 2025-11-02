@@ -1,5 +1,5 @@
 use crate::{
-    lua::ContextSocket,
+    lua::Context,
     renderer::textures::{TextureHandle, TextureOptions},
 };
 use mlua::{Lua, MultiValue, Result as LuaResult, UserData};
@@ -56,7 +56,7 @@ fn load(
     handle: &mut ImageHandle,
     (image_path, flags): (String, MultiValue),
 ) -> LuaResult<()> {
-    let socket = lua.app_data_ref::<&'static ContextSocket>().unwrap();
+    let ctx = lua.app_data_ref::<&'static Context>().unwrap();
     let mut is_async = false;
     let mut options = TextureOptions::LINEAR_REPEAT;
 
@@ -76,7 +76,7 @@ fn load(
         // replace image data if already allocated
         ImageHandle::Loaded(texture_handle) => {
             // in case of error, stay loaded with current texture
-            let _ = socket.texture_manager().update_texture(
+            let _ = ctx.texture_manager().update_texture(
                 texture_handle.id(),
                 image_path,
                 options,
@@ -85,7 +85,7 @@ fn load(
         }
         // create new texture handle
         ImageHandle::Unloaded => {
-            if let Ok(tex_handle) = socket
+            if let Ok(tex_handle) = ctx
                 .texture_manager()
                 .load_texture(image_path, options, is_async)
             {

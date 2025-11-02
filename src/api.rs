@@ -18,7 +18,7 @@ use crate::{
             set_foreground, set_window_title,
         },
     },
-    lua::ContextSocket,
+    lua::Context,
 };
 use mlua::{IntoLuaMulti, Lua, MultiValue, Result as LuaResult, Variadic};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -129,8 +129,8 @@ fn strip_escapes(_: &Lua, text: String) -> LuaResult<String> {
 }
 
 fn restart(l: &Lua, _: ()) -> LuaResult<()> {
-    let socket = l.app_data_ref::<&'static ContextSocket>().unwrap();
-    *socket.needs_restart() = true;
+    let ctx = l.app_data_ref::<&'static Context>().unwrap();
+    *ctx.needs_restart() = true;
     Ok(())
 }
 
@@ -142,10 +142,10 @@ fn open_url(l: &Lua, url: String) -> LuaResult<MultiValue> {
 }
 
 fn render_init(l: &Lua, features: Variadic<String>) -> LuaResult<()> {
-    let socket = l.app_data_ref::<&'static ContextSocket>().unwrap();
+    let ctx = l.app_data_ref::<&'static Context>().unwrap();
     for feature in features {
         if feature == "DPI_AWARE" {
-            *socket.is_dpi_aware() = true;
+            *ctx.is_dpi_aware() = true;
         }
     }
     Ok(())

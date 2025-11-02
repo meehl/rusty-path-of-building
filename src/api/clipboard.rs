@@ -1,9 +1,9 @@
-use crate::lua::ContextSocket;
+use crate::lua::Context;
 use mlua::{Lua, Result as LuaResult};
 
 pub fn copy(l: &Lua, text: String) -> LuaResult<()> {
-    let socket = l.app_data_ref::<&'static ContextSocket>().unwrap();
-    socket
+    let ctx = l.app_data_ref::<&'static Context>().unwrap();
+    ctx
         .clipboard()
         .set_text(text)
         .map_err(|e| anyhow::anyhow!("{}", e))?;
@@ -11,8 +11,8 @@ pub fn copy(l: &Lua, text: String) -> LuaResult<()> {
 }
 
 pub fn paste(l: &Lua, _: ()) -> LuaResult<String> {
-    let socket = l.app_data_ref::<&'static ContextSocket>().unwrap();
-    let text = socket
+    let ctx = l.app_data_ref::<&'static Context>().unwrap();
+    let text = ctx
         .clipboard()
         .get_text()
         .map_err(|e| anyhow::anyhow!("{}", e))?;

@@ -21,7 +21,7 @@ use std::{
     rc::Rc,
 };
 
-macro_rules! socket_accessor {
+macro_rules! ctx_accessor {
     ($field:ident: & $ty:ty) => {
         pub fn $field(&self) -> &$ty {
             let ptr = self.$field.get();
@@ -42,9 +42,9 @@ macro_rules! socket_accessor {
 
 /// A collection of pointers needed by the API funtions.
 ///
-/// Before executing any lua code, we need to "plug" the [`PoBContext`] into
-/// the ContextSocket and "unplug" them afterwards.
-pub struct ContextSocket {
+/// Before executing any lua code, we need to "plug" the references into
+/// the Context and "unplug" them afterwards.
+pub struct Context {
     window: Cell<*const WindowState>,
     input: Cell<*const InputState>,
     fonts: Cell<*mut Fonts>,
@@ -56,7 +56,7 @@ pub struct ContextSocket {
     is_dpi_aware: Cell<*mut bool>,
 }
 
-impl ContextSocket {
+impl Context {
     pub fn new() -> &'static Self {
         Box::leak(Box::new(Self {
             window: Cell::new(std::ptr::null()),
@@ -96,15 +96,15 @@ impl ContextSocket {
         self.is_dpi_aware.set(std::ptr::null_mut());
     }
 
-    socket_accessor!(window: &WindowState);
-    socket_accessor!(input: &InputState);
-    socket_accessor!(fonts: &mut Fonts);
-    socket_accessor!(texture_manager: &mut WrappedTextureManager);
-    socket_accessor!(clipboard: &mut Clipboard);
-    socket_accessor!(current_working_dir: &mut PathBuf);
-    socket_accessor!(layers: &mut Layers);
-    socket_accessor!(needs_restart: &mut bool);
-    socket_accessor!(is_dpi_aware: &mut bool);
+    ctx_accessor!(window: &WindowState);
+    ctx_accessor!(input: &InputState);
+    ctx_accessor!(fonts: &mut Fonts);
+    ctx_accessor!(texture_manager: &mut WrappedTextureManager);
+    ctx_accessor!(clipboard: &mut Clipboard);
+    ctx_accessor!(current_working_dir: &mut PathBuf);
+    ctx_accessor!(layers: &mut Layers);
+    ctx_accessor!(needs_restart: &mut bool);
+    ctx_accessor!(is_dpi_aware: &mut bool);
 }
 
 pub enum PoBEvent {
@@ -183,9 +183,9 @@ impl LuaInstance {
 
         Self::register_package_paths(&lua)?;
 
-        // register "socket"
-        let socket = ContextSocket::new();
-        lua.set_app_data(socket);
+        // register context
+        let ctx = Context::new();
+        lua.set_app_data(ctx);
 
         // register callbacks
         api::register_globals(&lua)?;
@@ -194,15 +194,15 @@ impl LuaInstance {
     }
 
     /// Loads and executes PoB's Launch.lua script
-    pub fn launch(&self, ctx: &mut PoBContext) -> LuaResult<()> {
-        let socket = self.lua.app_data_ref::<&'static ContextSocket>().unwrap();
-        socket.set(ctx);
+    pub fn launch(&self, pob_ctx: &mut PoBContext) -> LuaResult<()> {
+        let ctx = self.lua.app_data_ref::<&'static Context>().unwrap();
+        ctx.set(pob_ctx);
 
         let script_dir = Game::script_dir();
         change_working_directory(script_dir.as_path())?;
         self.load(script_dir.join("Launch.lua")).exec()?;
 
-        socket.clear();
+        ctx.clear();
         Ok(())
     }
 
@@ -234,12 +234,12 @@ impl LuaInstance {
         }
     }
 
-    pub fn handle_event(&self, event: PoBEvent, ctx: &mut PoBContext) -> LuaResult<()> {
+    pub fn handle_event(&self, event: PoBEvent, pob_ctx: &mut PoBContext) -> LuaResult<()> {
         profiling::scope!("handle_event", format!("{}", event));
 
-        // "Plug" references into "socket"
-        let socket = self.lua.app_data_ref::<&'static ContextSocket>().unwrap();
-        socket.set(ctx);
+        // "Plug" references into context
+        let ctx = self.lua.app_data_ref::<&'static Context>().unwrap();
+        ctx.set(pob_ctx);
 
         // Call event handler in PoB application code
         let handler_result = match event {
@@ -259,8 +259,8 @@ impl LuaInstance {
             }
         };
 
-        // "Unplug" references from "socket"
-        socket.clear();
+        // "Unplug" references from context
+        ctx.clear();
 
         handler_result
     }

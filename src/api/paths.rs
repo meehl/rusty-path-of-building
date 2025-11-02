@@ -3,7 +3,7 @@ use std::{fs, path::PathBuf};
 
 use crate::{
     args::Game,
-    lua::ContextSocket,
+    lua::Context,
     util::{change_working_directory, get_executable_dir},
 };
 
@@ -25,15 +25,15 @@ pub fn get_runtime_path(_: &Lua, _: ()) -> LuaResult<PathBuf> {
 }
 
 pub fn get_work_dir(l: &Lua, _: ()) -> LuaResult<PathBuf> {
-    let socket = l.app_data_ref::<&'static ContextSocket>().unwrap();
-    Ok(socket.current_working_dir().to_path_buf())
+    let ctx = l.app_data_ref::<&'static Context>().unwrap();
+    Ok(ctx.current_working_dir().to_path_buf())
 }
 
 // NOTE: unused
 pub fn set_work_dir(l: &Lua, path: String) -> LuaResult<()> {
-    let socket = l.app_data_ref::<&'static ContextSocket>().unwrap();
+    let ctx = l.app_data_ref::<&'static Context>().unwrap();
     if change_working_directory(&path).is_ok() {
-        *socket.current_working_dir() = path.into();
+        *ctx.current_working_dir() = path.into();
     }
     Ok(())
 }
