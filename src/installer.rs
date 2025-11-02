@@ -137,7 +137,7 @@ impl InstallMode {
         };
         job.append(&progress_text, Srgba::WHITE);
 
-        let layout = app_state.fonts.layout(job, app_state.window.scale_factor);
+        let layout = app_state.fonts.layout(job, app_state.window.scale_factor());
 
         // center text vertically and horizontally
         let screen_size = app_state.window.logical_size().cast::<f32>();

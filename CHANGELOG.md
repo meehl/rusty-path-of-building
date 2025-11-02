@@ -2,6 +2,10 @@
 
 ## [Unreleased] - ReleaseDate
 
+### Added
+
+- Implement UI scale overriding
+
 ### Changed
 
 - Reduce CPU usage while window is unfocused and not hovered over

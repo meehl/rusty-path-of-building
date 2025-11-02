@@ -11,7 +11,8 @@ pub struct WindowState {
     clipboard: Option<Clipboard>,
     pub window: Option<Arc<Window>>,
     pub size: PhysicalSize<u32>,
-    pub scale_factor: f32,
+    scale_factor: f32,
+    pub scale_factor_override: Option<f32>,
     pending_window_title: std::cell::Cell<Option<String>>,
     pub is_hovered: bool,
     pub is_focused: bool,
@@ -23,6 +24,7 @@ impl Default for WindowState {
             window: None,
             size: Default::default(),
             scale_factor: 1.0,
+            scale_factor_override: None,
             pending_window_title: std::cell::Cell::new(None),
             clipboard: None,
             is_hovered: true,
@@ -55,7 +57,15 @@ impl WindowState {
     }
 
     pub fn logical_size(&self) -> LogicalSize<u32> {
-        self.size.to_logical(self.scale_factor)
+        self.size.to_logical(self.scale_factor())
+    }
+
+    pub fn scale_factor(&self) -> f32 {
+        self.scale_factor_override.unwrap_or(self.scale_factor)
+    }
+
+    pub fn set_scale_factor(&mut self, scale_factor: f32) {
+        self.scale_factor = scale_factor;
     }
 
     pub fn focus(&self) {

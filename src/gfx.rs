@@ -144,7 +144,11 @@ impl GraphicsContext {
         }
     }
 
-    pub fn render(&mut self, render_job: RenderJob) -> Result<(), wgpu::SurfaceError> {
+    pub fn render(
+        &mut self,
+        render_job: RenderJob,
+        scale_factor: f32,
+    ) -> Result<(), wgpu::SurfaceError> {
         profiling::scope!("render");
 
         if !self.is_surface_configured {
@@ -172,7 +176,6 @@ impl GraphicsContext {
         } = render_job
         {
             let screen_size = PhysicalSize::new(self.config.width, self.config.height);
-            let pixels_per_point = self.window.as_ref().scale_factor() as f32;
 
             // upload new textures
             self.renderer
@@ -184,7 +187,7 @@ impl GraphicsContext {
                 &self.queue,
                 &meshes,
                 screen_size,
-                pixels_per_point,
+                scale_factor,
             );
 
             let rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -212,7 +215,7 @@ impl GraphicsContext {
                 &mut rpass.forget_lifetime(),
                 &meshes,
                 screen_size,
-                pixels_per_point,
+                scale_factor,
             );
 
             self.renderer.free_textures(&textures_delta);

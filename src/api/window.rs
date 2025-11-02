@@ -18,7 +18,7 @@ pub fn get_screen_size(l: &Lua, _: ()) -> LuaResult<(u32, u32)> {
 
 pub fn get_screen_scale(l: &Lua, _: ()) -> LuaResult<f32> {
     let ctx = l.app_data_ref::<&'static Context>().unwrap();
-    let scale_factor = ctx.window().scale_factor;
+    let scale_factor = ctx.window().scale_factor();
     Ok(scale_factor)
 }
 
@@ -34,12 +34,20 @@ pub fn set_foreground(l: &Lua, _: ()) -> LuaResult<()> {
     Ok(())
 }
 
-pub fn set_dpi_scale_override(_: &Lua, _percent: i32) -> LuaResult<()> {
-    // TODO:
+pub fn set_dpi_scale_override(l: &Lua, percent: i32) -> LuaResult<()> {
+    let socket = l.app_data_ref::<&'static Context>().unwrap();
+    match percent {
+        0 => socket.window().scale_factor_override = None,
+        p if p > 0 => socket.window().scale_factor_override = Some(p as f32 / 100.0),
+        _ => {}
+    }
     Ok(())
 }
 
-pub fn get_dpi_scale_override(_: &Lua, _: ()) -> LuaResult<i32> {
-    // TODO:
-    Ok(0)
+pub fn get_dpi_scale_override(l: &Lua, _: ()) -> LuaResult<i32> {
+    let socket = l.app_data_ref::<&'static Context>().unwrap();
+    match socket.window().scale_factor_override {
+        Some(scale_factor) => Ok((scale_factor * 100.0) as i32),
+        None => Ok(0),
+    }
 }

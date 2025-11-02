@@ -390,9 +390,8 @@ unsafe extern "C-unwind" fn draw_string(state: *mut ffi::lua_State) -> c_int {
         ctx.layers().set_draw_color(last_segment.color);
     }
 
-    let layout = ctx.fonts().layout(job, ctx.window().scale_factor);
-    ctx
-        .layers()
+    let layout = ctx.fonts().layout(job, ctx.window().scale_factor());
+    ctx.layers()
         .draw_text(position, layout, is_absolute_position);
 
     0
@@ -415,9 +414,7 @@ unsafe extern "C-unwind" fn get_string_width(state: *mut ffi::lua_State) -> c_in
     };
 
     let job = build_layout_job(text, Srgba::WHITE, font_type, line_height, None);
-    let width = ctx
-        .fonts()
-        .get_text_width(job, ctx.window().scale_factor);
+    let width = ctx.fonts().get_text_width(job, ctx.window().scale_factor());
 
     unsafe { ffi::lua_pushnumber(state, width as f64) };
     1
@@ -436,7 +433,7 @@ fn get_index_at_cur(
     let index = ctx.fonts().get_text_index_at_cursor(
         job,
         Point::new(cur_x, cur_y),
-        ctx.window().scale_factor,
+        ctx.window().scale_factor(),
     );
 
     // convert to lua's 1-based indexing

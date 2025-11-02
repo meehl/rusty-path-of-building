@@ -32,7 +32,7 @@ pub struct AppState {
 impl AppState {
     fn set_mouse_pos(&mut self, pos: PhysicalPoint<f32>) {
         self.input
-            .set_mouse_pos(pos.to_logical(self.window.scale_factor));
+            .set_mouse_pos(pos.to_logical(self.window.scale_factor()));
     }
 }
 
@@ -98,7 +98,7 @@ impl App {
             let meshes = self.tessellator.convert_clipped_primitives(
                 mode_output.primitives,
                 font_atlas_size,
-                self.state.window.scale_factor,
+                self.state.window.scale_factor(),
             );
 
             RenderJob::Render {
@@ -209,7 +209,7 @@ impl ApplicationHandler<GraphicsContext> for App {
                     };
 
                     if let Some(ref mut gfx) = self.gfx_context {
-                        match gfx.render(render_job) {
+                        match gfx.render(render_job, self.state.window.scale_factor()) {
                             Ok(_) => {
                                 self.force_render = should_continue;
 
@@ -242,7 +242,7 @@ impl ApplicationHandler<GraphicsContext> for App {
                 }
             }
             WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
-                self.state.window.scale_factor = scale_factor as f32;
+                self.state.window.set_scale_factor(scale_factor as f32);
             }
             WindowEvent::KeyboardInput {
                 event:
