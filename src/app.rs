@@ -18,7 +18,6 @@ use winit::{
     event::*,
     event_loop::ActiveEventLoop,
     keyboard::{ModifiersState, PhysicalKey},
-    platform::wayland::WindowAttributesExtWayland,
     window::Window,
 };
 
@@ -121,40 +120,47 @@ impl App {
             log::error!("{err}");
         }
     }
-}
 
-impl ApplicationHandler<GraphicsContext> for App {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let (title, app_id) = match Game::current() {
+    fn create_window(&mut self, event_loop: &ActiveEventLoop) -> anyhow::Result<()> {
+        let (title, _app_id) = match Game::current() {
             Game::Poe1 => ("Path of Building 1", "rusty-path-of-building-1"),
             Game::Poe2 => ("Path of Building 2", "rusty-path-of-building-2"),
         };
 
-        let window_attributes = Window::default_attributes()
+        #[allow(unused_mut)]
+        let mut window_attributes = Window::default_attributes()
             .with_title(title)
-            .with_window_icon(load_icon()) // only works on windows and x11
-            // on wayland we need an `app_id` that matches the name of a `.desktop` entry to load
-            // the icon
-            .with_name(app_id, app_id);
+            .with_window_icon(load_icon());
 
-        let window = match event_loop.create_window(window_attributes) {
-            Ok(window) => Arc::new(window),
-            Err(err) => {
-                log::error!("{err}");
-                event_loop.exit();
-                return;
+        #[cfg(target_os = "linux")]
+        {
+            use winit::platform::wayland::ActiveEventLoopExtWayland;
+            use winit::platform::x11::ActiveEventLoopExtX11;
+
+            if event_loop.is_x11() {
+                use winit::platform::x11::WindowAttributesExtX11;
+                window_attributes = window_attributes.with_name(_app_id, _app_id);
+            } else if event_loop.is_wayland() {
+                use winit::platform::wayland::WindowAttributesExtWayland;
+                window_attributes = window_attributes.with_name(_app_id, _app_id);
             }
-        };
+        }
 
+        let window = event_loop.create_window(window_attributes)?;
+        let window = Arc::new(window);
         self.state.window.set_window(Arc::clone(&window));
+        self.gfx_context = Some(pollster::block_on(GraphicsContext::new(window))?);
 
-        self.gfx_context = match pollster::block_on(GraphicsContext::new(window)) {
-            Ok(gfx) => Some(gfx),
-            Err(err) => {
-                log::error!("{err}");
-                event_loop.exit();
-                return;
-            }
+        Ok(())
+    }
+}
+
+impl ApplicationHandler<GraphicsContext> for App {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        if let Err(err) = self.create_window(event_loop) {
+            log::error!("{err}");
+            event_loop.exit();
+            return;
         }
     }
 
