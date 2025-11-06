@@ -14,11 +14,8 @@ use anyhow::Result;
 use arboard::Clipboard;
 use std::sync::Arc;
 use winit::{
-    application::ApplicationHandler,
-    event::*,
-    event_loop::ActiveEventLoop,
-    keyboard::{ModifiersState, PhysicalKey},
-    window::Window,
+    application::ApplicationHandler, event::*, event_loop::ActiveEventLoop, keyboard::PhysicalKey,
+    platform::modifier_supplement::KeyEventExtModifierSupplement, window::Window,
 };
 
 struct FrameOutput {
@@ -222,16 +219,17 @@ impl ApplicationHandler<GraphicsContext> for App {
             }
             WindowEvent::KeyboardInput {
                 event:
-                    KeyEvent {
+                    key_event @ KeyEvent {
                         physical_key: PhysicalKey::Code(code),
-                        logical_key,
                         state,
                         ..
                     },
                 ..
             } => {
+                // update input state
                 self.state.input.set_key_pressed(code, state.is_pressed());
 
+                // forward KeyUp/KeyDown events
                 let event = match state {
                     ElementState::Pressed => AppEvent::KeyDown { code },
                     ElementState::Released => AppEvent::KeyUp { code },
@@ -239,25 +237,12 @@ impl ApplicationHandler<GraphicsContext> for App {
                 self.handle_event(event);
 
                 // handle text input
-                if state.is_pressed() {
-                    match logical_key {
-                        winit::keyboard::Key::Character(text) => {
-                            // only emit event if no modifier except Shift is pressed.
-                            let modifiers = self.state.input.key_modifiers;
-                            if modifiers.difference(ModifiersState::SHIFT).is_empty() {
-                                for ch in text.chars() {
-                                    let event = AppEvent::CharacterInput { ch };
-                                    self.handle_event(event);
-                                }
-                            }
-                        }
-                        winit::keyboard::Key::Named(named) => {
-                            if named == winit::keyboard::NamedKey::Space {
-                                let event = AppEvent::CharacterInput { ch: ' ' };
-                                self.handle_event(event);
-                            }
-                        }
-                        _ => {}
+                if let Some(text) = key_event.text_with_all_modifiers()
+                    && state.is_pressed()
+                {
+                    for ch in text.chars() {
+                        let event = AppEvent::CharacterInput { ch };
+                        self.handle_event(event);
                     }
                 }
             }
