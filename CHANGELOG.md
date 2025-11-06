@@ -5,6 +5,7 @@
 ### Changed
 
 - Replace non-ASCII characters in text input with '?'
+- Use `smithay-clipboard` crate for clipboard support on Wayland
 
 ## [0.2.7] - 2025-11-02
 

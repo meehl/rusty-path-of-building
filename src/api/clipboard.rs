@@ -3,18 +3,11 @@ use mlua::{Lua, Result as LuaResult};
 
 pub fn copy(l: &Lua, text: String) -> LuaResult<()> {
     let ctx = l.app_data_ref::<&'static Context>().unwrap();
-    ctx
-        .clipboard()
-        .set_text(text)
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
+    ctx.window().set_clipboard_text(text);
     Ok(())
 }
 
-pub fn paste(l: &Lua, _: ()) -> LuaResult<String> {
+pub fn paste(l: &Lua, _: ()) -> LuaResult<Option<String>> {
     let ctx = l.app_data_ref::<&'static Context>().unwrap();
-    let text = ctx
-        .clipboard()
-        .get_text()
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
-    Ok(text)
+    Ok(ctx.window().get_clipboard_text())
 }

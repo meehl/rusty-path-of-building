@@ -11,7 +11,6 @@ use crate::{
     window::WindowState,
 };
 use anyhow::Result;
-use arboard::Clipboard;
 use std::sync::Arc;
 use winit::{
     application::ApplicationHandler, event::*, event_loop::ActiveEventLoop, keyboard::PhysicalKey,
@@ -27,7 +26,6 @@ pub struct AppState {
     pub input: InputState,
     pub fonts: Fonts,
     pub texture_manager: WrappedTextureManager,
-    pub clipboard: Clipboard,
 }
 
 impl AppState {
@@ -54,7 +52,6 @@ impl App {
                 input: InputState::default(),
                 fonts: Fonts::new(pob_font_definitions()),
                 texture_manager: WrappedTextureManager::new(),
-                clipboard: arboard::Clipboard::new()?,
             },
             tessellator: Tessellator::default(),
             force_render: false,

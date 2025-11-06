@@ -11,7 +11,7 @@ publish = false
 [dependencies]
 ahash = "0.8.12"
 anyhow = "1.0"
-arboard = { version = "3.6.1", default-features = false, features = ["wayland-data-control"] }
+arboard = { version = "3.6.1", default-features = false }
 bytemuck = "1.23.2"
 clap = { version = "4.5.46", features = ["derive"] }
 dds = "0.1.0"
@@ -32,6 +32,7 @@ parley = "0.6.0"
 pollster = "0.3"
 profiling = "1.0"
 puffin_http = { version = "0.16", optional = true }
+raw-window-handle = "0.6.2"
 regex = "1.11.2"
 swash = "0.2.5"
 tar = "0.4.44"
@@ -39,6 +40,9 @@ ureq = "3.1.2"
 wgpu = { version = "27.0.1", default-features = false, features = ["std", "parking_lot", "vulkan", "wgsl"] }
 winit = "0.30"
 zstd = "0.13.3"
+
+[target.'cfg(unix)'.dependencies]
+smithay-clipboard = "0.7.3"
 
 [features]
 profile-with-puffin = ["profiling/profile-with-puffin", "dep:puffin_http"]

@@ -12,7 +12,6 @@ use crate::{
     util::change_working_directory,
     window::WindowState,
 };
-use arboard::Clipboard;
 use clap::Parser;
 use mlua::{Lua, Result as LuaResult, Table};
 use std::{
@@ -45,11 +44,10 @@ macro_rules! ctx_accessor {
 /// Before executing any lua code, we need to "plug" the references into
 /// the Context and "unplug" them afterwards.
 pub struct Context {
-    window: Cell<*const WindowState>,
+    window: Cell<*mut WindowState>,
     input: Cell<*const InputState>,
     fonts: Cell<*mut Fonts>,
     texture_manager: Cell<*mut WrappedTextureManager>,
-    clipboard: Cell<*mut Clipboard>,
     current_working_dir: Cell<*mut PathBuf>,
     layers: Cell<*mut Layers>,
     needs_restart: Cell<*mut bool>,
@@ -59,11 +57,10 @@ pub struct Context {
 impl Context {
     pub fn new() -> &'static Self {
         Box::leak(Box::new(Self {
-            window: Cell::new(std::ptr::null()),
+            window: Cell::new(std::ptr::null_mut()),
             input: Cell::new(std::ptr::null()),
             fonts: Cell::new(std::ptr::null_mut()),
             texture_manager: Cell::new(std::ptr::null_mut()),
-            clipboard: Cell::new(std::ptr::null_mut()),
             current_working_dir: Cell::new(std::ptr::null_mut()),
             layers: Cell::new(std::ptr::null_mut()),
             needs_restart: Cell::new(std::ptr::null_mut()),
@@ -72,11 +69,10 @@ impl Context {
     }
 
     pub fn set(&self, ctx: &mut PoBContext) {
-        self.window.set(&ctx.app.window);
+        self.window.set(&mut ctx.app.window);
         self.input.set(&ctx.app.input);
         self.fonts.set(&mut ctx.app.fonts);
         self.texture_manager.set(&mut ctx.app.texture_manager);
-        self.clipboard.set(&mut ctx.app.clipboard);
         self.current_working_dir
             .set(&mut ctx.pob.current_working_dir);
         self.layers.set(&mut ctx.pob.layers);
@@ -85,22 +81,20 @@ impl Context {
     }
 
     pub fn clear(&self) {
-        self.window.set(std::ptr::null());
+        self.window.set(std::ptr::null_mut());
         self.input.set(std::ptr::null());
         self.fonts.set(std::ptr::null_mut());
         self.texture_manager.set(std::ptr::null_mut());
-        self.clipboard.set(std::ptr::null_mut());
         self.current_working_dir.set(std::ptr::null_mut());
         self.layers.set(std::ptr::null_mut());
         self.needs_restart.set(std::ptr::null_mut());
         self.is_dpi_aware.set(std::ptr::null_mut());
     }
 
-    ctx_accessor!(window: &WindowState);
+    ctx_accessor!(window: &mut WindowState);
     ctx_accessor!(input: &InputState);
     ctx_accessor!(fonts: &mut Fonts);
     ctx_accessor!(texture_manager: &mut WrappedTextureManager);
-    ctx_accessor!(clipboard: &mut Clipboard);
     ctx_accessor!(current_working_dir: &mut PathBuf);
     ctx_accessor!(layers: &mut Layers);
     ctx_accessor!(needs_restart: &mut bool);

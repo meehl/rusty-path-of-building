@@ -8,6 +8,7 @@ use winit::event_loop::EventLoop;
 mod api;
 mod app;
 mod args;
+mod clipboard;
 mod color;
 mod dpi;
 mod fonts;

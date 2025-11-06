@@ -1,10 +1,14 @@
+use crate::{
+    clipboard::Clipboard,
+    dpi::{ConvertToLogical, LogicalSize, PhysicalSize},
+};
+use raw_window_handle::HasDisplayHandle;
 use std::sync::Arc;
-
 use winit::window::Window;
 
-use crate::dpi::{ConvertToLogical, LogicalSize, PhysicalSize};
-
 pub struct WindowState {
+    // NOTE: clipboard needs to be destroyed before window
+    clipboard: Option<Clipboard>,
     pub window: Option<Arc<Window>>,
     pub size: PhysicalSize<u32>,
     pub scale_factor: f32,
@@ -18,6 +22,7 @@ impl Default for WindowState {
             size: Default::default(),
             scale_factor: 1.0,
             pending_window_title: std::cell::Cell::new(None),
+            clipboard: None,
         }
     }
 }
@@ -31,6 +36,9 @@ impl WindowState {
         let winit::dpi::PhysicalSize { width, height } = window.inner_size();
         self.size = PhysicalSize::new(width, height);
         self.scale_factor = window.scale_factor() as f32;
+
+        let raw_display_handle = window.display_handle().ok().map(|h| h.as_raw());
+        self.clipboard = Some(Clipboard::new(raw_display_handle));
         self.window = Some(window);
     }
 
@@ -49,6 +57,20 @@ impl WindowState {
     pub fn focus(&self) {
         if let Some(ref window) = self.window {
             window.focus_window();
+        }
+    }
+
+    pub fn set_clipboard_text(&mut self, text: String) {
+        if let Some(clipboard) = &mut self.clipboard {
+            clipboard.set_text(text);
+        }
+    }
+
+    pub fn get_clipboard_text(&mut self) -> Option<String> {
+        if let Some(clipboard) = &mut self.clipboard {
+            clipboard.get_text()
+        } else {
+            None
         }
     }
 }
