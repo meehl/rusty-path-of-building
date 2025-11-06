@@ -43,6 +43,5 @@ Please refer to the [Lua documentation](https://www.lua.org/manual/5.1/manual.ht
 
 ## Known Issues
 
-- The clipboard doesn't work with Wayland compositors that don't support the data-control extension(s). It is recommended to fall back to `Xwayland` in these cases. This can be done by unsetting `WAYLAND_DISPLAY`. More info here: https://github.com/1Password/arboard?tab=readme-ov-file#backend-support
 - Overriding UI scaling through the options is currently not implemented.
 - If automatic updates fail, navigate to `~/.local/share/RustyPathOfBuilding{1,2}/` and delete both the `rpob.version` file and the `Update` directory. This will force a complete re-download of PoB's latest assets and Lua code on the next startup. (Note: Third-party backends, like this project, face challenges supporting PoB's update mechanism. To make it work, fragile workarounds had to be implemented that can break unexpectedly)
