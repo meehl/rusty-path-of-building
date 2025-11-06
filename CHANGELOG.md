@@ -2,6 +2,10 @@
 
 ## [Unreleased] - ReleaseDate
 
+### Changed
+
+- Replace non-ASCII characters in text input with '?'
+
 ## [0.2.7] - 2025-11-02
 
 ### Added
@@ -111,8 +115,8 @@
 - First release
 
 <!-- next-url -->
-[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.7...HEAD
 
+[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.7...HEAD
 [0.2.7]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.4...v0.2.5
