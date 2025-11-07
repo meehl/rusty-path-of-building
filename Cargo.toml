@@ -4,7 +4,7 @@ authors = ["meehl"]
 description = "Cross-platform runtime for Path of Building"
 repository = "https://github.com/meehl/rusty-path-of-building"
 license = "MIT"
-version = "0.2.7"
+version = "0.2.8"
 edition = "2024"
 publish = false
 
