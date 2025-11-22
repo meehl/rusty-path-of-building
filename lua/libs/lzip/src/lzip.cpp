@@ -646,7 +646,7 @@ static int l_zipFile_Read(lua_State* L)
 	if (n < 1) {
 		luaL_error(L, "Usage: zipFile:Read(count) or zipFile:read(\"*a\")");
 	}
-	int count;
+	int count = 0;
 	if (lua_isnumber(L, 1)) {
 		count = lua_tointeger(L, 1);
 	} else {
