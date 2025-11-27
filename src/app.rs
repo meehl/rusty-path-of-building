@@ -154,7 +154,6 @@ impl ApplicationHandler<GraphicsContext> for App {
         if let Err(err) = self.create_window(event_loop) {
             log::error!("{err}");
             event_loop.exit();
-            return;
         }
     }
 
