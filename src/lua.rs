@@ -170,9 +170,9 @@ impl LuaInstance {
         // SAFETY: use `unsafe_new` to allow loading of C modules
         let lua = unsafe { Lua::unsafe_new() };
 
-        // expose build arg to lua
+        // expose import url to lua
         let args = Args::parse();
-        let args_table = lua.create_sequence_from(std::iter::once(args.build_path))?;
+        let args_table = lua.create_sequence_from(std::iter::once(args.import_url))?;
         lua.globals().set("arg", args_table)?;
 
         Self::register_package_paths(&lua)?;

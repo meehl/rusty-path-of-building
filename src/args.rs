@@ -9,7 +9,10 @@ pub struct Args {
     #[arg(value_enum)]
     pub game: Game,
 
-    pub build_path: Option<String>,
+    #[arg(
+        help = "URL of build to import on startup. Needs to use custom protocol schema, e.g. `pob://pobbin/<id>`"
+    )]
+    pub import_url: Option<String>,
 }
 
 #[derive(Debug, Clone, ValueEnum)]
