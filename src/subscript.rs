@@ -305,7 +305,7 @@ pub fn register_subscript_globals(
         "IsSubScriptRunning",
         lua.create_function(is_subscript_running)?,
     )?;
-    globals.set("IsSubScriptRunning", lua.create_function(abort_subscript)?)?;
+    globals.set("AbortSubScript", lua.create_function(abort_subscript)?)?;
     Ok(())
 }
 
