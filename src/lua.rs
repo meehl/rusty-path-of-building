@@ -13,7 +13,7 @@ use crate::{
     window::WindowState,
 };
 use clap::Parser;
-use mlua::{Lua, Result as LuaResult, Table};
+use mlua::{Function, Lua, Result as LuaResult, Table, ThreadStatus};
 use std::{
     cell::{Cell, RefCell},
     path::PathBuf,
@@ -226,6 +226,29 @@ impl LuaInstance {
                 }
             }
         }
+    }
+
+    pub fn has_running_subscripts(&self) -> bool {
+        self.subscript_manager.borrow().has_running_subscripts()
+    }
+
+    pub fn has_active_coroutine(&self) -> bool {
+        self.get_coroutines().is_ok_and(|coroutines| {
+            coroutines.pairs::<mlua::Thread, bool>().any(|pair| {
+                pair.is_ok_and(|(thread, _)| {
+                    matches!(
+                        thread.status(),
+                        ThreadStatus::Resumable | ThreadStatus::Running
+                    )
+                })
+            })
+        })
+    }
+
+    fn get_coroutines(&self) -> LuaResult<Table> {
+        let coroutine_module: Table = self.lua.globals().get("coroutine")?;
+        let list_func: Function = coroutine_module.get("_list")?;
+        list_func.call::<Table>(())
     }
 
     pub fn handle_event(&self, event: PoBEvent, pob_ctx: &mut PoBContext) -> LuaResult<()> {

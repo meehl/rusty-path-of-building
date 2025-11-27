@@ -13,6 +13,8 @@ pub struct WindowState {
     pub size: PhysicalSize<u32>,
     pub scale_factor: f32,
     pending_window_title: std::cell::Cell<Option<String>>,
+    pub is_hovered: bool,
+    pub is_focused: bool,
 }
 
 impl Default for WindowState {
@@ -23,6 +25,8 @@ impl Default for WindowState {
             scale_factor: 1.0,
             pending_window_title: std::cell::Cell::new(None),
             clipboard: None,
+            is_hovered: true,
+            is_focused: true,
         }
     }
 }
@@ -71,6 +75,12 @@ impl WindowState {
             clipboard.get_text()
         } else {
             None
+        }
+    }
+
+    pub fn request_redraw(&self) {
+        if let Some(ref window) = self.window {
+            window.request_redraw();
         }
     }
 }

@@ -68,9 +68,14 @@ impl PoBMode {
         let identical = layers_hash == self.previous_layers_hash;
         self.previous_layers_hash = layers_hash;
 
+        let has_active_subscript = self.lua_instance.has_running_subscripts();
+        let has_active_coroutine = self.lua_instance.has_active_coroutine();
+        let should_continue = has_active_subscript || has_active_coroutine;
+
         Ok(ModeFrameOutput {
             primitives: self.state.layers.consume_layers(),
             can_elide: identical,
+            should_continue,
         })
     }
 

@@ -34,6 +34,9 @@ pub enum ModeTransition {
 pub struct ModeFrameOutput {
     pub primitives: Box<dyn Iterator<Item = ClippedPrimitive>>,
     pub can_elide: bool,
+    /// Indicates that this should be redrawn again next frame even if user is not interacting with
+    /// window
+    pub should_continue: bool,
 }
 
 pub enum AppMode {

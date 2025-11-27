@@ -73,6 +73,7 @@ impl InstallMode {
         Ok(ModeFrameOutput {
             primitives,
             can_elide: false,
+            should_continue: true,
         })
     }
 

@@ -147,8 +147,6 @@ impl GraphicsContext {
     pub fn render(&mut self, render_job: RenderJob) -> Result<(), wgpu::SurfaceError> {
         profiling::scope!("render");
 
-        self.window.request_redraw();
-
         if !self.is_surface_configured {
             return Ok(());
         }
@@ -217,7 +215,7 @@ impl GraphicsContext {
                 pixels_per_point,
             );
 
-            self.renderer.free_textures(&textures_delta)
+            self.renderer.free_textures(&textures_delta);
         }
 
         {

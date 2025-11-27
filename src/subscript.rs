@@ -74,6 +74,10 @@ impl SubscriptManager {
 
         results
     }
+
+    pub fn has_running_subscripts(&self) -> bool {
+        !self.scripts.is_empty()
+    }
 }
 
 enum SubscriptCall {

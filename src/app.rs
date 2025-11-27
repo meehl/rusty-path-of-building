@@ -19,6 +19,7 @@ use winit::{
 
 struct FrameOutput {
     pub render_job: RenderJob,
+    pub should_continue: bool,
 }
 
 pub struct AppState {
@@ -39,6 +40,7 @@ pub struct App {
     gfx_context: Option<GraphicsContext>,
     state: AppState,
     tessellator: Tessellator,
+    needs_reconfigure: bool,
     force_render: bool,
     current_mode: AppMode,
 }
@@ -54,7 +56,8 @@ impl App {
                 texture_manager: WrappedTextureManager::new(),
             },
             tessellator: Tessellator::default(),
-            force_render: false,
+            needs_reconfigure: true,
+            force_render: true,
             current_mode: AppMode::Install(InstallMode::new()),
         })
     }
@@ -92,8 +95,6 @@ impl App {
         {
             RenderJob::Skip
         } else {
-            self.force_render = false;
-
             let meshes = self.tessellator.convert_clipped_primitives(
                 mode_output.primitives,
                 font_atlas_size,
@@ -106,7 +107,10 @@ impl App {
             }
         };
 
-        Ok(FrameOutput { render_job })
+        Ok(FrameOutput {
+            render_job,
+            should_continue: mode_output.should_continue,
+        })
     }
 
     fn handle_event(&mut self, event: AppEvent) {
@@ -177,26 +181,50 @@ impl ApplicationHandler<GraphicsContext> for App {
                     return;
                 }
 
-                let render_job = match self.frame() {
-                    Ok(FrameOutput { render_job }) => render_job,
-                    Err(err) => {
-                        log::error!("{err}");
-                        event_loop.exit();
-                        return;
+                if self.needs_reconfigure {
+                    if let Some(ref mut gfx) = self.gfx_context {
+                        let size = gfx.window.inner_size();
+                        gfx.resize(size.width, size.height);
                     }
-                };
+                    self.needs_reconfigure = false;
+                    // Render at least one frame after reconfigure
+                    self.force_render = true;
+                }
 
-                if let Some(ref mut gfx) = self.gfx_context {
-                    match gfx.render(render_job) {
-                        Ok(_) => {}
-                        // Reconfigure the surface if it's lost or outdated
-                        Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
-                            let size = gfx.window.inner_size();
-                            gfx.resize(size.width, size.height);
-                            self.force_render = true;
-                        }
+                let is_focused = self.state.window.is_focused;
+                let is_hovered = self.state.window.is_hovered;
+                let should_render = is_focused || is_hovered || self.force_render;
+
+                if should_render {
+                    let FrameOutput {
+                        render_job,
+                        should_continue,
+                    } = match self.frame() {
+                        Ok(frame_output) => frame_output,
                         Err(err) => {
-                            log::error!("Unable to render: {err}");
+                            log::error!("{err}");
+                            event_loop.exit();
+                            return;
+                        }
+                    };
+
+                    if let Some(ref mut gfx) = self.gfx_context {
+                        match gfx.render(render_job) {
+                            Ok(_) => {
+                                self.force_render = should_continue;
+
+                                if is_focused || is_hovered || should_continue {
+                                    self.state.window.request_redraw();
+                                }
+                            }
+                            // Reconfigure the surface if it's lost or outdated
+                            Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
+                                self.needs_reconfigure = true;
+                                self.state.window.request_redraw();
+                            }
+                            Err(err) => {
+                                log::error!("Unable to render: {err}");
+                            }
                         }
                     }
                 }
@@ -204,11 +232,14 @@ impl ApplicationHandler<GraphicsContext> for App {
                 profiling::finish_frame!();
             }
             WindowEvent::Resized(size) => {
-                if let Some(ref mut gfx) = self.gfx_context {
-                    gfx.resize(size.width, size.height);
-                    self.force_render = true;
-                }
                 self.state.window.size = PhysicalSize::new(size.width, size.height);
+                self.needs_reconfigure = true;
+            }
+            WindowEvent::Focused(focused) => {
+                self.state.window.is_focused = focused;
+                if focused {
+                    self.state.window.request_redraw();
+                }
             }
             WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
                 self.state.window.scale_factor = scale_factor as f32;
@@ -263,6 +294,13 @@ impl ApplicationHandler<GraphicsContext> for App {
             WindowEvent::CursorMoved { position, .. } => {
                 let pos = PhysicalPoint::new(position.x as f32, position.y as f32);
                 self.state.set_mouse_pos(pos);
+            }
+            WindowEvent::CursorEntered { .. } => {
+                self.state.window.is_hovered = true;
+                self.state.window.request_redraw();
+            }
+            WindowEvent::CursorLeft { .. } => {
+                self.state.window.is_hovered = false;
             }
             WindowEvent::MouseWheel { delta, .. } => {
                 let delta = match delta {
