@@ -7,7 +7,6 @@ use crate::{
     mode::{AppEvent, ModeFrameOutput, ModeTransition},
     renderer::primitives::{ClippedPrimitive, DrawPrimitive, TextPrimitive},
 };
-use anyhow::bail;
 use flate2::read::GzDecoder;
 use parley::{FontFamily, GenericFamily};
 use regex::Regex;
@@ -161,10 +160,10 @@ fn install<P: AsRef<Path>>(
     progress_tx: &mpsc::Sender<Progress>,
 ) -> anyhow::Result<()> {
     // Skip installation if version file exists
+    let current_version = env!("CARGO_PKG_VERSION");
     let version_file_path = target_dir.as_ref().join("rpob.version");
     if version_file_path.exists() {
         let old_version = fs::read_to_string(&version_file_path).unwrap();
-        let current_version = env!("CARGO_PKG_VERSION");
 
         if old_version != current_version {
             log::info!("New version detected: {old_version} -> {current_version}");
@@ -174,7 +173,11 @@ fn install<P: AsRef<Path>>(
         return Ok(());
     }
 
-    download_path_of_building(&target_dir, progress_tx)?;
+    let compatibility_info = fetch_compatibility_info()?;
+    let needed_pob_version = highest_supported_pob_version(&compatibility_info, current_version)
+        .ok_or_else(|| anyhow::anyhow!("Unable to determine supported PoB version"))?;
+
+    download_path_of_building(&target_dir, needed_pob_version, progress_tx)?;
     replace_updatecheck(&target_dir)?;
     set_branch_and_platform(&target_dir)?;
 
@@ -184,9 +187,73 @@ fn install<P: AsRef<Path>>(
     Ok(())
 }
 
-/// Downloads latest release of Path of Building
+#[derive(Debug)]
+struct VersionReq {
+    pob_ver: String,
+    min_rpob_ver: String,
+}
+
+/// Fetches and evaluates compatibility table
+fn fetch_compatibility_info() -> anyhow::Result<Vec<VersionReq>> {
+    let compatibility_info_file_name = match Game::current() {
+        Game::Poe1 => "Compatibility_pob1.lua",
+        Game::Poe2 => "Compatibility_pob2.lua",
+    };
+
+    let compatibility_info_file_url = &format!(
+        "https://raw.githubusercontent.com/{REPO_NAME}/main/{}",
+        compatibility_info_file_name
+    );
+
+    let compatibility_info_file = download_file_contents(compatibility_info_file_url)?;
+
+    // Load and evaluate compatibility file contents as Lua code
+    let lua = mlua::Lua::new();
+    let compatibility_table = lua.load(compatibility_info_file).eval::<mlua::Table>()?;
+
+    // Compatibility table maps PoB version to minimum required Rusty PoB version
+    Ok(compatibility_table
+        .pairs::<String, String>()
+        .filter_map(|p| p.ok())
+        .map(|(pob_version, min_req_rpob_ver)| VersionReq {
+            pob_ver: pob_version,
+            min_rpob_ver: min_req_rpob_ver,
+        })
+        .collect())
+}
+
+/// Determines highest PoB version supported by given Rusty PoB version
+fn highest_supported_pob_version<'a>(
+    compatibility_info: &'a Vec<VersionReq>,
+    rpob_version: &str,
+) -> Option<&'a str> {
+    let mut highest_pob_version = None;
+    for VersionReq {
+        pob_ver,
+        min_rpob_ver,
+    } in compatibility_info
+    {
+        if is_higher_version(min_rpob_ver, rpob_version).unwrap_or(false) {
+            // found PoB version that meets our minimum requirements
+            match highest_pob_version {
+                // make sure it is the highest PoB version possible
+                Some(h_pob_version) => {
+                    if is_higher_version(h_pob_version, pob_ver).unwrap_or(false) {
+                        highest_pob_version = Some(pob_ver.as_str());
+                    }
+                }
+                None => highest_pob_version = Some(pob_ver.as_str()),
+            }
+        }
+    }
+
+    highest_pob_version
+}
+
+/// Downloads specified version of Path of Building
 fn download_path_of_building<P: AsRef<Path>>(
     target_dir: P,
+    pob_version: &str,
     progress_tx: &mpsc::Sender<Progress>,
 ) -> anyhow::Result<()> {
     log::info!("Downloading Path of Building assets...");
@@ -196,8 +263,8 @@ fn download_path_of_building<P: AsRef<Path>>(
         Game::Poe2 => "PathOfBuildingCommunity/PathOfBuilding-PoE2",
     };
     let url = format!(
-        "https://github.com/{}/archive/refs/heads/master.tar.gz",
-        repo
+        "https://github.com/{}/archive/refs/tags/v{}.tar.gz",
+        repo, pob_version
     );
 
     let mut response = http_get_with_backoff(&url)?;
@@ -303,6 +370,7 @@ fn set_branch_and_platform<P: AsRef<Path>>(target_dir: P) -> anyhow::Result<()> 
     Ok(())
 }
 
+/// Downloads file and saves it to given path
 fn download_file<P: AsRef<Path>>(url: &str, file_path: P) -> anyhow::Result<()> {
     let mut response = http_get_with_backoff(url)?;
 
@@ -312,7 +380,19 @@ fn download_file<P: AsRef<Path>>(url: &str, file_path: P) -> anyhow::Result<()> 
         copy(&mut body.as_reader(), &mut file)?;
         Ok(())
     } else {
-        bail!("Unable to download: {}", url);
+        anyhow::bail!("Unable to download: {}", url);
+    }
+}
+
+/// Downloads file and returns contents as string
+fn download_file_contents(url: &str) -> anyhow::Result<String> {
+    let mut response = http_get_with_backoff(url)?;
+
+    if response.status().is_success() {
+        let body = response.body_mut();
+        Ok(body.read_to_string()?)
+    } else {
+        anyhow::bail!("Unable to download: {}", url);
     }
 }
 
@@ -431,5 +511,130 @@ fn http_get_with_backoff(url: &str) -> anyhow::Result<Response<ureq::Body>> {
         }
 
         return Ok(resp);
+    }
+}
+
+/// Compares two SemVer versions and returns true if v2 is higher or equal than v1
+fn is_higher_version(v1: &str, v2: &str) -> anyhow::Result<bool> {
+    let re = Regex::new(r"^(\d+)\.(\d+)\.(\d+)$").unwrap();
+
+    let parse_version = |v: &str| -> anyhow::Result<(u32, u32, u32)> {
+        let caps = re
+            .captures(v)
+            .ok_or_else(|| anyhow::anyhow!("Invalid semver format: {}", v))?;
+
+        let major = caps[1].parse::<u32>().unwrap();
+        let minor = caps[2].parse::<u32>().unwrap();
+        let patch = caps[3].parse::<u32>().unwrap();
+
+        Ok((major, minor, patch))
+    };
+
+    let (major1, minor1, patch1) = parse_version(v1)?;
+    let (major2, minor2, patch2) = parse_version(v2)?;
+
+    Ok(major2 > major1
+        || (major2 == major1 && minor2 > minor1)
+        || (major2 == major1 && minor2 == minor1 && patch2 >= patch1))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_major_version() {
+        assert_eq!(is_higher_version("1.0.0", "2.0.0").unwrap(), true);
+        assert_eq!(is_higher_version("2.0.0", "1.0.0").unwrap(), false);
+    }
+
+    #[test]
+    fn test_minor_version() {
+        assert_eq!(is_higher_version("1.5.0", "1.6.0").unwrap(), true);
+        assert_eq!(is_higher_version("1.10.0", "1.9.0").unwrap(), false);
+    }
+
+    #[test]
+    fn test_patch_version() {
+        assert_eq!(is_higher_version("1.0.3", "1.0.4").unwrap(), true);
+        assert_eq!(is_higher_version("1.0.10", "1.0.9").unwrap(), false);
+    }
+
+    #[test]
+    fn test_same_version() {
+        assert_eq!(is_higher_version("1.5.3", "1.5.3").unwrap(), true);
+    }
+
+    #[test]
+    fn test_invalid_semver_format() {
+        assert!(is_higher_version("1.0", "2.0.0").is_err());
+        assert!(is_higher_version("1.0.0", "2.0").is_err());
+        assert!(is_higher_version("invalid", "2.0.0").is_err());
+        assert!(is_higher_version("1.0.0", "a.bb.ccc").is_err());
+    }
+
+    #[test]
+    fn test_highest_supported_pob_ver() {
+        let compat_info = vec![
+            VersionReq {
+                pob_ver: String::from("2.56.0"),
+                min_rpob_ver: String::from("0.1.0"),
+            },
+            // compat info might not be sorted by pob_version
+            VersionReq {
+                pob_ver: String::from("2.58.0"),
+                min_rpob_ver: String::from("0.2.6"),
+            },
+            VersionReq {
+                pob_ver: String::from("2.57.0"),
+                min_rpob_ver: String::from("0.2.6"),
+            },
+            VersionReq {
+                pob_ver: String::from("2.58.1"),
+                min_rpob_ver: String::from("0.2.8"),
+            },
+            VersionReq {
+                pob_ver: String::from("2.59.0"),
+                min_rpob_ver: String::from("0.2.9"),
+            },
+            VersionReq {
+                pob_ver: String::from("2.59.1"),
+                min_rpob_ver: String::from("0.2.10"),
+            },
+            VersionReq {
+                pob_ver: String::from("2.59.2"),
+                min_rpob_ver: String::from("0.2.10"),
+            },
+        ];
+        assert_eq!(highest_supported_pob_version(&compat_info, "0.0.2"), None);
+        assert_eq!(highest_supported_pob_version(&compat_info, "a.b.c"), None);
+        assert_eq!(
+            highest_supported_pob_version(&compat_info, "0.1.0"),
+            Some("2.56.0")
+        );
+        assert_eq!(
+            highest_supported_pob_version(&compat_info, "0.2.0"),
+            Some("2.56.0")
+        );
+        assert_eq!(
+            highest_supported_pob_version(&compat_info, "0.2.6"),
+            Some("2.58.0")
+        );
+        assert_eq!(
+            highest_supported_pob_version(&compat_info, "0.2.7"),
+            Some("2.58.0")
+        );
+        assert_eq!(
+            highest_supported_pob_version(&compat_info, "0.2.8"),
+            Some("2.58.1")
+        );
+        assert_eq!(
+            highest_supported_pob_version(&compat_info, "0.2.9"),
+            Some("2.59.0")
+        );
+        assert_eq!(
+            highest_supported_pob_version(&compat_info, "0.2.10"),
+            Some("2.59.2")
+        );
     }
 }
