@@ -9,6 +9,11 @@
 ### Changed
 
 - Reduce CPU usage while window is unfocused and not hovered over
+- Download highest compatible PoB version instead of latest version
+
+### Fixed
+
+- Register `AbortSubscript` function under right name
 
 ## [0.2.8] - 2025-11-07
 
