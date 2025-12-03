@@ -2,6 +2,8 @@
 
 ## [Unreleased] - ReleaseDate
 
+## [0.2.9] - 2025-12-03
+
 ### Added
 
 - Implement UI scale overriding
@@ -131,8 +133,9 @@
 - First release
 
 <!-- next-url -->
+[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.9...HEAD
 
-[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.8...HEAD
+[0.2.9]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.8...v0.2.9
 [0.2.8]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.5...v0.2.6
