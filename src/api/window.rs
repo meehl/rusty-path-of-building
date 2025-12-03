@@ -35,18 +35,18 @@ pub fn set_foreground(l: &Lua, _: ()) -> LuaResult<()> {
 }
 
 pub fn set_dpi_scale_override(l: &Lua, percent: i32) -> LuaResult<()> {
-    let socket = l.app_data_ref::<&'static Context>().unwrap();
+    let ctx = l.app_data_ref::<&'static Context>().unwrap();
     match percent {
-        0 => socket.window().scale_factor_override = None,
-        p if p > 0 => socket.window().scale_factor_override = Some(p as f32 / 100.0),
+        0 => ctx.window().scale_factor_override = None,
+        p if p > 0 => ctx.window().scale_factor_override = Some(p as f32 / 100.0),
         _ => {}
     }
     Ok(())
 }
 
 pub fn get_dpi_scale_override(l: &Lua, _: ()) -> LuaResult<i32> {
-    let socket = l.app_data_ref::<&'static Context>().unwrap();
-    match socket.window().scale_factor_override {
+    let ctx = l.app_data_ref::<&'static Context>().unwrap();
+    match ctx.window().scale_factor_override {
         Some(scale_factor) => Ok((scale_factor * 100.0) as i32),
         None => Ok(0),
     }
