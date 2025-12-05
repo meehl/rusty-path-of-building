@@ -6,6 +6,7 @@ use crate::{
     fonts::{Alignment, FontStyle, LayoutJob},
     mode::{AppEvent, ModeFrameOutput, ModeTransition},
     renderer::primitives::{ClippedPrimitive, DrawPrimitive, TextPrimitive},
+    util::replace_in_matching_lines,
 };
 use flate2::read::GzDecoder;
 use parley::{FontFamily, GenericFamily};
@@ -335,9 +336,9 @@ fn download_path_of_building<P: AsRef<Path>>(
     Ok(())
 }
 
-/// Replaces UpdateCheck with rusty-path-of-building's custom version of it.
+/// Replaces UpdateCheck with rusty-path-of-building's modified version
 fn replace_updatecheck<P: AsRef<Path>>(target_dir: P) -> anyhow::Result<()> {
-    log::info!("Downloading custom UpdateCheck.lua script...");
+    log::info!("Downloading modified UpdateCheck.lua script...");
 
     download_file(
         &format!(
@@ -346,6 +347,31 @@ fn replace_updatecheck<P: AsRef<Path>>(target_dir: P) -> anyhow::Result<()> {
         ),
         target_dir.as_ref().join("UpdateCheck.lua"),
     )?;
+
+    // Replace original checksum with checksum of modified update script
+    let new_checksum = download_file_contents(&format!(
+        "https://raw.githubusercontent.com/{REPO_NAME}/main/{}",
+        "UpdateCheck.lua.sha1"
+    ))?;
+
+    // file contains checksum followed by filename (separated by whitespace)
+    // we only need the checksum
+    let new_checksum = new_checksum
+        .split_whitespace()
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("Invalid checksum file"))?;
+
+    let filename = target_dir.as_ref().join("manifest.xml");
+    let manifest = fs::read_to_string(&filename)?;
+
+    let new_manifest = replace_in_matching_lines(
+        &manifest,
+        r#"name="UpdateCheck.lua""#,
+        r#"sha1="([0-9A-Za-z]+)""#,
+        &format!(r#"sha1="{}""#, new_checksum),
+    );
+
+    fs::write(&filename, &new_manifest)?;
 
     Ok(())
 }

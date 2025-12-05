@@ -27,3 +27,29 @@ pub fn calculate_hash<T: Hash>(t: &T) -> u64 {
     t.hash(&mut state);
     state.finish()
 }
+
+/// Performs replacement only in lines that match a given pattern
+pub fn replace_in_matching_lines(
+    input: &str,
+    match_pattern: &str,
+    replace_pattern: &str,
+    replacement_text: &str,
+) -> String {
+    let match_re = regex::Regex::new(match_pattern).expect("Invalid match regex");
+    let replace_re = regex::Regex::new(replace_pattern).expect("Invalid replace regex");
+
+    let mut output = String::new();
+    for line in input.lines() {
+        dbg!(&line);
+        if match_re.is_match(line) {
+            // if line matches the pattern, replace
+            let replaced_line = replace_re.replace_all(line, replacement_text);
+            output.push_str(&replaced_line);
+        } else {
+            // otherwise, keep original line
+            output.push_str(line);
+        }
+        output.push('\n');
+    }
+    output
+}
