@@ -22,6 +22,10 @@ Please check [the Arch Wiki](https://wiki.archlinux.org/title/Arch_User_Reposito
 
 [![Stable version badge](https://img.shields.io/flathub/v/community.pathofbuilding.PathOfBuilding)](https://flathub.org/en/apps/community.pathofbuilding.PathOfBuilding)
 
+### Nix
+
+[nixpkgs](https://search.nixos.org/packages?type=packages&query=rusty-path-of-building)
+
 ### Building from source
 
 `LuaJIT` needs to be installed on your system for the `mlua` crate to compile.
