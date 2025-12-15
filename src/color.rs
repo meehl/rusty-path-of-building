@@ -67,8 +67,20 @@ impl From<Srgba> for image::Rgba<u8> {
     }
 }
 
+impl From<Srgba> for [f32; 4] {
+    fn from(value: Srgba) -> Self {
+        value.0.map(u8_to_f32)
+    }
+}
+
 /// f32 [0.0, 1.0] -> u8 [0, 255]
 #[inline(always)]
 const fn f32_to_u8(c: f32) -> u8 {
     ((c * 255.0) + 0.5) as u8
+}
+
+/// u8 [0, 255] -> f32 [0.0, 1.0]
+#[inline(always)]
+const fn u8_to_f32(c: u8) -> f32 {
+    c as f32 / 255.0
 }

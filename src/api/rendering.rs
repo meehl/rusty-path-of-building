@@ -34,6 +34,7 @@ pub fn register_globals(lua: &Lua) -> LuaResult<()> {
     // thousands of times per frame. C functions are used to get raw access to
     // the lua stack without the overhead.
     unsafe { globals.set("SetDrawColor", lua.create_c_function(set_draw_color)?)? };
+    unsafe { globals.set("GetDrawColor", lua.create_c_function(get_draw_color)?)? };
     unsafe { globals.set("SetViewport", lua.create_c_function(set_viewport)?)? };
     unsafe {
         globals.set("SetDrawLayer", lua.create_c_function(set_draw_layer)?)?;
@@ -158,6 +159,20 @@ unsafe extern "C-unwind" fn set_draw_color(state: *mut ffi::lua_State) -> c_int 
     };
 
     0
+}
+
+unsafe extern "C-unwind" fn get_draw_color(state: *mut ffi::lua_State) -> c_int {
+    //profiling::scope!("get_draw_color");
+    let lua_instance = unsafe { Lua::get_or_init_from_ptr(state) };
+    let ctx = lua_instance.app_data_ref::<&'static Context>().unwrap();
+
+    let color: [f32; 4] = ctx.layers().get_draw_color().into();
+    unsafe { ffi::lua_pushnumber(state, color[0] as f64) };
+    unsafe { ffi::lua_pushnumber(state, color[1] as f64) };
+    unsafe { ffi::lua_pushnumber(state, color[2] as f64) };
+    unsafe { ffi::lua_pushnumber(state, color[3] as f64) };
+
+    4
 }
 
 unsafe extern "C-unwind" fn set_viewport(state: *mut ffi::lua_State) -> c_int {

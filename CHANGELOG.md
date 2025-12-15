@@ -2,6 +2,10 @@
 
 ## [Unreleased] - ReleaseDate
 
+### Added
+
+- Implement GetDrawColor
+
 ### Fixed
 
 - Avoid redundant update after initial download
