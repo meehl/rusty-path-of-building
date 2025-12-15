@@ -1,8 +1,6 @@
-use crate::{
-    app::App,
-    args::{Args, Game},
-};
+use crate::{app::App, args::Args};
 use clap::Parser;
+use std::path::{Path, PathBuf};
 use winit::event_loop::EventLoop;
 
 mod api;
@@ -40,12 +38,33 @@ fn main() -> anyhow::Result<()> {
     };
 
     let args = Args::parse();
-    Game::init(args.game);
+    let script_dir = find_nearby_launch_script();
 
-    let mut app = App::new()?;
+    let mut app = App::new(args.game, script_dir)?;
 
     let event_loop = EventLoop::with_user_event().build()?;
     event_loop.run_app(&mut app)?;
 
     Ok(())
+}
+
+/// Search for the Launch.lua file in nearby locations
+fn find_nearby_launch_script() -> Option<PathBuf> {
+    let mut candidates = vec![Path::new("Launch.lua"), Path::new("src/Launch.lua")];
+
+    if let Ok(cwd) = std::env::current_dir()
+        && cwd.ends_with("runtime")
+    {
+        candidates.push(Path::new("../src/Launch.lua"));
+    }
+
+    for candidate in candidates {
+        if candidate.try_exists().is_ok_and(|exists| exists) {
+            if let Some(Ok(candidate)) = candidate.parent().map(Path::canonicalize) {
+                return Some(candidate);
+            }
+        }
+    }
+
+    None
 }

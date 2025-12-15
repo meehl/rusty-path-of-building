@@ -11,6 +11,7 @@ use crate::{
     window::WindowState,
 };
 use anyhow::Result;
+use std::path::PathBuf;
 use std::sync::Arc;
 use winit::{
     application::ApplicationHandler, event::*, event_loop::ActiveEventLoop, keyboard::PhysicalKey,
@@ -27,6 +28,7 @@ pub struct AppState {
     pub input: InputState,
     pub fonts: Fonts,
     pub texture_manager: WrappedTextureManager,
+    pub script_dir: PathBuf,
 }
 
 impl AppState {
@@ -39,6 +41,7 @@ impl AppState {
 pub struct App {
     gfx_context: Option<GraphicsContext>,
     state: AppState,
+    game: Game,
     tessellator: Tessellator,
     needs_reconfigure: bool,
     force_render: bool,
@@ -46,19 +49,35 @@ pub struct App {
 }
 
 impl App {
-    pub fn new() -> Result<Self> {
+    pub fn new(game: Game, custom_script_dir: Option<PathBuf>) -> Result<Self> {
+        let uses_custom_script_dir = custom_script_dir.is_some();
+        let script_dir = custom_script_dir.unwrap_or_else(|| game.script_dir());
+
+        let mut state = AppState {
+            window: WindowState::default(),
+            input: InputState::default(),
+            fonts: Fonts::new(pob_font_definitions()),
+            texture_manager: WrappedTextureManager::new(),
+            script_dir,
+        };
+
+        let current_mode = if uses_custom_script_dir {
+            // Skip installer if custom script dir is provided.
+            // Used for local testing
+            let pob_mode = PoBMode::new(&mut state)?;
+            AppMode::PoB(pob_mode)
+        } else {
+            AppMode::Install(InstallMode::new(game))
+        };
+
         Ok(Self {
             gfx_context: None,
-            state: AppState {
-                window: WindowState::default(),
-                input: InputState::default(),
-                fonts: Fonts::new(pob_font_definitions()),
-                texture_manager: WrappedTextureManager::new(),
-            },
+            state,
+            game,
             tessellator: Tessellator::default(),
             needs_reconfigure: true,
             force_render: true,
-            current_mode: AppMode::Install(InstallMode::new()),
+            current_mode,
         })
     }
 
@@ -120,7 +139,7 @@ impl App {
     }
 
     fn create_window(&mut self, event_loop: &ActiveEventLoop) -> anyhow::Result<()> {
-        let (title, _app_id) = match Game::current() {
+        let (title, _app_id) = match self.game {
             Game::Poe1 => ("Path of Building 1", "rusty-path-of-building-1"),
             Game::Poe2 => ("Path of Building 2", "rusty-path-of-building-2"),
         };

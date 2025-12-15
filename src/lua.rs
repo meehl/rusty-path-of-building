@@ -1,5 +1,4 @@
 use crate::{
-    Game,
     api::{self, get_callback},
     app::AppState,
     args::Args,
@@ -48,6 +47,7 @@ pub struct Context {
     input: Cell<*const InputState>,
     fonts: Cell<*mut Fonts>,
     texture_manager: Cell<*mut WrappedTextureManager>,
+    script_dir: Cell<*const PathBuf>,
     current_working_dir: Cell<*mut PathBuf>,
     layers: Cell<*mut Layers>,
     needs_restart: Cell<*mut bool>,
@@ -61,6 +61,7 @@ impl Context {
             input: Cell::new(std::ptr::null()),
             fonts: Cell::new(std::ptr::null_mut()),
             texture_manager: Cell::new(std::ptr::null_mut()),
+            script_dir: Cell::new(std::ptr::null()),
             current_working_dir: Cell::new(std::ptr::null_mut()),
             layers: Cell::new(std::ptr::null_mut()),
             needs_restart: Cell::new(std::ptr::null_mut()),
@@ -73,6 +74,7 @@ impl Context {
         self.input.set(&ctx.app.input);
         self.fonts.set(&mut ctx.app.fonts);
         self.texture_manager.set(&mut ctx.app.texture_manager);
+        self.script_dir.set(&mut ctx.app.script_dir);
         self.current_working_dir
             .set(&mut ctx.pob.current_working_dir);
         self.layers.set(&mut ctx.pob.layers);
@@ -85,6 +87,7 @@ impl Context {
         self.input.set(std::ptr::null());
         self.fonts.set(std::ptr::null_mut());
         self.texture_manager.set(std::ptr::null_mut());
+        self.script_dir.set(std::ptr::null());
         self.current_working_dir.set(std::ptr::null_mut());
         self.layers.set(std::ptr::null_mut());
         self.needs_restart.set(std::ptr::null_mut());
@@ -95,6 +98,7 @@ impl Context {
     ctx_accessor!(input: &InputState);
     ctx_accessor!(fonts: &mut Fonts);
     ctx_accessor!(texture_manager: &mut WrappedTextureManager);
+    ctx_accessor!(script_dir: &PathBuf);
     ctx_accessor!(current_working_dir: &mut PathBuf);
     ctx_accessor!(layers: &mut Layers);
     ctx_accessor!(needs_restart: &mut bool);
@@ -154,10 +158,10 @@ pub struct LuaInstance {
 }
 
 impl LuaInstance {
-    pub fn new() -> anyhow::Result<Self> {
-        let subscript_manager = Rc::new(RefCell::new(SubscriptManager::new()));
+    pub fn new(script_dir: &PathBuf) -> anyhow::Result<Self> {
+        let subscript_manager = Rc::new(RefCell::new(SubscriptManager::new(script_dir.to_owned())));
 
-        let lua = Self::create_lua_state()?;
+        let lua = Self::create_lua_state(script_dir)?;
         register_subscript_globals(&lua, &subscript_manager)?;
 
         Ok(Self {
@@ -166,7 +170,7 @@ impl LuaInstance {
         })
     }
 
-    fn create_lua_state() -> LuaResult<Lua> {
+    fn create_lua_state(script_dir: &PathBuf) -> LuaResult<Lua> {
         // SAFETY: use `unsafe_new` to allow loading of C modules
         let lua = unsafe { Lua::unsafe_new() };
 
@@ -175,7 +179,7 @@ impl LuaInstance {
         let args_table = lua.create_sequence_from(std::iter::once(args.import_url))?;
         lua.globals().set("arg", args_table)?;
 
-        Self::register_package_paths(&lua)?;
+        Self::register_package_paths(&lua, script_dir)?;
 
         // register context
         let ctx = Context::new();
@@ -192,8 +196,8 @@ impl LuaInstance {
         let ctx = self.lua.app_data_ref::<&'static Context>().unwrap();
         ctx.set(pob_ctx);
 
-        let script_dir = Game::script_dir();
-        change_working_directory(script_dir.as_path())?;
+        let script_dir = pob_ctx.app.script_dir.as_path();
+        change_working_directory(script_dir)?;
         self.load(script_dir.join("Launch.lua")).exec()?;
 
         ctx.clear();
@@ -201,27 +205,30 @@ impl LuaInstance {
     }
 
     pub fn restart(&mut self, ctx: &mut PoBContext) -> LuaResult<()> {
-        self.lua = Self::create_lua_state()?;
+        self.lua = Self::create_lua_state(&ctx.app.script_dir)?;
         register_subscript_globals(&self.lua, &self.subscript_manager)?;
         self.launch(ctx)?;
         Ok(())
     }
 
     /// Run functions for subscripts and handle their completion/failure.
-    pub fn handle_subscripts(&self, ctx: &mut PoBContext) {
+    pub fn handle_subscripts(&self, pob_ctx: &mut PoBContext) {
         profiling::scope!("handle_subscripts");
 
+        let ctx = self.lua.app_data_ref::<&'static Context>().unwrap();
+        ctx.set(pob_ctx);
         let subscript_events = self.subscript_manager.borrow_mut().process(self);
+        ctx.clear();
 
         // Handle finished/errored subscripts.
         for event in subscript_events {
             match event {
                 SubscriptResult::SubscriptFinished { id, return_values } => {
-                    self.handle_event(PoBEvent::SubFinished { id, return_values }, ctx)
+                    self.handle_event(PoBEvent::SubFinished { id, return_values }, pob_ctx)
                         .unwrap();
                 }
                 SubscriptResult::SubscriptError { id, error } => {
-                    self.handle_event(PoBEvent::SubError { id, error }, ctx)
+                    self.handle_event(PoBEvent::SubError { id, error }, pob_ctx)
                         .unwrap();
                 }
             }
@@ -283,8 +290,7 @@ impl LuaInstance {
     }
 
     /// Adds "${script_dir}/lua" to package path
-    pub fn register_package_paths(lua: &Lua) -> LuaResult<()> {
-        let script_dir = Game::script_dir();
+    pub fn register_package_paths(lua: &Lua, script_dir: &PathBuf) -> LuaResult<()> {
         let package: Table = lua.globals().get("package")?;
         let mut package_path: String = package.get("path")?;
         package_path.push(';');

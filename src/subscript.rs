@@ -1,14 +1,14 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::sync::mpsc::{Receiver, Sender, TryRecvError};
-use std::{collections::VecDeque, sync::mpsc::channel, thread::JoinHandle};
-
+use crate::{api::get_callback, lua::LuaInstance};
 use anyhow::{Result, anyhow};
-use mlua::{Function, IntoLuaMulti, Lua, Value};
-use mlua::{Integer, MultiValue, Number, Result as LuaResult};
-
-use crate::api::get_callback;
-use crate::lua::LuaInstance;
+use mlua::{Function, Integer, IntoLuaMulti, Lua, MultiValue, Number, Result as LuaResult, Value};
+use std::{
+    cell::RefCell,
+    collections::VecDeque,
+    path::PathBuf,
+    rc::Rc,
+    sync::mpsc::{Receiver, Sender, TryRecvError, channel},
+    thread::JoinHandle,
+};
 
 #[derive(Debug)]
 pub enum SubscriptResult {
@@ -25,13 +25,15 @@ pub enum SubscriptResult {
 pub struct SubscriptManager {
     current_id: u64,
     scripts: Vec<Subscript>,
+    script_dir: PathBuf,
 }
 
 impl SubscriptManager {
-    pub fn new() -> Self {
+    pub fn new(script_dir: PathBuf) -> Self {
         Self {
             current_id: 0,
             scripts: Vec::new(),
+            script_dir,
         }
     }
 
@@ -51,6 +53,7 @@ impl SubscriptManager {
             blocking_calls,
             nonblocking_calls,
             arguments,
+            self.script_dir.clone(),
         );
         self.scripts.push(subscript);
         id
@@ -119,6 +122,7 @@ impl Subscript {
         blocking_calls: Vec<String>,
         nonblocking_calls: Vec<String>,
         arguments: NativeMultiValue,
+        script_dir: PathBuf,
     ) -> Self {
         let (tx, rx) = channel();
 
@@ -129,7 +133,7 @@ impl Subscript {
             let lua = unsafe { Lua::unsafe_new() };
 
             // add ./lua to package.path and package.cpath
-            LuaInstance::register_package_paths(&lua)?;
+            LuaInstance::register_package_paths(&lua, &script_dir)?;
 
             for function_name in blocking_calls {
                 let thread_tx = tx.clone();

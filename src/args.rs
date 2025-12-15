@@ -15,7 +15,7 @@ pub struct Args {
     pub import_url: Option<String>,
 }
 
-#[derive(Debug, Clone, ValueEnum)]
+#[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum Game {
     #[value(name = "poe1")]
     Poe1,
@@ -23,30 +23,16 @@ pub enum Game {
     Poe2,
 }
 
-static GAME_CONFIG: std::sync::OnceLock<Game> = std::sync::OnceLock::new();
-
 impl Game {
-    pub fn init(game: Game) {
-        GAME_CONFIG.set(game).expect("Game should be uninitialized");
-    }
-
-    pub fn current() -> &'static Game {
-        GAME_CONFIG.get().expect("Game should be initialized")
-    }
-
-    pub fn data_dir() -> PathBuf {
-        let directory_name = match Self::current() {
+    pub fn data_dir(&self) -> PathBuf {
+        let directory_name = match self {
             Game::Poe1 => "RustyPathOfBuilding1",
             Game::Poe2 => "RustyPathOfBuilding2",
         };
         BaseDirs::new().unwrap().data_dir().join(directory_name)
     }
 
-    pub fn script_dir() -> PathBuf {
-        Game::data_dir()
-    }
-
-    pub fn user_data_dir() -> PathBuf {
-        Game::data_dir().join("userdata")
+    pub fn script_dir(&self) -> PathBuf {
+        self.data_dir()
     }
 }

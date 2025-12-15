@@ -49,12 +49,12 @@ pub struct InstallMode {
 }
 
 impl InstallMode {
-    pub fn new() -> Self {
-        let script_dir = Game::script_dir();
+    pub fn new(game: Game) -> Self {
+        let script_dir = game.script_dir();
         let (progress_tx, progress_rx) = mpsc::channel();
 
         thread::spawn(move || {
-            if let Err(err) = install(script_dir.as_path(), &progress_tx) {
+            if let Err(err) = install(script_dir.as_path(), game, &progress_tx) {
                 progress_tx.send(Progress::Error(err)).unwrap();
                 return;
             }
@@ -158,6 +158,7 @@ impl InstallMode {
 
 fn install<P: AsRef<Path>>(
     target_dir: P,
+    game: Game,
     progress_tx: &mpsc::Sender<Progress>,
 ) -> anyhow::Result<()> {
     // Skip installation if version file exists
@@ -174,11 +175,11 @@ fn install<P: AsRef<Path>>(
         return Ok(());
     }
 
-    let compatibility_info = fetch_compatibility_info()?;
+    let compatibility_info = fetch_compatibility_info(game)?;
     let needed_pob_version = highest_supported_pob_version(&compatibility_info, current_version)
         .ok_or_else(|| anyhow::anyhow!("Unable to determine supported PoB version"))?;
 
-    download_path_of_building(&target_dir, needed_pob_version, progress_tx)?;
+    download_path_of_building(&target_dir, game, needed_pob_version, progress_tx)?;
     replace_updatecheck(&target_dir)?;
     set_branch_and_platform(&target_dir)?;
 
@@ -195,8 +196,8 @@ struct VersionReq {
 }
 
 /// Fetches and evaluates compatibility table
-fn fetch_compatibility_info() -> anyhow::Result<Vec<VersionReq>> {
-    let compatibility_info_file_name = match Game::current() {
+fn fetch_compatibility_info(game: Game) -> anyhow::Result<Vec<VersionReq>> {
+    let compatibility_info_file_name = match game {
         Game::Poe1 => "Compatibility_pob1.lua",
         Game::Poe2 => "Compatibility_pob2.lua",
     };
@@ -254,12 +255,13 @@ fn highest_supported_pob_version<'a>(
 /// Downloads specified version of Path of Building
 fn download_path_of_building<P: AsRef<Path>>(
     target_dir: P,
+    game: Game,
     pob_version: &str,
     progress_tx: &mpsc::Sender<Progress>,
 ) -> anyhow::Result<()> {
     log::info!("Downloading Path of Building assets...");
 
-    let repo = match Game::current() {
+    let repo = match game {
         Game::Poe1 => "PathOfBuildingCommunity/PathOfBuilding",
         Game::Poe2 => "PathOfBuildingCommunity/PathOfBuilding-PoE2",
     };

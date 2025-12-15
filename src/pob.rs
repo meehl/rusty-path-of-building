@@ -34,7 +34,7 @@ impl PoBMode {
             is_dpi_aware: false,
         };
 
-        let lua_instance = LuaInstance::new()?;
+        let lua_instance = LuaInstance::new(&app_state.script_dir)?;
 
         let mut pob_ctx = PoBContext::new(app_state, &mut state);
         lua_instance.launch(&mut pob_ctx)?;
