@@ -40,7 +40,6 @@ pub fn replace_in_matching_lines(
 
     let mut output = String::new();
     for line in input.lines() {
-        dbg!(&line);
         if match_re.is_match(line) {
             // if line matches the pattern, replace
             let replaced_line = replace_re.replace_all(line, replacement_text);
