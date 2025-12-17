@@ -12,19 +12,11 @@ rusty-path-of-building [poe1|poe2]
 
 ## Installation
 
-### Arch (AUR)
-
-[![Stable version badge](https://img.shields.io/aur/version/rusty-path-of-building)](https://aur.archlinux.org/packages/rusty-path-of-building)
-
-Please check [the Arch Wiki](https://wiki.archlinux.org/title/Arch_User_Repository) on how to install packages from the AUR.
+[![Packaging status](https://repology.org/badge/vertical-allrepos/rusty-path-of-building.svg)](https://repology.org/project/rusty-path-of-building/versions)
 
 ### Flathub
 
 [![Stable version badge](https://img.shields.io/flathub/v/community.pathofbuilding.PathOfBuilding)](https://flathub.org/en/apps/community.pathofbuilding.PathOfBuilding)
-
-### Nix
-
-[nixpkgs](https://search.nixos.org/packages?type=packages&query=rusty-path-of-building)
 
 ### Building from source
 
