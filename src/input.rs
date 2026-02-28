@@ -1,3 +1,5 @@
+//! Module to handle user inputs like keyboard keys and mouse buttons.
+
 use crate::dpi::LogicalPoint;
 use ahash::{HashMap, HashSet};
 use std::time::{Duration, Instant};
@@ -6,16 +8,23 @@ use winit::{
     keyboard::{KeyCode, ModifiersState},
 };
 
+/// Current state of various keyboard and mouse inputs for the application.
 #[derive(Default)]
 pub struct InputState {
+    /// Current state(s) of modifier keys. (Shift, Control, Alt, Super)
     pub key_modifiers: ModifiersState,
+    /// HashSet of currently pressed keyboard keys.
     keys_pressed: HashSet<KeyCode>,
+    /// HashSet of currently pressed mouse buttons.
     mouse_pressed: HashSet<MouseButton>,
+    /// HashMap of mouse buttons (keys) with the last time they were pressed.
     mouse_last_pressed: HashMap<MouseButton, Instant>,
+    /// Current cursor position relative to the top-left corner of the window.
     cursor_pos: LogicalPoint<f32>,
 }
 
 impl InputState {
+    /// Updates [`Self::keys_pressed`] based on `is_pressed`.
     pub fn set_key_pressed(&mut self, code: KeyCode, is_pressed: bool) {
         if is_pressed {
             self.keys_pressed.insert(code);
@@ -24,10 +33,14 @@ impl InputState {
         }
     }
 
+    /// Returns if the key (determined by `code`) is pressed (`true`) or not
+    /// pressed (`false`).
     pub fn key_pressed(&self, code: KeyCode) -> bool {
         self.keys_pressed.contains(&code)
     }
 
+    /// Updates [`Self::mouse_pressed`](field@Self::mouse_pressed) based on provided
+    /// `button` and `is_pressed`.
     pub fn set_mouse_pressed(&mut self, button: MouseButton, is_pressed: bool) -> bool {
         if is_pressed {
             self.mouse_pressed.insert(button);
@@ -50,19 +63,24 @@ impl InputState {
         }
     }
 
+    /// Returns `true` if the `button` was pressed and no release has been seen.
     pub fn mouse_pressed(&self, button: MouseButton) -> bool {
         self.mouse_pressed.contains(&button)
     }
 
+    /// Returns the last known cursor position.
     pub fn mouse_pos(&self) -> LogicalPoint<f32> {
         self.cursor_pos
     }
 
+    /// Sets [`Self::cursor_pos`] to the provided `pos`.
     pub fn set_mouse_pos(&mut self, pos: LogicalPoint<f32>) {
         self.cursor_pos = pos;
     }
 }
 
+/// Attempts to convert the provided string `s` to a [KeyCode].
+/// Returns [None] if no matching string found.
 pub fn str_as_keycode(s: &str) -> Option<KeyCode> {
     Some(match s.to_uppercase().as_str() {
         // Letters
@@ -149,6 +167,10 @@ pub fn str_as_keycode(s: &str) -> Option<KeyCode> {
     })
 }
 
+/// Attempts to convert the provided [KeyCode], `s`, to a str that the PoB Lua
+/// backend recognizes.
+///
+/// Returns [None] if no matching string found.
 pub fn keycode_as_str(code: KeyCode) -> Option<&'static str> {
     Some(match code {
         // Letters
@@ -246,6 +268,10 @@ pub fn keycode_as_str(code: KeyCode) -> Option<&'static str> {
     })
 }
 
+/// Attempts to convert the provided [&str], `s`, from the PoB Lua Backend to a
+/// [MouseButton].
+///
+/// Returns [None] if no matching string found.
 pub fn str_as_mousebutton(s: &str) -> Option<MouseButton> {
     Some(match s.to_uppercase().as_str() {
         "LEFTBUTTON" => MouseButton::Left,
@@ -257,6 +283,10 @@ pub fn str_as_mousebutton(s: &str) -> Option<MouseButton> {
     })
 }
 
+/// Attempts to convert the provided [MouseButton] to a [str] that the PoB Lua
+/// backend recognizes.
+///
+/// Returns [None] if no matching [MouseButton] was found.
 pub fn mousebutton_as_str(button: MouseButton) -> Option<&'static str> {
     Some(match button {
         MouseButton::Left => "LEFTBUTTON",
