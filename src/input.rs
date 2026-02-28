@@ -77,6 +77,14 @@ impl InputState {
     pub fn set_mouse_pos(&mut self, pos: LogicalPoint<f32>) {
         self.cursor_pos = pos;
     }
+
+    /// Clears all pressed keys, buttons, and modifier states. Used when the
+    /// application loses focus to avoid keys being "stuck" on/pressed.
+    pub fn clear_pressed(&mut self) {
+        self.keys_pressed.clear();
+        self.mouse_pressed.clear();
+        self.key_modifiers = ModifiersState::empty();
+    }
 }
 
 /// Attempts to convert the provided string `s` to a [KeyCode].

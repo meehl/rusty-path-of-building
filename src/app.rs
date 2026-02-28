@@ -258,6 +258,10 @@ impl ApplicationHandler<GraphicsContext> for App {
                 self.state.window.is_focused = focused;
                 if focused {
                     self.state.window.request_redraw();
+                } else {
+                    // Clear inputs on lost focus to avoid "stuck" keys on Wayland
+                    // systems.
+                    self.state.input.clear_pressed();
                 }
             }
             WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
