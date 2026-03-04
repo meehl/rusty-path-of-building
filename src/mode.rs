@@ -1,14 +1,14 @@
 use crate::{
     app::AppState, installer::InstallMode, pob::PoBMode, renderer::primitives::ClippedPrimitive,
 };
-use winit::{event::MouseButton, keyboard::KeyCode};
+use winit::{event::MouseButton, keyboard::Key};
 
 pub enum AppEvent {
     KeyDown {
-        code: KeyCode,
+        key: Key,
     },
     KeyUp {
-        code: KeyCode,
+        key: Key,
     },
     MouseDown {
         button: MouseButton,

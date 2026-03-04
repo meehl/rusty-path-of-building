@@ -1,7 +1,7 @@
 use crate::{
     app::AppState,
     dpi::{LogicalRect, LogicalSize},
-    input::{keycode_as_str, mousebutton_as_str},
+    input::{key_as_str, mousebutton_as_str},
     layers::Layers,
     lua::{LuaInstance, PoBContext, PoBEvent},
     mode::{AppEvent, ModeFrameOutput, ModeTransition},
@@ -97,14 +97,14 @@ impl PoBMode {
         let mut ctx = PoBContext::new(app_state, &mut self.state);
 
         match event {
-            AppEvent::KeyDown { code } => {
-                if let Some(key_string) = keycode_as_str(code) {
+            AppEvent::KeyDown { key } => {
+                if let Some(key_string) = key_as_str(key) {
                     let pob_event = PoBEvent::KeyDown(key_string, false);
                     self.lua_instance.handle_event(pob_event, &mut ctx)?;
                 }
             }
-            AppEvent::KeyUp { code } => {
-                if let Some(key_string) = keycode_as_str(code) {
+            AppEvent::KeyUp { key } => {
+                if let Some(key_string) = key_as_str(key) {
                     let pob_event = PoBEvent::KeyUp(key_string);
                     self.lua_instance.handle_event(pob_event, &mut ctx)?;
                 }
@@ -127,14 +127,14 @@ impl PoBMode {
             AppEvent::MouseWheel { delta } => {
                 if delta > 0.0 {
                     self.lua_instance
-                        .handle_event(PoBEvent::KeyDown("WHEELUP", false), &mut ctx)?;
+                        .handle_event(PoBEvent::KeyDown("WHEELUP".into(), false), &mut ctx)?;
                     self.lua_instance
-                        .handle_event(PoBEvent::KeyUp("WHEELUP"), &mut ctx)?;
+                        .handle_event(PoBEvent::KeyUp("WHEELUP".into()), &mut ctx)?;
                 } else if delta < 0.0 {
                     self.lua_instance
-                        .handle_event(PoBEvent::KeyDown("WHEELDOWN", false), &mut ctx)?;
+                        .handle_event(PoBEvent::KeyDown("WHEELDOWN".into(), false), &mut ctx)?;
                     self.lua_instance
-                        .handle_event(PoBEvent::KeyUp("WHEELDOWN"), &mut ctx)?;
+                        .handle_event(PoBEvent::KeyUp("WHEELDOWN".into()), &mut ctx)?;
                 }
             }
             AppEvent::CharacterInput { ch } => {

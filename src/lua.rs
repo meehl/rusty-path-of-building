@@ -18,6 +18,7 @@ use std::{
     path::PathBuf,
     rc::Rc,
 };
+use winit::keyboard::SmolStr;
 
 macro_rules! ctx_accessor {
     ($field:ident: & $ty:ty) => {
@@ -109,8 +110,8 @@ pub enum PoBEvent {
     Init,
     Exit,
     Frame,
-    KeyDown(&'static str, bool),
-    KeyUp(&'static str),
+    KeyDown(SmolStr, bool),
+    KeyUp(SmolStr),
     Char(char),
     SubFinished {
         id: u64,
@@ -271,9 +272,9 @@ impl LuaInstance {
             PoBEvent::Exit => get_callback(&self.lua, "OnExit")?.call::<()>(()),
             PoBEvent::Frame => get_callback(&self.lua, "OnFrame")?.call::<()>(()),
             PoBEvent::KeyDown(key, double_click) => {
-                get_callback(&self.lua, "OnKeyDown")?.call::<()>((key, double_click))
+                get_callback(&self.lua, "OnKeyDown")?.call::<()>((key.as_str(), double_click))
             }
-            PoBEvent::KeyUp(key) => get_callback(&self.lua, "OnKeyUp")?.call::<()>(key),
+            PoBEvent::KeyUp(key) => get_callback(&self.lua, "OnKeyUp")?.call::<()>(key.as_str()),
             PoBEvent::Char(ch) => get_callback(&self.lua, "OnChar")?.call::<()>(ch),
             PoBEvent::SubFinished { id, return_values } => {
                 get_callback(&self.lua, "OnSubFinished")?.call::<()>((id, return_values))
