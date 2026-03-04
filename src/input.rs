@@ -5,7 +5,7 @@ use ahash::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 use winit::{
     event::MouseButton,
-    keyboard::{KeyCode, ModifiersState},
+    keyboard::{Key, ModifiersState, NamedKey, SmolStr},
 };
 
 /// Current state of various keyboard and mouse inputs for the application.
@@ -14,7 +14,7 @@ pub struct InputState {
     /// Current state(s) of modifier keys. (Shift, Control, Alt, Super)
     pub key_modifiers: ModifiersState,
     /// HashSet of currently pressed keyboard keys.
-    keys_pressed: HashSet<KeyCode>,
+    keys_pressed: HashSet<Key>,
     /// HashSet of currently pressed mouse buttons.
     mouse_pressed: HashSet<MouseButton>,
     /// HashMap of mouse buttons (keys) with the last time they were pressed.
@@ -25,18 +25,17 @@ pub struct InputState {
 
 impl InputState {
     /// Updates [`Self::keys_pressed`] based on `is_pressed`.
-    pub fn set_key_pressed(&mut self, code: KeyCode, is_pressed: bool) {
+    pub fn set_key_pressed(&mut self, key: Key, is_pressed: bool) {
         if is_pressed {
-            self.keys_pressed.insert(code);
+            self.keys_pressed.insert(key);
         } else {
-            self.keys_pressed.remove(&code);
+            self.keys_pressed.remove(&key);
         }
     }
 
-    /// Returns if the key (determined by `code`) is pressed (`true`) or not
-    /// pressed (`false`).
-    pub fn key_pressed(&self, code: KeyCode) -> bool {
-        self.keys_pressed.contains(&code)
+    /// Returns if the key is pressed (`true`) or not pressed (`false`).
+    pub fn key_pressed(&self, key: Key) -> bool {
+        self.keys_pressed.contains(&key)
     }
 
     /// Updates [`Self::mouse_pressed`](field@Self::mouse_pressed) based on provided
@@ -87,196 +86,144 @@ impl InputState {
     }
 }
 
-/// Attempts to convert the provided string `s` to a [KeyCode].
-/// Returns [None] if no matching string found.
-pub fn str_as_keycode(s: &str) -> Option<KeyCode> {
+/// Attempts to convert the provided string `s` to a [winit::keyboard::Key].
+/// Returns [None] if no matching Key found.
+pub fn str_as_key(s: &str) -> Option<Key> {
     Some(match s.to_uppercase().as_str() {
-        // Letters
-        "A" => KeyCode::KeyA,
-        "B" => KeyCode::KeyB,
-        "C" => KeyCode::KeyC,
-        "D" => KeyCode::KeyD,
-        "E" => KeyCode::KeyE,
-        "F" => KeyCode::KeyF,
-        "G" => KeyCode::KeyG,
-        "H" => KeyCode::KeyH,
-        "I" => KeyCode::KeyI,
-        "J" => KeyCode::KeyJ,
-        "K" => KeyCode::KeyK,
-        "L" => KeyCode::KeyL,
-        "M" => KeyCode::KeyM,
-        "N" => KeyCode::KeyN,
-        "O" => KeyCode::KeyO,
-        "P" => KeyCode::KeyP,
-        "Q" => KeyCode::KeyQ,
-        "R" => KeyCode::KeyR,
-        "S" => KeyCode::KeyS,
-        "T" => KeyCode::KeyT,
-        "U" => KeyCode::KeyU,
-        "V" => KeyCode::KeyV,
-        "W" => KeyCode::KeyW,
-        "X" => KeyCode::KeyX,
-        "Y" => KeyCode::KeyY,
-        "Z" => KeyCode::KeyZ,
+        "A" => Key::Character(SmolStr::new_static("A")),
+        "B" => Key::Character(SmolStr::new_static("B")),
+        "C" => Key::Character(SmolStr::new_static("C")),
+        "D" => Key::Character(SmolStr::new_static("D")),
+        "E" => Key::Character(SmolStr::new_static("E")),
+        "F" => Key::Character(SmolStr::new_static("F")),
+        "G" => Key::Character(SmolStr::new_static("G")),
+        "H" => Key::Character(SmolStr::new_static("H")),
+        "I" => Key::Character(SmolStr::new_static("I")),
+        "J" => Key::Character(SmolStr::new_static("J")),
+        "K" => Key::Character(SmolStr::new_static("K")),
+        "L" => Key::Character(SmolStr::new_static("L")),
+        "M" => Key::Character(SmolStr::new_static("M")),
+        "N" => Key::Character(SmolStr::new_static("N")),
+        "O" => Key::Character(SmolStr::new_static("O")),
+        "P" => Key::Character(SmolStr::new_static("P")),
+        "Q" => Key::Character(SmolStr::new_static("Q")),
+        "R" => Key::Character(SmolStr::new_static("R")),
+        "S" => Key::Character(SmolStr::new_static("S")),
+        "T" => Key::Character(SmolStr::new_static("T")),
+        "U" => Key::Character(SmolStr::new_static("U")),
+        "V" => Key::Character(SmolStr::new_static("V")),
+        "W" => Key::Character(SmolStr::new_static("W")),
+        "X" => Key::Character(SmolStr::new_static("X")),
+        "Y" => Key::Character(SmolStr::new_static("Y")),
+        "Z" => Key::Character(SmolStr::new_static("Z")),
 
-        // Digits
-        "0" => KeyCode::Digit0,
-        "1" => KeyCode::Digit1,
-        "2" => KeyCode::Digit2,
-        "3" => KeyCode::Digit3,
-        "4" => KeyCode::Digit4,
-        "5" => KeyCode::Digit5,
-        "6" => KeyCode::Digit6,
-        "7" => KeyCode::Digit7,
-        "8" => KeyCode::Digit8,
-        "9" => KeyCode::Digit9,
+        "0" => Key::Character(SmolStr::new_static("0")),
+        "1" => Key::Character(SmolStr::new_static("1")),
+        "2" => Key::Character(SmolStr::new_static("2")),
+        "3" => Key::Character(SmolStr::new_static("3")),
+        "4" => Key::Character(SmolStr::new_static("4")),
+        "5" => Key::Character(SmolStr::new_static("5")),
+        "6" => Key::Character(SmolStr::new_static("6")),
+        "7" => Key::Character(SmolStr::new_static("7")),
+        "8" => Key::Character(SmolStr::new_static("8")),
+        "9" => Key::Character(SmolStr::new_static("9")),
 
-        // Modifiers
-        "SHIFT" => KeyCode::ShiftLeft,
-        "CTRL" => KeyCode::ControlLeft,
-        "ALT" => KeyCode::AltLeft,
+        "SHIFT" => Key::Named(NamedKey::Shift),
+        "CTRL" => Key::Named(NamedKey::Control),
+        "ALT" => Key::Named(NamedKey::Alt),
 
-        // F Keys
-        "F1" => KeyCode::F1,
-        "F2" => KeyCode::F2,
-        "F3" => KeyCode::F3,
-        "F4" => KeyCode::F4,
-        "F5" => KeyCode::F5,
-        "F6" => KeyCode::F6,
-        "F7" => KeyCode::F7,
-        "F8" => KeyCode::F8,
-        "F9" => KeyCode::F9,
-        "F10" => KeyCode::F10,
-        "F11" => KeyCode::F11,
-        "F12" => KeyCode::F12,
+        "F1" => Key::Named(NamedKey::F1),
+        "F2" => Key::Named(NamedKey::F2),
+        "F3" => Key::Named(NamedKey::F3),
+        "F4" => Key::Named(NamedKey::F4),
+        "F5" => Key::Named(NamedKey::F5),
+        "F6" => Key::Named(NamedKey::F6),
+        "F7" => Key::Named(NamedKey::F7),
+        "F8" => Key::Named(NamedKey::F8),
+        "F9" => Key::Named(NamedKey::F9),
+        "F10" => Key::Named(NamedKey::F10),
+        "F11" => Key::Named(NamedKey::F11),
+        "F12" => Key::Named(NamedKey::F12),
 
-        // Rest
-        " " => KeyCode::Space,
-        "BACK" => KeyCode::Backspace,
-        "TAB" => KeyCode::Tab,
-        "RETURN" => KeyCode::Enter,
-        "ESCAPE" => KeyCode::Escape,
-        "PAUSE" => KeyCode::Pause,
-        "PAGEUP" => KeyCode::PageUp,
-        "PAGEDOWN" => KeyCode::PageDown,
-        "END" => KeyCode::End,
-        "HOME" => KeyCode::Home,
-        "PRINTSCREEN" => KeyCode::PrintScreen,
-        "INSERT" => KeyCode::Insert,
-        "DELETE" => KeyCode::Delete,
-        "UP" => KeyCode::ArrowUp,
-        "DOWN" => KeyCode::ArrowDown,
-        "LEFT" => KeyCode::ArrowLeft,
-        "RIGHT" => KeyCode::ArrowRight,
-        "NUMLOCK" => KeyCode::NumLock,
-        "SCROLL" => KeyCode::ScrollLock,
+        " " => Key::Named(NamedKey::Space),
+        "BACK" => Key::Named(NamedKey::Backspace),
+        "TAB" => Key::Named(NamedKey::Tab),
+        "RETURN" => Key::Named(NamedKey::Enter),
+        "ESCAPE" => Key::Named(NamedKey::Escape),
+        "PAUSE" => Key::Named(NamedKey::Pause),
+        "PAGEUP" => Key::Named(NamedKey::PageUp),
+        "PAGEDOWN" => Key::Named(NamedKey::PageDown),
+        "END" => Key::Named(NamedKey::End),
+        "HOME" => Key::Named(NamedKey::Home),
+        "PRINTSCREEN" => Key::Named(NamedKey::PrintScreen),
+        "INSERT" => Key::Named(NamedKey::Insert),
+        "DELETE" => Key::Named(NamedKey::Delete),
+        "UP" => Key::Named(NamedKey::ArrowUp),
+        "DOWN" => Key::Named(NamedKey::ArrowDown),
+        "LEFT" => Key::Named(NamedKey::ArrowLeft),
+        "RIGHT" => Key::Named(NamedKey::ArrowRight),
+        "NUMLOCK" => Key::Named(NamedKey::NumLock),
+        "SCROLL" => Key::Named(NamedKey::ScrollLock),
 
         _ => return None,
     })
 }
 
-/// Attempts to convert the provided [KeyCode], `s`, to a str that the PoB Lua
-/// backend recognizes.
+/// Attempts to convert the provided [winit::keyboard::Key] `key` to a string
+/// representation that PoB recognizes.
 ///
 /// Returns [None] if no matching string found.
-pub fn keycode_as_str(code: KeyCode) -> Option<&'static str> {
-    Some(match code {
-        // Letters
-        KeyCode::KeyA => "a",
-        KeyCode::KeyB => "b",
-        KeyCode::KeyC => "c",
-        KeyCode::KeyD => "d",
-        KeyCode::KeyE => "e",
-        KeyCode::KeyF => "f",
-        KeyCode::KeyG => "g",
-        KeyCode::KeyH => "h",
-        KeyCode::KeyI => "i",
-        KeyCode::KeyJ => "j",
-        KeyCode::KeyK => "k",
-        KeyCode::KeyL => "l",
-        KeyCode::KeyM => "m",
-        KeyCode::KeyN => "n",
-        KeyCode::KeyO => "o",
-        KeyCode::KeyP => "p",
-        KeyCode::KeyQ => "q",
-        KeyCode::KeyR => "r",
-        KeyCode::KeyS => "s",
-        KeyCode::KeyT => "t",
-        KeyCode::KeyU => "u",
-        KeyCode::KeyV => "v",
-        KeyCode::KeyW => "w",
-        KeyCode::KeyX => "x",
-        KeyCode::KeyY => "y",
-        KeyCode::KeyZ => "z",
-
-        // Digits
-        KeyCode::Digit0 => "0",
-        KeyCode::Digit1 => "1",
-        KeyCode::Digit2 => "2",
-        KeyCode::Digit3 => "3",
-        KeyCode::Digit4 => "4",
-        KeyCode::Digit5 => "5",
-        KeyCode::Digit6 => "6",
-        KeyCode::Digit7 => "7",
-        KeyCode::Digit8 => "8",
-        KeyCode::Digit9 => "9",
-
-        // Modifiers
-        KeyCode::ShiftLeft => "SHIFT",
-        KeyCode::ControlLeft => "CTRL",
-        KeyCode::AltLeft => "ALT",
-
-        // F Keys
-        KeyCode::F1 => "F1",
-        KeyCode::F2 => "F2",
-        KeyCode::F3 => "F3",
-        KeyCode::F4 => "F4",
-        KeyCode::F5 => "F5",
-        KeyCode::F6 => "F6",
-        KeyCode::F7 => "F7",
-        KeyCode::F8 => "F8",
-        KeyCode::F9 => "F9",
-        KeyCode::F10 => "F10",
-        KeyCode::F11 => "F11",
-        KeyCode::F12 => "F12",
-
-        // Rest
-        KeyCode::Space => " ",
-        KeyCode::Backspace => "BACK",
-        KeyCode::Tab => "TAB",
-        KeyCode::Enter => "RETURN",
-        KeyCode::Escape => "ESCAPE",
-        KeyCode::Pause => "PAUSE",
-        KeyCode::PageUp => "PAGEUP",
-        KeyCode::PageDown => "PAGEDOWN",
-        KeyCode::End => "END",
-        KeyCode::Home => "HOME",
-        KeyCode::PrintScreen => "PRINTSCREEN",
-        KeyCode::Insert => "INSERT",
-        KeyCode::Delete => "DELETE",
-        KeyCode::ArrowUp => "UP",
-        KeyCode::ArrowDown => "DOWN",
-        KeyCode::ArrowLeft => "LEFT",
-        KeyCode::ArrowRight => "RIGHT",
-        KeyCode::NumLock => "NUMLOCK",
-        KeyCode::ScrollLock => "SCROLL",
-
-        KeyCode::Equal => "+", // This is what PoB does
-        KeyCode::Minus => "-",
-        KeyCode::Comma => ",",
-        KeyCode::Period => ".",
-        KeyCode::Slash => "/",
-
-        KeyCode::NumpadAdd => "+",
-        KeyCode::NumpadSubtract => "-",
-        KeyCode::NumpadEnter => "RETURN",
-        KeyCode::Numpad0 => "0",
-
+pub fn key_as_str(key: Key) -> Option<SmolStr> {
+    Some(match key {
+        Key::Character(ch) => {
+            if ch == "=" {
+                SmolStr::new("+") // This is what PoB does
+            } else {
+                ch
+            }
+        }
+        Key::Named(named) => SmolStr::new(match named {
+            NamedKey::Shift => "SHIFT",
+            NamedKey::Control => "CTRL",
+            NamedKey::Alt => "ALT",
+            NamedKey::F1 => "F1",
+            NamedKey::F2 => "F2",
+            NamedKey::F3 => "F3",
+            NamedKey::F4 => "F4",
+            NamedKey::F5 => "F5",
+            NamedKey::F6 => "F6",
+            NamedKey::F7 => "F7",
+            NamedKey::F8 => "F8",
+            NamedKey::F9 => "F9",
+            NamedKey::F10 => "F10",
+            NamedKey::F11 => "F11",
+            NamedKey::F12 => "F12",
+            NamedKey::Space => " ",
+            NamedKey::Backspace => "BACK",
+            NamedKey::Tab => "TAB",
+            NamedKey::Enter => "RETURN",
+            NamedKey::Escape => "ESCAPE",
+            NamedKey::Pause => "PAUSE",
+            NamedKey::PageUp => "PAGEUP",
+            NamedKey::PageDown => "PAGEDOWN",
+            NamedKey::End => "END",
+            NamedKey::Home => "HOME",
+            NamedKey::PrintScreen => "PRINTSCREEN",
+            NamedKey::Insert => "INSERT",
+            NamedKey::Delete => "DELETE",
+            NamedKey::ArrowUp => "UP",
+            NamedKey::ArrowDown => "DOWN",
+            NamedKey::ArrowLeft => "LEFT",
+            NamedKey::ArrowRight => "RIGHT",
+            NamedKey::NumLock => "NUMLOCK",
+            NamedKey::ScrollLock => "SCROLL",
+            _ => return None,
+        }),
         _ => return None,
     })
 }
 
-/// Attempts to convert the provided [&str], `s`, from the PoB Lua Backend to a
+/// Attempts to convert the provided [&str] `s` from the PoB Lua Backend to a
 /// [MouseButton].
 ///
 /// Returns [None] if no matching string found.
@@ -291,17 +238,17 @@ pub fn str_as_mousebutton(s: &str) -> Option<MouseButton> {
     })
 }
 
-/// Attempts to convert the provided [MouseButton] to a [str] that the PoB Lua
+/// Attempts to convert the provided [MouseButton] to a [SmolStr] that the PoB Lua
 /// backend recognizes.
 ///
 /// Returns [None] if no matching [MouseButton] was found.
-pub fn mousebutton_as_str(button: MouseButton) -> Option<&'static str> {
+pub fn mousebutton_as_str(button: MouseButton) -> Option<SmolStr> {
     Some(match button {
-        MouseButton::Left => "LEFTBUTTON",
-        MouseButton::Right => "RIGHTBUTTON",
-        MouseButton::Middle => "MIDDLEBUTTON",
-        MouseButton::Back => "MOUSE4",
-        MouseButton::Forward => "MOUSE5",
+        MouseButton::Left => SmolStr::new("LEFTBUTTON"),
+        MouseButton::Right => SmolStr::new("RIGHTBUTTON"),
+        MouseButton::Middle => SmolStr::new("MIDDLEBUTTON"),
+        MouseButton::Back => SmolStr::new("MOUSE4"),
+        MouseButton::Forward => SmolStr::new("MOUSE5"),
         _ => return None,
     })
 }

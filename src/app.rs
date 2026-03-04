@@ -14,7 +14,7 @@ use anyhow::Result;
 use std::path::PathBuf;
 use std::sync::Arc;
 use winit::{
-    application::ApplicationHandler, event::*, event_loop::ActiveEventLoop, keyboard::PhysicalKey,
+    application::ApplicationHandler, event::*, event_loop::ActiveEventLoop,
     platform::modifier_supplement::KeyEventExtModifierSupplement, window::Window,
 };
 
@@ -267,27 +267,27 @@ impl ApplicationHandler<GraphicsContext> for App {
             WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
                 self.state.window.set_scale_factor(scale_factor as f32);
             }
-            WindowEvent::KeyboardInput {
-                event:
-                    key_event @ KeyEvent {
-                        physical_key: PhysicalKey::Code(code),
-                        state,
-                        ..
-                    },
-                ..
-            } => {
+            WindowEvent::KeyboardInput { event, .. } => {
+                let state = event.state;
+
                 // update input state
-                self.state.input.set_key_pressed(code, state.is_pressed());
+                self.state
+                    .input
+                    .set_key_pressed(event.logical_key.clone(), state.is_pressed());
 
                 // forward KeyUp/KeyDown events
-                let event = match state {
-                    ElementState::Pressed => AppEvent::KeyDown { code },
-                    ElementState::Released => AppEvent::KeyUp { code },
+                let app_event = match state {
+                    ElementState::Pressed => AppEvent::KeyDown {
+                        key: event.logical_key.clone(),
+                    },
+                    ElementState::Released => AppEvent::KeyUp {
+                        key: event.logical_key.clone(),
+                    },
                 };
-                self.handle_event(event);
+                self.handle_event(app_event);
 
                 // handle text input
-                if let Some(text) = key_event.text_with_all_modifiers()
+                if let Some(text) = event.text_with_all_modifiers()
                     && state.is_pressed()
                 {
                     for ch in text.chars() {
