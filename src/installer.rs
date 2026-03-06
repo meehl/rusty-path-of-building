@@ -19,7 +19,7 @@ use std::{
     sync::mpsc::{self, Receiver, TryRecvError},
     thread,
 };
-use ureq::{Agent, config::Config, http::Response};
+use ureq::{Agent, http::Response};
 
 const REPO_NAME: &str = "meehl/rusty-pob-manifest";
 
@@ -29,6 +29,7 @@ enum DownloadProgress {
 }
 
 enum Progress {
+    Status(String),
     Download(DownloadProgress),
     Complete,
     Error(anyhow::Error),
@@ -36,6 +37,7 @@ enum Progress {
 
 enum CurrentProgress {
     Starting,
+    Status(String),
     Download(DownloadProgress),
 }
 
@@ -84,6 +86,9 @@ impl InstallMode {
                     Ok(Progress::Download(progress)) => {
                         self.current_progress = CurrentProgress::Download(progress);
                     }
+                    Ok(Progress::Status(msg)) => {
+                        self.current_progress = CurrentProgress::Status(msg);
+                    }
                     Ok(Progress::Complete) => {
                         return Ok(Some(ModeTransition::PoB));
                     }
@@ -126,6 +131,7 @@ impl InstallMode {
 
         let progress_text = match &self.current_progress {
             CurrentProgress::Starting => String::from("Starting download..."),
+            CurrentProgress::Status(msg) => msg.clone(),
             CurrentProgress::Download(progress) => match progress {
                 DownloadProgress::Percentage(progress) => {
                     let percent = (progress * 100.0) as u32;
@@ -175,16 +181,29 @@ fn install<P: AsRef<Path>>(
         return Ok(());
     }
 
+    progress_tx.send(Progress::Status("Fetching compatibility info...".into()))?;
+    log::info!("Fetching compatibility info...");
     let compatibility_info = fetch_compatibility_info(game)?;
+
+    progress_tx.send(Progress::Status("Resolving PoB version...".into()))?;
+    log::info!("Resolving supported PoB version...");
     let needed_pob_version = highest_supported_pob_version(&compatibility_info, current_version)
         .ok_or_else(|| anyhow::anyhow!("Unable to determine supported PoB version"))?;
+    log::info!("Using PoB version: {needed_pob_version}");
 
+    progress_tx.send(Progress::Status("Downloading assets...".into()))?;
     download_path_of_building(&target_dir, game, needed_pob_version, progress_tx)?;
+
+    progress_tx.send(Progress::Status("Patching UpdateCheck...".into()))?;
+    log::info!("Patching UpdateCheck...");
     replace_updatecheck(&target_dir)?;
+
+    progress_tx.send(Progress::Status("Finalizing installation...".into()))?;
+    log::info!("Finalizing installation...");
     set_branch_and_platform(&target_dir)?;
 
-    // write version file
     fs::write(&version_file_path, env!("CARGO_PKG_VERSION")).unwrap();
+    log::info!("Installation complete.");
 
     Ok(())
 }
