@@ -20,6 +20,8 @@ use std::{
     thread,
 };
 use ureq::http::Response;
+use ureq::config::{Config, IpFamily};
+use ureq::Agent;
 
 const REPO_NAME: &str = "meehl/rusty-pob-manifest";
 
@@ -486,9 +488,15 @@ fn http_get_with_backoff(url: &str) -> anyhow::Result<Response<ureq::Body>> {
     let mut attempt = 0;
     let mut backoff_secs: u64 = 2;
 
+    let agent: Agent = Config::builder()
+        .ip_family(IpFamily::Ipv4Only)
+        .build()
+        .into();
+
     loop {
         attempt += 1;
-        let resp_result = ureq::get(url)
+        let resp_result = agent
+            .get(url)
             .header("User-Agent", "rusty-path-of-building")
             .call();
 
