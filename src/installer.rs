@@ -19,7 +19,7 @@ use std::{
     sync::mpsc::{self, Receiver, TryRecvError},
     thread,
 };
-use ureq::http::Response;
+use ureq::{Agent, config::Config, http::Response};
 
 const REPO_NAME: &str = "meehl/rusty-pob-manifest";
 
@@ -486,9 +486,16 @@ fn http_get_with_backoff(url: &str) -> anyhow::Result<Response<ureq::Body>> {
     let mut attempt = 0;
     let mut backoff_secs: u64 = 2;
 
+    let config = Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(10)))
+        .build();
+
+    let agent: Agent = config.into();
+
     loop {
         attempt += 1;
-        let resp_result = ureq::get(url)
+        let resp_result = agent
+            .get(url)
             .header("User-Agent", "rusty-path-of-building")
             .call();
 
