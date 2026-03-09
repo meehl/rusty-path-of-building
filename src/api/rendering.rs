@@ -484,8 +484,15 @@ fn build_layout_job<'a>(
         }
     };
 
-    // TODO: check how PoB determines font size
-    let font_size = (line_height - 2).clamp(11, 32) as f32;
+    // NOTE: This is just an approximation and was chosen based on how it looks.
+    //
+    // PoB uses pre-rendered font atlases of discrete sizes and selects the appropriate
+    // atlas based on the provided height. Rusty-PoB dynamically renders fonts to a
+    // cached font atlas to support the selection of arbitrary sizes.
+    //
+    // TODO: font size in some dropdowns is too small, e.g. socket group selection in
+    // 'Calcs' tab
+    let font_size = (line_height - 2).max(1) as f32;
 
     let mut job = LayoutJob::new(
         font_family,
