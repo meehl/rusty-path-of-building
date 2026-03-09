@@ -52,6 +52,7 @@ pub struct Context {
     current_working_dir: Cell<*mut PathBuf>,
     layers: Cell<*mut Layers>,
     needs_restart: Cell<*mut bool>,
+    exit_requested: Cell<*mut bool>,
     is_dpi_aware: Cell<*mut bool>,
 }
 
@@ -66,6 +67,7 @@ impl Context {
             current_working_dir: Cell::new(std::ptr::null_mut()),
             layers: Cell::new(std::ptr::null_mut()),
             needs_restart: Cell::new(std::ptr::null_mut()),
+            exit_requested: Cell::new(std::ptr::null_mut()),
             is_dpi_aware: Cell::new(std::ptr::null_mut()),
         }))
     }
@@ -80,6 +82,7 @@ impl Context {
             .set(&mut ctx.pob.current_working_dir);
         self.layers.set(&mut ctx.pob.layers);
         self.needs_restart.set(&mut ctx.pob.needs_restart);
+        self.exit_requested.set(&mut ctx.pob.exit_requested);
         self.is_dpi_aware.set(&mut ctx.pob.is_dpi_aware);
     }
 
@@ -92,6 +95,7 @@ impl Context {
         self.current_working_dir.set(std::ptr::null_mut());
         self.layers.set(std::ptr::null_mut());
         self.needs_restart.set(std::ptr::null_mut());
+        self.exit_requested.set(std::ptr::null_mut());
         self.is_dpi_aware.set(std::ptr::null_mut());
     }
 
@@ -103,6 +107,7 @@ impl Context {
     ctx_accessor!(current_working_dir: &mut PathBuf);
     ctx_accessor!(layers: &mut Layers);
     ctx_accessor!(needs_restart: &mut bool);
+    ctx_accessor!(exit_requested: &mut bool);
     ctx_accessor!(is_dpi_aware: &mut bool);
 }
 
@@ -269,7 +274,17 @@ impl LuaInstance {
         // Call event handler in PoB application code
         let handler_result = match event {
             PoBEvent::Init => get_callback(&self.lua, "OnInit")?.call::<()>(()),
-            PoBEvent::Exit => get_callback(&self.lua, "OnExit")?.call::<()>(()),
+            PoBEvent::Exit => {
+                let can_exit: bool = get_callback(&self.lua, "CanExit")
+                    .and_then(|f| f.call(()))
+                    .unwrap_or(true);
+                if can_exit {
+                    get_callback(&self.lua, "OnExit")?.call::<()>(())?;
+                    let ctx = self.lua.app_data_ref::<&'static Context>().unwrap();
+                    *ctx.exit_requested() = true;
+                }
+                Ok(())
+            }
             PoBEvent::Frame => get_callback(&self.lua, "OnFrame")?.call::<()>(()),
             PoBEvent::KeyDown(key, double_click) => {
                 get_callback(&self.lua, "OnKeyDown")?.call::<()>((key.as_str(), double_click))

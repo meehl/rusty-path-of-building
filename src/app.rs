@@ -189,13 +189,22 @@ impl ApplicationHandler<GraphicsContext> for App {
         match event {
             WindowEvent::CloseRequested => {
                 self.handle_event(AppEvent::Exit);
-                event_loop.exit();
+                if self.current_mode.should_exit() {
+                    event_loop.exit();
+                } else {
+                    self.state.window.request_redraw();
+                }
             }
             WindowEvent::RedrawRequested => {
                 profiling::scope!("RedrawRequested");
 
                 if let Err(err) = self.update() {
                     log::error!("{err}");
+                    event_loop.exit();
+                    return;
+                }
+
+                if self.current_mode.should_exit() {
                     event_loop.exit();
                     return;
                 }
@@ -226,6 +235,11 @@ impl ApplicationHandler<GraphicsContext> for App {
                             return;
                         }
                     };
+                    
+                    if self.current_mode.should_exit() {
+                        event_loop.exit();
+                        return;
+                    }
 
                     if let Some(ref mut gfx) = self.gfx_context {
                         match gfx.render(render_job, self.state.window.scale_factor()) {
