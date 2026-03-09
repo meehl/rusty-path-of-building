@@ -65,4 +65,11 @@ impl AppMode {
             AppMode::PoB(mode) => mode.handle_event(state, event),
         }
     }
+
+    pub fn can_exit(&mut self, state: &mut AppState) -> bool {
+        match self {
+            AppMode::Install(_) => true,
+            AppMode::PoB(mode) => mode.can_exit(state),
+        }
+    }
 }

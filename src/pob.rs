@@ -147,6 +147,11 @@ impl PoBMode {
         Ok(())
     }
 
+    pub fn can_exit(&mut self, app_state: &mut AppState) -> bool {
+        let mut ctx = PoBContext::new(app_state, &mut self.state);
+        self.lua_instance.can_exit(&mut ctx)
+    }
+
     fn reset_viewport(&mut self, size: LogicalSize<u32>) {
         self.state
             .layers

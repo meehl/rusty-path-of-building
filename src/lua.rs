@@ -52,6 +52,7 @@ pub struct Context {
     current_working_dir: Cell<*mut PathBuf>,
     layers: Cell<*mut Layers>,
     needs_restart: Cell<*mut bool>,
+    should_exit: Cell<*mut bool>,
     is_dpi_aware: Cell<*mut bool>,
 }
 
@@ -66,6 +67,7 @@ impl Context {
             current_working_dir: Cell::new(std::ptr::null_mut()),
             layers: Cell::new(std::ptr::null_mut()),
             needs_restart: Cell::new(std::ptr::null_mut()),
+            should_exit: Cell::new(std::ptr::null_mut()),
             is_dpi_aware: Cell::new(std::ptr::null_mut()),
         }))
     }
@@ -80,6 +82,7 @@ impl Context {
             .set(&mut ctx.pob.current_working_dir);
         self.layers.set(&mut ctx.pob.layers);
         self.needs_restart.set(&mut ctx.pob.needs_restart);
+        self.should_exit.set(&mut ctx.app.should_exit);
         self.is_dpi_aware.set(&mut ctx.pob.is_dpi_aware);
     }
 
@@ -92,6 +95,7 @@ impl Context {
         self.current_working_dir.set(std::ptr::null_mut());
         self.layers.set(std::ptr::null_mut());
         self.needs_restart.set(std::ptr::null_mut());
+        self.should_exit.set(std::ptr::null_mut());
         self.is_dpi_aware.set(std::ptr::null_mut());
     }
 
@@ -103,6 +107,7 @@ impl Context {
     ctx_accessor!(current_working_dir: &mut PathBuf);
     ctx_accessor!(layers: &mut Layers);
     ctx_accessor!(needs_restart: &mut bool);
+    ctx_accessor!(should_exit: &mut bool);
     ctx_accessor!(is_dpi_aware: &mut bool);
 }
 
@@ -257,6 +262,18 @@ impl LuaInstance {
         let coroutine_module: Table = self.lua.globals().get("coroutine")?;
         let list_func: Function = coroutine_module.get("_list")?;
         list_func.call::<Table>(())
+    }
+
+    pub fn can_exit(&self, pob_ctx: &mut PoBContext) -> bool {
+        let ctx = self.lua.app_data_ref::<&'static Context>().unwrap();
+        ctx.set(pob_ctx);
+
+        let can_exit = get_callback(&self.lua, "CanExit")
+            .and_then(|f| f.call(()))
+            .unwrap_or(true);
+
+        ctx.clear();
+        can_exit
     }
 
     pub fn handle_event(&self, event: PoBEvent, pob_ctx: &mut PoBContext) -> LuaResult<()> {

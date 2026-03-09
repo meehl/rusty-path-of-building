@@ -61,6 +61,7 @@ pub fn register_globals(lua: &Lua) -> LuaResult<()> {
     // general
     globals.set("GetTime", lua.create_function(get_time)?)?;
     globals.set("StripEscapes", lua.create_function(strip_escapes)?)?;
+    globals.set("Exit", lua.create_function(exit)?)?;
     globals.set("Restart", lua.create_function(restart)?)?;
     globals.set("OpenURL", lua.create_function(open_url)?)?;
     globals.set("RenderInit", lua.create_function(render_init)?)?;
@@ -126,6 +127,15 @@ fn get_time(_l: &Lua, _: ()) -> LuaResult<u128> {
 
 fn strip_escapes(_: &Lua, text: String) -> LuaResult<String> {
     Ok(PoBString(&text).strip_escapes())
+}
+
+fn exit(l: &Lua, exit_msg: Option<String>) -> LuaResult<()> {
+    if let Some(exit_msg) = exit_msg {
+        println!("{exit_msg}");
+    }
+    let ctx = l.app_data_ref::<&'static Context>().unwrap();
+    *ctx.should_exit() = true;
+    Ok(())
 }
 
 fn restart(l: &Lua, _: ()) -> LuaResult<()> {
