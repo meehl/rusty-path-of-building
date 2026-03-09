@@ -12,7 +12,6 @@ pub struct PoBState {
     pub layers: Layers,
     pub current_working_dir: PathBuf,
     pub needs_restart: bool,
-    pub exit_requested: bool,
     pub is_dpi_aware: bool,
 }
 
@@ -32,7 +31,6 @@ impl PoBMode {
             layers: Layers::default(),
             current_working_dir: PathBuf::default(),
             needs_restart: false,
-            exit_requested: false,
             is_dpi_aware: false,
         };
 
@@ -149,8 +147,9 @@ impl PoBMode {
         Ok(())
     }
 
-    pub fn exit_requested(&self) -> bool {
-        self.state.exit_requested
+    pub fn can_exit(&mut self, app_state: &mut AppState) -> bool {
+        let mut ctx = PoBContext::new(app_state, &mut self.state);
+        self.lua_instance.can_exit(&mut ctx)
     }
 
     fn reset_viewport(&mut self, size: LogicalSize<u32>) {

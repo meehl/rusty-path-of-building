@@ -29,6 +29,7 @@ pub struct AppState {
     pub fonts: Fonts,
     pub texture_manager: WrappedTextureManager,
     pub script_dir: PathBuf,
+    pub should_exit: bool,
 }
 
 impl AppState {
@@ -59,6 +60,7 @@ impl App {
             fonts: Fonts::new(pob_font_definitions()),
             texture_manager: WrappedTextureManager::new(),
             script_dir,
+            should_exit: false,
         };
 
         let current_mode = if uses_custom_script_dir {
@@ -188,10 +190,8 @@ impl ApplicationHandler<GraphicsContext> for App {
     ) {
         match event {
             WindowEvent::CloseRequested => {
-                self.handle_event(AppEvent::Exit);
-                if self.current_mode.should_exit() {
-                    event_loop.exit();
-                } else {
+                self.state.should_exit = self.current_mode.can_exit(&mut self.state);
+                if !self.state.should_exit {
                     self.state.window.request_redraw();
                 }
             }
@@ -204,7 +204,8 @@ impl ApplicationHandler<GraphicsContext> for App {
                     return;
                 }
 
-                if self.current_mode.should_exit() {
+                if self.state.should_exit {
+                    self.handle_event(AppEvent::Exit);
                     event_loop.exit();
                     return;
                 }
@@ -235,11 +236,6 @@ impl ApplicationHandler<GraphicsContext> for App {
                             return;
                         }
                     };
-                    
-                    if self.current_mode.should_exit() {
-                        event_loop.exit();
-                        return;
-                    }
 
                     if let Some(ref mut gfx) = self.gfx_context {
                         match gfx.render(render_job, self.state.window.scale_factor()) {

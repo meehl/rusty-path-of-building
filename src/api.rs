@@ -129,12 +129,12 @@ fn strip_escapes(_: &Lua, text: String) -> LuaResult<String> {
     Ok(PoBString(&text).strip_escapes())
 }
 
-fn exit(l: &Lua, _: ()) -> LuaResult<()> {
-    if let Ok(on_exit) = get_callback(l, "OnExit") {
-        let _ = on_exit.call::<()>(());
+fn exit(l: &Lua, exit_msg: Option<String>) -> LuaResult<()> {
+    if let Some(exit_msg) = exit_msg {
+        println!("{exit_msg}");
     }
     let ctx = l.app_data_ref::<&'static Context>().unwrap();
-    *ctx.exit_requested() = true;
+    *ctx.should_exit() = true;
     Ok(())
 }
 

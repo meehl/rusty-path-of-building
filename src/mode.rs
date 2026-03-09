@@ -66,10 +66,10 @@ impl AppMode {
         }
     }
 
-    pub fn should_exit(&self) -> bool {
+    pub fn can_exit(&mut self, state: &mut AppState) -> bool {
         match self {
             AppMode::Install(_) => true,
-            AppMode::PoB(mode) => mode.exit_requested(),
+            AppMode::PoB(mode) => mode.can_exit(state),
         }
     }
 }
