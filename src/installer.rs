@@ -11,7 +11,6 @@ use crate::{
 use flate2::read::GzDecoder;
 use parley::{FontFamily, GenericFamily};
 use regex::Regex;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::{
     fs::{self},
     io::copy,
@@ -19,9 +18,15 @@ use std::{
     sync::mpsc::{self, Receiver, TryRecvError},
     thread,
 };
+use std::{
+    sync::LazyLock,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 use ureq::{Agent, http::Response};
 
 const REPO_NAME: &str = "meehl/rusty-pob-manifest";
+static VERSION_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^(\d+)\.(\d+)\.(\d+)$").unwrap());
 
 enum DownloadProgress {
     Percentage(f32), // percentage of total size (between 0 and 1)
@@ -236,6 +241,9 @@ fn fetch_compatibility_info(game: Game) -> anyhow::Result<Vec<VersionReq>> {
     Ok(compatibility_table
         .pairs::<String, String>()
         .filter_map(|p| p.ok())
+        // filter out beta versions. beta version adds a suffix to the version string which is not
+        // matched by the version regex resulting in them being filtered out
+        .filter(|(pob_version, _)| VERSION_RE.is_match(pob_version))
         .map(|(pob_version, min_req_rpob_ver)| VersionReq {
             pob_ver: pob_version,
             min_rpob_ver: min_req_rpob_ver,
@@ -359,8 +367,6 @@ fn download_path_of_building<P: AsRef<Path>>(
 
 /// Replaces UpdateCheck with rusty-path-of-building's modified version
 fn replace_updatecheck<P: AsRef<Path>>(target_dir: P) -> anyhow::Result<()> {
-    log::info!("Downloading modified UpdateCheck.lua script...");
-
     download_file(
         &format!(
             "https://raw.githubusercontent.com/{REPO_NAME}/main/{}",
@@ -570,10 +576,8 @@ fn http_get_with_backoff(url: &str) -> anyhow::Result<Response<ureq::Body>> {
 
 /// Compares two SemVer versions and returns true if v2 is higher or equal than v1
 fn is_higher_version(v1: &str, v2: &str) -> anyhow::Result<bool> {
-    let re = Regex::new(r"^(\d+)\.(\d+)\.(\d+)$").unwrap();
-
     let parse_version = |v: &str| -> anyhow::Result<(u32, u32, u32)> {
-        let caps = re
+        let caps = VERSION_RE
             .captures(v)
             .ok_or_else(|| anyhow::anyhow!("Invalid semver format: {}", v))?;
 
