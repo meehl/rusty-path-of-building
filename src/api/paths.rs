@@ -47,3 +47,15 @@ pub fn make_dir(l: &Lua, path: String) -> LuaResult<MultiValue> {
         Err(err) => Ok((Value::Nil, err.to_string()).into_lua_multi(l)?),
     }
 }
+
+pub fn remove_dir(l: &Lua, (path, recursive): (String, Option<bool>)) -> LuaResult<MultiValue> {
+    let result = if recursive.unwrap_or(false) {
+        fs::remove_dir_all(&path)
+    } else {
+        fs::remove_dir(&path)
+    };
+    match result {
+        Ok(_) => Ok(Value::Boolean(true).into_lua_multi(l)?),
+        Err(err) => Ok((Value::Nil, err.to_string()).into_lua_multi(l)?),
+    }
+}

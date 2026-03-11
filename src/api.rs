@@ -9,7 +9,8 @@ use crate::{
         input::{get_cursor_pos, is_key_down},
         lua::{load_module, protected_call, protected_load_module},
         paths::{
-            get_runtime_path, get_script_path, get_user_path, get_work_dir, make_dir, set_work_dir,
+            get_runtime_path, get_script_path, get_user_path, get_work_dir, make_dir, remove_dir,
+            set_work_dir,
         },
         rendering::PoBString,
         search_handle::new_search_handle,
@@ -51,6 +52,7 @@ pub fn register_globals(lua: &Lua) -> LuaResult<()> {
     globals.set("GetWorkDir", lua.create_function(get_work_dir)?)?;
     globals.set("SetWorkDir", lua.create_function(set_work_dir)?)?;
     globals.set("MakeDir", lua.create_function(make_dir)?)?;
+    globals.set("RemoveDir", lua.create_function(remove_dir)?)?;
 
     // console
     globals.set("ConPrintf", lua.create_function(console_printf)?)?;
