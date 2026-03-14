@@ -2,6 +2,8 @@
 
 ## [Unreleased] - ReleaseDate
 
+## [0.2.14] - 2026-03-14
+
 ### Fixed
 
 - Fix deletion of character build directories
@@ -172,8 +174,9 @@
 - First release
 
 <!-- next-url -->
+[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.14...HEAD
 
-[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.13...HEAD
+[0.2.14]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.13...v0.2.14
 [0.2.13]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.12...v0.2.13
 [0.2.12]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.11...v0.2.12
 [0.2.11]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.10...v0.2.11
