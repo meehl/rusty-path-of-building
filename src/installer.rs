@@ -4,55 +4,47 @@ use crate::{
     color::Srgba,
     dpi::{LogicalPoint, LogicalRect},
     fonts::{Alignment, FontStyle, LayoutJob},
+    installer::download::{
+        DownloadEvent, ExtractionRule, build_client, download_and_extract_tarball,
+        download_file_to_disk, fetch_file_contents,
+    },
     mode::{AppEvent, ModeFrameOutput, ModeTransition},
     renderer::primitives::{ClippedPrimitive, DrawPrimitive, TextPrimitive},
     util::replace_in_matching_lines,
 };
-use flate2::read::GzDecoder;
 use parley::{FontFamily, GenericFamily};
 use regex::Regex;
 use std::{
-    fs::{self},
-    io::copy,
-    path::{Path, PathBuf},
-    sync::mpsc::{self, Receiver, TryRecvError},
+    fs,
+    path::Path,
+    sync::{
+        LazyLock,
+        mpsc::{self, Receiver, TryRecvError},
+    },
     thread,
 };
-use std::{
-    sync::LazyLock,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
-use ureq::{Agent, http::Response};
 
-const REPO_NAME: &str = "meehl/rusty-pob-manifest";
+mod download;
+
+const COMPAT_REPO: &str = "meehl/rusty-pob-manifest";
+
 static VERSION_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^(\d+)\.(\d+)\.(\d+)$").unwrap());
 
-enum DownloadProgress {
-    Percentage(f32), // percentage of total size (between 0 and 1)
-    TotalBytes(u64), // amount of bytes downloaded
-}
+static MANIFEST_VERSION_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"<Version").unwrap());
 
 enum Progress {
     Status(String),
-    Download(DownloadProgress),
     Complete,
     Error(anyhow::Error),
 }
 
-enum CurrentProgress {
-    Starting,
-    Status(String),
-    Download(DownloadProgress),
-}
-
-/// Execution mode in which PoB's assets are downloaded if they don't exist yet.
+/// Execution mode in which initial installation of PoB is performed.
 ///
-/// Immediately transitions into PoB mode if assets already exist. Otherwise,
-/// it downloads them to the user directory and displays the download progress.
+/// Immediately transitions into PoB mode if already installed.
 pub struct InstallMode {
     progress_rx: Option<Receiver<Progress>>,
-    current_progress: CurrentProgress,
+    status: String,
 }
 
 impl InstallMode {
@@ -62,15 +54,15 @@ impl InstallMode {
 
         thread::spawn(move || {
             if let Err(err) = install(script_dir.as_path(), game, &progress_tx) {
-                progress_tx.send(Progress::Error(err)).unwrap();
+                let _ = progress_tx.send(Progress::Error(err));
                 return;
             }
-            progress_tx.send(Progress::Complete).unwrap();
+            let _ = progress_tx.send(Progress::Complete);
         });
 
         Self {
             progress_rx: Some(progress_rx),
-            current_progress: CurrentProgress::Starting,
+            status: String::from("Starting installation..."),
         }
     }
 
@@ -88,20 +80,13 @@ impl InstallMode {
         if let Some(progress_rx) = &self.progress_rx {
             loop {
                 match progress_rx.try_recv() {
-                    Ok(Progress::Download(progress)) => {
-                        self.current_progress = CurrentProgress::Download(progress);
-                    }
-                    Ok(Progress::Status(msg)) => {
-                        self.current_progress = CurrentProgress::Status(msg);
-                    }
-                    Ok(Progress::Complete) => {
-                        return Ok(Some(ModeTransition::PoB));
-                    }
+                    Ok(Progress::Status(msg)) => self.status = msg,
+                    Ok(Progress::Complete) => return Ok(Some(ModeTransition::PoB)),
                     Ok(Progress::Error(err)) => {
-                        return Err(anyhow::anyhow!("Download failed: {}", err));
+                        return Err(anyhow::anyhow!("Installation failed: {err}"));
                     }
                     Err(TryRecvError::Disconnected) => {
-                        return Err(anyhow::anyhow!("Download thread disconnected!"));
+                        return Err(anyhow::anyhow!("Install thread disconnected unexpectedly"));
                     }
                     Err(TryRecvError::Empty) => {
                         break;
@@ -134,24 +119,10 @@ impl InstallMode {
             FontStyle::Normal,
         );
 
-        let progress_text = match &self.current_progress {
-            CurrentProgress::Starting => String::from("Starting download..."),
-            CurrentProgress::Status(msg) => msg.clone(),
-            CurrentProgress::Download(progress) => match progress {
-                DownloadProgress::Percentage(progress) => {
-                    let percent = (progress * 100.0) as u32;
-                    format!("Downloading assets... ({})", percent)
-                }
-                DownloadProgress::TotalBytes(total_bytes) => {
-                    format!("Downloading assets... ({})", format_bytes(*total_bytes))
-                }
-            },
-        };
-        job.append(&progress_text, Srgba::WHITE);
+        job.append(&self.status, Srgba::WHITE);
 
         let layout = app_state.fonts.layout(job, app_state.window.scale_factor());
 
-        // center text vertically and horizontally
         let screen_size = app_state.window.logical_size().cast::<f32>();
         let pos = LogicalPoint::new(screen_size.width / 2.0, screen_size.height / 2.0);
 
@@ -162,52 +133,62 @@ impl InstallMode {
             primitive: DrawPrimitive::Text(primitive),
         };
 
-        let primitives = vec![clipped_primitive];
-        Box::new(primitives.into_iter())
+        Box::new(vec![clipped_primitive].into_iter())
     }
 }
 
+// Helper function for writing status to both the message channel and the log
+fn report(tx: &mpsc::Sender<Progress>, msg: impl Into<String>) {
+    let msg = msg.into();
+    log::info!("{msg}");
+    let _ = tx.send(Progress::Status(msg));
+}
+
+/// Performs full installation of PoB assets into `target_dir`.
+///
+/// Skips installation if `rpob.version` already exists.
+///
+/// Steps:
+/// 1. Fetch the compatibility table to determine which PoB version is
+///    supported by the current Rusty PoB version.
+/// 2. Download and extract the PoB release tarball into `target_dir`.
+/// 3. Replace `UpdateCheck.lua` with a patched version and update its
+///    checksum in `manifest.xml`. This is needed to support PoB native updater.
+/// 4. Set the branch and platform fields in `manifest.xml`.
+/// 5. Write `rpob.version` to mark the installation as complete.
 fn install<P: AsRef<Path>>(
     target_dir: P,
     game: Game,
     progress_tx: &mpsc::Sender<Progress>,
 ) -> anyhow::Result<()> {
-    // Skip installation if version file exists
-    let current_version = env!("CARGO_PKG_VERSION");
-    let version_file_path = target_dir.as_ref().join("rpob.version");
-    if version_file_path.exists() {
-        let old_version = fs::read_to_string(&version_file_path).unwrap();
+    let target_dir = target_dir.as_ref();
+    let client = build_client()?;
 
+    let version_file_path = target_dir.join("rpob.version");
+    let current_version = env!("CARGO_PKG_VERSION");
+    if version_file_path.exists() {
+        let old_version = fs::read_to_string(&version_file_path)?;
         if old_version != current_version {
-            log::info!("New version detected: {old_version} -> {current_version}");
+            log::info!("Version changed: {old_version} -> {current_version}");
             fs::write(&version_file_path, current_version).unwrap();
         }
-
         return Ok(());
     }
 
-    progress_tx.send(Progress::Status("Fetching compatibility info...".into()))?;
-    log::info!("Fetching compatibility info...");
-    let compatibility_info = fetch_compatibility_info(game)?;
-
-    progress_tx.send(Progress::Status("Resolving PoB version...".into()))?;
-    log::info!("Resolving supported PoB version...");
-    let needed_pob_version = highest_supported_pob_version(&compatibility_info, current_version)
+    report(progress_tx, "Fetching compatibility info...");
+    let compat_info = fetch_compatibility_info(&client, game)?;
+    let pob_version = highest_supported_pob_version(&compat_info, current_version)
         .ok_or_else(|| anyhow::anyhow!("Unable to determine supported PoB version"))?;
-    log::info!("Using PoB version: {needed_pob_version}");
+    log::info!("Using PoB version: {pob_version}");
 
-    progress_tx.send(Progress::Status("Downloading assets...".into()))?;
-    download_path_of_building(&target_dir, game, needed_pob_version, progress_tx)?;
+    report(progress_tx, "Downloading assets...");
+    download_pob(&client, target_dir, game, pob_version, progress_tx)?;
 
-    progress_tx.send(Progress::Status("Patching UpdateCheck...".into()))?;
-    log::info!("Patching UpdateCheck...");
-    replace_updatecheck(&target_dir)?;
+    report(progress_tx, "Finalizing installation...");
+    replace_updatecheck(&client, target_dir)?;
+    set_branch_and_platform(target_dir)?;
 
-    progress_tx.send(Progress::Status("Finalizing installation...".into()))?;
-    log::info!("Finalizing installation...");
-    set_branch_and_platform(&target_dir)?;
-
-    fs::write(&version_file_path, env!("CARGO_PKG_VERSION")).unwrap();
+    fs::write(&version_file_path, current_version)?;
     log::info!("Installation complete.");
 
     Ok(())
@@ -219,30 +200,27 @@ struct VersionReq {
     min_rpob_ver: String,
 }
 
-/// Fetches and evaluates compatibility table
-fn fetch_compatibility_info(game: Game) -> anyhow::Result<Vec<VersionReq>> {
-    let compatibility_info_file_name = match game {
+/// Fetches compatibility info
+fn fetch_compatibility_info(
+    client: &reqwest::blocking::Client,
+    game: Game,
+) -> anyhow::Result<Vec<VersionReq>> {
+    let file_name = match game {
         Game::Poe1 => "Compatibility_pob1.lua",
         Game::Poe2 => "Compatibility_pob2.lua",
     };
 
-    let compatibility_info_file_url = &format!(
-        "https://raw.githubusercontent.com/{REPO_NAME}/main/{}",
-        compatibility_info_file_name
-    );
-
-    let compatibility_info_file = download_file_contents(compatibility_info_file_url)?;
+    let compatibility_info_file = fetch_file_contents(client, COMPAT_REPO, file_name)?;
 
     // Load and evaluate compatibility file contents as Lua code
     let lua = mlua::Lua::new();
     let compatibility_table = lua.load(compatibility_info_file).eval::<mlua::Table>()?;
 
-    // Compatibility table maps PoB version to minimum required Rusty PoB version
+    // Compatibility table maps PoB version to minimum required Rusty PoB version.
+    // Beta versions have a non-semver suffix and are filtered out by the regex.
     Ok(compatibility_table
         .pairs::<String, String>()
         .filter_map(|p| p.ok())
-        // filter out beta versions. beta version adds a suffix to the version string which is not
-        // matched by the version regex resulting in them being filtered out
         .filter(|(pob_version, _)| VERSION_RE.is_match(pob_version))
         .map(|(pob_version, min_req_rpob_ver)| VersionReq {
             pob_ver: pob_version,
@@ -251,202 +229,145 @@ fn fetch_compatibility_info(game: Game) -> anyhow::Result<Vec<VersionReq>> {
         .collect())
 }
 
-/// Determines highest PoB version supported by given Rusty PoB version
+/// Determines the highest PoB version supported by the given Rusty PoB version.
 fn highest_supported_pob_version<'a>(
-    compatibility_info: &'a Vec<VersionReq>,
+    compatibility_info: &'a [VersionReq],
     rpob_version: &str,
 ) -> Option<&'a str> {
-    let mut highest_pob_version = None;
+    let mut highest: Option<&str> = None;
     for VersionReq {
         pob_ver,
         min_rpob_ver,
     } in compatibility_info
     {
         if is_higher_version(min_rpob_ver, rpob_version).unwrap_or(false) {
-            // found PoB version that meets our minimum requirements
-            match highest_pob_version {
-                // make sure it is the highest PoB version possible
-                Some(h_pob_version) => {
-                    if is_higher_version(h_pob_version, pob_ver).unwrap_or(false) {
-                        highest_pob_version = Some(pob_ver.as_str());
-                    }
-                }
-                None => highest_pob_version = Some(pob_ver.as_str()),
+            match highest {
+                Some(h) if !is_higher_version(h, pob_ver).unwrap_or(false) => {}
+                _ => highest = Some(pob_ver.as_str()),
             }
         }
     }
-
-    highest_pob_version
+    highest
 }
 
-/// Downloads specified version of Path of Building
-fn download_path_of_building<P: AsRef<Path>>(
+fn download_pob<P: AsRef<Path>>(
+    client: &reqwest::blocking::Client,
     target_dir: P,
     game: Game,
     pob_version: &str,
     progress_tx: &mpsc::Sender<Progress>,
 ) -> anyhow::Result<()> {
-    log::info!("Downloading Path of Building assets...");
+    let target_dir = target_dir.as_ref();
 
-    let repo = match game {
+    let pob_repo = match game {
         Game::Poe1 => "PathOfBuildingCommunity/PathOfBuilding",
         Game::Poe2 => "PathOfBuildingCommunity/PathOfBuilding-PoE2",
     };
-    let url = format!(
-        "https://github.com/{}/archive/refs/tags/v{}.tar.gz",
-        repo, pob_version
-    );
 
-    let mut response = http_get_with_backoff(&url)?;
-    let total_size = response
-        .headers()
-        .get("Content-Length")
-        .and_then(|s| s.to_str().ok()?.parse::<u64>().ok());
+    let rules = vec![
+        ExtractionRule::File {
+            tarball_path: "manifest.xml".into(),
+            dest_path: target_dir.join("manifest.xml"),
+        },
+        ExtractionRule::File {
+            tarball_path: "help.txt".into(),
+            dest_path: target_dir.join("help.txt"),
+        },
+        ExtractionRule::File {
+            tarball_path: "changelog.txt".into(),
+            dest_path: target_dir.join("changelog.txt"),
+        },
+        ExtractionRule::File {
+            tarball_path: "LICENSE.md".into(),
+            dest_path: target_dir.join("LICENSE.md"),
+        },
+        ExtractionRule::RewritePrefix {
+            prefix: "src/".into(),
+            dest_dir: target_dir.to_path_buf(),
+        },
+        ExtractionRule::RewritePrefix {
+            prefix: "runtime/lua/".into(),
+            dest_dir: target_dir.join("lua"),
+        },
+    ];
 
-    let body_reader = response.body_mut().as_reader();
-    let mut archive = tar::Archive::new(GzDecoder::new(body_reader));
-    let mut downloaded = 0u64;
-
-    for file in archive.entries()? {
-        let mut file = file?;
-        let file_path = file.path()?;
-        let components: Vec<_> = file_path.components().collect();
-
-        let target_path = match components.len() {
-            0..=1 => None,
-            // put these into target_dir/
-            2 => {
-                let filename = components[1].as_os_str();
-                if filename == "manifest.xml"
-                    || filename == "help.txt"
-                    || filename == "changelog.txt"
-                    || filename == "LICENSE.md"
-                {
-                    Some(target_dir.as_ref().join(filename))
-                } else {
-                    None
+    download_and_extract_tarball(
+        &client,
+        pob_repo,
+        &format!("v{pob_version}"),
+        &rules,
+        5,
+        &mut |event| {
+            let msg = match event {
+                DownloadEvent::Progress {
+                    downloaded,
+                    total: Some(total),
+                } => {
+                    let pct = (downloaded as f32 / total as f32 * 100.0) as u32;
+                    format!("Downloading assets... ({pct}%)")
                 }
-            }
-            // put lua runtime files into target_dir/lua/
-            3.. => {
-                if components[1].as_os_str() == "src"
-                    || (components[1].as_os_str() == "runtime"
-                        && components[2].as_os_str() == "lua")
-                {
-                    Some(
-                        target_dir
-                            .as_ref()
-                            .join(components[2..].iter().collect::<PathBuf>()),
-                    )
-                } else {
-                    None
+                DownloadEvent::Progress {
+                    downloaded,
+                    total: None,
+                } => {
+                    format!("Downloading assets... ({})", format_bytes(downloaded))
                 }
-            }
-        };
-
-        // create needed directories and extract
-        if let Some(target_path) = target_path {
-            if let Some(parent) = target_path.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            file.unpack(&target_path)?;
-        }
-
-        downloaded += file.size();
-
-        if let Some(total) = total_size {
-            let progress = downloaded as f32 / total as f32;
-            progress_tx.send(Progress::Download(DownloadProgress::Percentage(progress)))?;
-        } else {
-            progress_tx.send(Progress::Download(DownloadProgress::TotalBytes(downloaded)))?;
-        }
-    }
-
+                DownloadEvent::Retrying { attempt } => {
+                    format!("Retrying... (Attempt {})", attempt)
+                }
+            };
+            let _ = progress_tx.send(Progress::Status(msg));
+        },
+    )?;
     Ok(())
 }
 
-/// Replaces UpdateCheck with rusty-path-of-building's modified version
-fn replace_updatecheck<P: AsRef<Path>>(target_dir: P) -> anyhow::Result<()> {
-    download_file(
-        &format!(
-            "https://raw.githubusercontent.com/{REPO_NAME}/main/{}",
-            "UpdateCheck.lua"
-        ),
-        target_dir.as_ref().join("UpdateCheck.lua"),
-    )?;
+/// Replaces UpdateCheck.lua with rusty-path-of-building's modified version and
+/// updates its checksum in manifest.xml.
+fn replace_updatecheck<P: AsRef<Path>>(
+    client: &reqwest::blocking::Client,
+    target_dir: P,
+) -> anyhow::Result<()> {
+    let target_dir = target_dir.as_ref();
+    let file_name = "UpdateCheck.lua";
 
-    // Replace original checksum with checksum of modified update script
-    let new_checksum = download_file_contents(&format!(
-        "https://raw.githubusercontent.com/{REPO_NAME}/main/{}",
-        "UpdateCheck.lua.sha1"
-    ))?;
+    download_file_to_disk(client, COMPAT_REPO, file_name, target_dir.join(file_name))?;
 
-    // file contains checksum followed by filename (separated by whitespace)
-    // we only need the checksum
-    let new_checksum = new_checksum
+    // .sha1 file format: "<checksum>  UpdateCheck.lua" - we only need the checksum.
+    let sha1_contents = fetch_file_contents(client, COMPAT_REPO, "UpdateCheck.lua.sha1")?;
+    let new_checksum = sha1_contents
         .split_whitespace()
         .next()
-        .ok_or_else(|| anyhow::anyhow!("Invalid checksum file"))?;
+        .ok_or_else(|| anyhow::anyhow!("Invalid checksum file format"))?;
 
-    let filename = target_dir.as_ref().join("manifest.xml");
-    let manifest = fs::read_to_string(&filename)?;
-
+    let manifest_path = target_dir.join("manifest.xml");
+    let manifest = fs::read_to_string(&manifest_path)?;
     let new_manifest = replace_in_matching_lines(
         &manifest,
         r#"name="UpdateCheck.lua""#,
         r#"sha1="([0-9A-Za-z]+)""#,
-        &format!(r#"sha1="{}""#, new_checksum),
+        &format!(r#"sha1="{new_checksum}""#),
     );
-
-    fs::write(&filename, &new_manifest)?;
+    fs::write(&manifest_path, &new_manifest)?;
 
     Ok(())
 }
 
 /// Sets branch and platform in manifest.xml
 fn set_branch_and_platform<P: AsRef<Path>>(target_dir: P) -> anyhow::Result<()> {
-    let filename = target_dir.as_ref().join("manifest.xml");
-    let manifest = fs::read_to_string(&filename)?;
+    let path = target_dir.as_ref().join("manifest.xml");
+    let manifest = fs::read_to_string(&path)?;
 
-    #[cfg(not(target_os = "windows"))]
-    let platform = std::env::consts::OS;
     #[cfg(target_os = "windows")]
     let platform = "win32";
+    #[cfg(not(target_os = "windows"))]
+    let platform = std::env::consts::OS;
 
-    let new_version = format!(r#"<Version branch="master" platform="{}""#, platform);
-
-    let version_regex = Regex::new(r"<Version").unwrap();
-    let new_manifest = version_regex.replace(&manifest, new_version);
-
-    fs::write(&filename, new_manifest.as_ref())?;
+    let replacement = format!(r#"<Version branch="master" platform="{platform}""#);
+    let new_manifest = MANIFEST_VERSION_RE.replace(&manifest, replacement);
+    fs::write(&path, new_manifest.as_ref())?;
 
     Ok(())
-}
-
-/// Downloads file and saves it to given path
-fn download_file<P: AsRef<Path>>(url: &str, file_path: P) -> anyhow::Result<()> {
-    let mut response = http_get_with_backoff(url)?;
-
-    if response.status().is_success() {
-        let body = response.body_mut();
-        let mut file = fs::File::create(file_path)?;
-        copy(&mut body.as_reader(), &mut file)?;
-        Ok(())
-    } else {
-        anyhow::bail!("Unable to download: {}", url);
-    }
-}
-
-/// Downloads file and returns contents as string
-fn download_file_contents(url: &str) -> anyhow::Result<String> {
-    let mut response = http_get_with_backoff(url)?;
-
-    if response.status().is_success() {
-        let body = response.body_mut();
-        Ok(body.read_to_string()?)
-    } else {
-        anyhow::bail!("Unable to download: {}", url);
-    }
 }
 
 fn format_bytes(size_in_bytes: u64) -> String {
@@ -461,120 +382,11 @@ fn format_bytes(size_in_bytes: u64) -> String {
     } else if size_in_bytes >= KB {
         format!("{:.2} KB", size_in_bytes as f64 / KB as f64)
     } else {
-        format!("{} bytes", size_in_bytes)
+        format!("{size_in_bytes} bytes")
     }
 }
 
-/// Calculates wait time based on rate limit headers or falls back to default backoff.
-fn calculate_wait_time(resp: &Response<ureq::Body>, default_backoff: u64) -> u64 {
-    let headers = resp.headers();
-
-    // Wait for time specified in retry-after response header if present
-    if let Some(retry_after) = headers
-        .get("retry-after")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|s| s.parse::<u64>().ok())
-    {
-        return retry_after;
-    }
-
-    // The number of requests remaining in the current rate limit window
-    let remaining = headers
-        .get("x-ratelimit-remaining")
-        .and_then(|v| v.to_str().ok());
-
-    if remaining == Some("0") {
-        // Calculate time until rate limit reset
-        if let Some(reset_epoch) = headers
-            .get("x-ratelimit-reset")
-            .and_then(|v| v.to_str().ok())
-            .and_then(|s| s.parse::<u64>().ok())
-        {
-            let now_epoch = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs();
-
-            if reset_epoch > now_epoch {
-                return reset_epoch - now_epoch;
-            }
-        }
-    }
-
-    default_backoff
-}
-
-/// Performs a GET request with exponential backoff aware of GitHub rate limit headers.
-fn http_get_with_backoff(url: &str) -> anyhow::Result<Response<ureq::Body>> {
-    const MAX_ATTEMPTS: usize = 6;
-    const MAX_BACKOFF_SECS: u64 = 60;
-    let mut attempt = 0;
-    let mut backoff_secs: u64 = 2;
-
-    let config = Agent::config_builder()
-        .timeout_global(Some(Duration::from_secs(10)))
-        .build();
-
-    let agent: Agent = config.into();
-
-    loop {
-        attempt += 1;
-        let resp_result = agent
-            .get(url)
-            .header("User-Agent", "rusty-path-of-building")
-            .call();
-
-        let resp = match resp_result {
-            Ok(r) => r,
-            Err(err) => {
-                log::warn!(
-                    "Transport error: {} (attempt {}/{})",
-                    err,
-                    attempt,
-                    MAX_ATTEMPTS
-                );
-                if attempt >= MAX_ATTEMPTS {
-                    return Err(anyhow::Error::new(err));
-                }
-                thread::sleep(Duration::from_secs(backoff_secs));
-                backoff_secs = (backoff_secs * 2).min(MAX_BACKOFF_SECS);
-                continue;
-            }
-        };
-
-        let status = resp.status();
-        if status == 403 || status == 429 {
-            let wait = calculate_wait_time(&resp, backoff_secs);
-
-            log::warn!(
-                "Rate limited (status {}). Waiting {}s before retry (attempt {}/{})",
-                status,
-                wait,
-                attempt,
-                MAX_ATTEMPTS
-            );
-            if attempt >= MAX_ATTEMPTS {
-                return Err(anyhow::anyhow!(
-                    "HTTP {} after {} attempts for {}",
-                    status,
-                    attempt,
-                    url
-                ));
-            }
-            thread::sleep(Duration::from_secs(wait));
-            backoff_secs = (backoff_secs * 2).min(MAX_BACKOFF_SECS);
-            continue;
-        }
-
-        if status.is_client_error() || status.is_server_error() {
-            return Err(anyhow::anyhow!("http status: {} for {}", status, url));
-        }
-
-        return Ok(resp);
-    }
-}
-
-/// Compares two SemVer versions and returns true if v2 is higher or equal than v1
+/// Returns true if `v2` is greater than or equal to `v1`.
 fn is_higher_version(v1: &str, v2: &str) -> anyhow::Result<bool> {
     let parse_version = |v: &str| -> anyhow::Result<(u32, u32, u32)> {
         let caps = VERSION_RE
@@ -602,25 +414,25 @@ mod tests {
 
     #[test]
     fn test_major_version() {
-        assert_eq!(is_higher_version("1.0.0", "2.0.0").unwrap(), true);
-        assert_eq!(is_higher_version("2.0.0", "1.0.0").unwrap(), false);
+        assert!(is_higher_version("1.0.0", "2.0.0").unwrap());
+        assert!(!is_higher_version("2.0.0", "1.0.0").unwrap());
     }
 
     #[test]
     fn test_minor_version() {
-        assert_eq!(is_higher_version("1.5.0", "1.6.0").unwrap(), true);
-        assert_eq!(is_higher_version("1.10.0", "1.9.0").unwrap(), false);
+        assert!(is_higher_version("1.5.0", "1.6.0").unwrap());
+        assert!(!is_higher_version("1.10.0", "1.9.0").unwrap());
     }
 
     #[test]
     fn test_patch_version() {
-        assert_eq!(is_higher_version("1.0.3", "1.0.4").unwrap(), true);
-        assert_eq!(is_higher_version("1.0.10", "1.0.9").unwrap(), false);
+        assert!(is_higher_version("1.0.3", "1.0.4").unwrap());
+        assert!(!is_higher_version("1.0.10", "1.0.9").unwrap());
     }
 
     #[test]
     fn test_same_version() {
-        assert_eq!(is_higher_version("1.5.3", "1.5.3").unwrap(), true);
+        assert!(is_higher_version("1.5.3", "1.5.3").unwrap());
     }
 
     #[test]
@@ -635,33 +447,33 @@ mod tests {
     fn test_highest_supported_pob_ver() {
         let compat_info = vec![
             VersionReq {
-                pob_ver: String::from("2.56.0"),
-                min_rpob_ver: String::from("0.1.0"),
+                pob_ver: "2.56.0".into(),
+                min_rpob_ver: "0.1.0".into(),
             },
             // compat info might not be sorted by pob_version
             VersionReq {
-                pob_ver: String::from("2.58.0"),
-                min_rpob_ver: String::from("0.2.6"),
+                pob_ver: "2.58.0".into(),
+                min_rpob_ver: "0.2.6".into(),
             },
             VersionReq {
-                pob_ver: String::from("2.57.0"),
-                min_rpob_ver: String::from("0.2.6"),
+                pob_ver: "2.57.0".into(),
+                min_rpob_ver: "0.2.6".into(),
             },
             VersionReq {
-                pob_ver: String::from("2.58.1"),
-                min_rpob_ver: String::from("0.2.8"),
+                pob_ver: "2.58.1".into(),
+                min_rpob_ver: "0.2.8".into(),
             },
             VersionReq {
-                pob_ver: String::from("2.59.0"),
-                min_rpob_ver: String::from("0.2.9"),
+                pob_ver: "2.59.0".into(),
+                min_rpob_ver: "0.2.9".into(),
             },
             VersionReq {
-                pob_ver: String::from("2.59.1"),
-                min_rpob_ver: String::from("0.2.10"),
+                pob_ver: "2.59.1".into(),
+                min_rpob_ver: "0.2.10".into(),
             },
             VersionReq {
-                pob_ver: String::from("2.59.2"),
-                min_rpob_ver: String::from("0.2.10"),
+                pob_ver: "2.59.2".into(),
+                min_rpob_ver: "0.2.10".into(),
             },
         ];
         assert_eq!(highest_supported_pob_version(&compat_info, "0.0.2"), None);
