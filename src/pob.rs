@@ -138,7 +138,6 @@ impl PoBMode {
                 }
             }
             AppEvent::CharacterInput { ch } => {
-                let ch = if ch.is_ascii() { ch } else { '?' };
                 self.lua_instance
                     .handle_event(PoBEvent::Char(ch), &mut ctx)?;
             }
