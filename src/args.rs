@@ -13,7 +13,7 @@ use std::path::PathBuf;
 #[command(version, about, long_about = None)]
 pub struct Args {
     /// Used to determine which PoB to start. (PoE1 or PoE2)
-    #[arg(value_enum, default_value = "poe1")]
+    #[arg(value_enum)]
     pub game: Game,
 
     /// Specify a build to load on start using a URL. (Optional)
