@@ -52,7 +52,9 @@ pub struct App {
 impl App {
     pub fn new(game: Game, custom_script_dir: Option<PathBuf>) -> Result<Self> {
         let uses_custom_script_dir = custom_script_dir.is_some();
-        let script_dir = custom_script_dir.unwrap_or_else(|| game.script_dir());
+        let raw_script_dir = custom_script_dir.unwrap_or_else(|| game.script_dir());
+        // Normalize to strip \\?\ prefix on Windows so paths passed to Lua are clean
+        let script_dir = dunce::simplified(&raw_script_dir).to_path_buf();
 
         let mut state = AppState {
             window: WindowState::default(),

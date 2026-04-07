@@ -7,7 +7,7 @@ use crate::{
     layers::Layers,
     pob::PoBState,
     renderer::textures::WrappedTextureManager,
-    subscript::{NativeMultiValue, SubscriptManager, SubscriptResult, register_subscript_globals},
+    subscript::{register_subscript_globals, NativeMultiValue, SubscriptManager, SubscriptResult},
     util::change_working_directory,
     window::WindowState,
 };
@@ -312,9 +312,9 @@ impl LuaInstance {
         let package: Table = lua.globals().get("package")?;
         let mut package_path: String = package.get("path")?;
         package_path.push(';');
-        package_path.push_str(script_dir.join("lua/?.lua").to_str().unwrap());
+        package_path.push_str(&script_dir.join("lua/?.lua").to_string_lossy());
         package_path.push(';');
-        package_path.push_str(script_dir.join("lua/?/init.lua").to_str().unwrap());
+        package_path.push_str(&script_dir.join("lua/?/init.lua").to_string_lossy());
         package.set("path", package_path)?;
 
         Ok(())

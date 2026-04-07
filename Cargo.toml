@@ -45,5 +45,12 @@ zstd = "0.13.3"
 [target.'cfg(unix)'.dependencies]
 smithay-clipboard = "0.7.3"
 
+[build-dependencies]
+image = { version = "0.25", default-features = false, features = ["png"] }
+ico = "0.3"
+
+[target.'cfg(target_os = "windows")'.build-dependencies]
+winresource = "0.1"
+
 [features]
 profile-with-puffin = ["profiling/profile-with-puffin", "dep:puffin_http"]

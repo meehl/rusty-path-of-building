@@ -1,3 +1,8 @@
+#![cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
+
 use crate::{app::App, args::Args};
 use clap::Parser;
 use std::path::{Path, PathBuf};
@@ -60,7 +65,7 @@ fn find_nearby_launch_script() -> Option<PathBuf> {
 
     for candidate in candidates {
         if candidate.try_exists().is_ok_and(|exists| exists) {
-            if let Some(Ok(candidate)) = candidate.parent().map(Path::canonicalize) {
+            if let Some(Ok(candidate)) = candidate.parent().map(dunce::canonicalize) {
                 return Some(candidate);
             }
         }

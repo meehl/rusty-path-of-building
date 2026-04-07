@@ -8,7 +8,7 @@ use ahash::AHasher;
 
 pub fn get_executable_dir() -> anyhow::Result<PathBuf> {
     let exe_path = env::current_exe()?;
-    let exe_parent_dir = exe_path.parent().unwrap().canonicalize()?;
+    let exe_parent_dir = dunce::canonicalize(exe_path.parent().unwrap())?;
     Ok(exe_parent_dir)
 }
 
