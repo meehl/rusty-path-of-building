@@ -167,6 +167,7 @@ impl App {
 
         let window = event_loop.create_window(window_attributes)?;
         let window = Arc::new(window);
+        window.set_ime_allowed(true);
         self.state.window.set_window(Arc::clone(&window));
         self.gfx_context = Some(pollster::block_on(GraphicsContext::new(window))?);
 
@@ -276,6 +277,17 @@ impl ApplicationHandler<GraphicsContext> for App {
             }
             WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
                 self.state.window.set_scale_factor(scale_factor as f32);
+            }
+            WindowEvent::Ime(ime) => {
+                match ime {
+                    Ime::Commit(text) => {
+                        for ch in text.chars() {
+                            let event = AppEvent::CharacterInput { ch };
+                            self.handle_event(event);
+                        }
+                    }
+                    Ime::Preedit(_, _) | Ime::Enabled | Ime::Disabled => {}
+                }
             }
             WindowEvent::KeyboardInput { event, .. } => {
                 let state = event.state;

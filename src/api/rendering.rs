@@ -66,14 +66,20 @@ pub fn register_globals(lua: &Lua) -> LuaResult<()> {
 }
 
 macro_rules! str_from_stack {
-    ($s:ident, $i:expr) => {
-        unsafe {
-            let mut size = 0;
-            let data = ffi::luaL_checklstring($s, $i, &mut size);
-            let bytes = std::slice::from_raw_parts(data as *const u8, size);
-            std::str::from_utf8_unchecked(bytes)
-        }
-    };
+    ($s:ident, $i:expr) => {{
+        let mut size = 0;
+        let data = unsafe { ffi::luaL_checklstring($s, $i, &mut size) };
+        let bytes = unsafe { std::slice::from_raw_parts(data as *const u8, size) };
+        // Lua strings are arbitrary byte arrays and may not be valid UTF-8.
+        // DrawStringCursorIndex returns a UTF-8 byte offset, which PoB uses with
+        // string.sub() to slice text. For multi-byte characters (e.g. Chinese UTF-8)
+        // this produces mid-character byte sequences that are not valid UTF-8.
+        // Lossy conversion replaces them with U+FFFD instead of causing UB in
+        // parley/swash. Backspace in Chinese text fields may show garbled characters
+        // as a result; fixing this properly requires DrawStringCursorIndex to return
+        // a character count instead of a byte offset.
+        String::from_utf8_lossy(bytes)
+    }};
 }
 
 macro_rules! f32_from_stack {
@@ -135,7 +141,7 @@ unsafe extern "C-unwind" fn set_draw_color(state: *mut ffi::lua_State) -> c_int 
         // escape_code
         1 => {
             let esc_str = str_from_stack!(state, -nargs);
-            let color = Srgba::from_escape_code(esc_str);
+            let color = Srgba::from_escape_code(&esc_str);
             ctx.layers().set_draw_color(color);
         }
         // rgb
@@ -392,7 +398,7 @@ unsafe extern "C-unwind" fn draw_string(state: *mut ffi::lua_State) -> c_int {
 
     let current_draw_color = ctx.layers().get_draw_color();
     let job = build_layout_job(
-        text,
+        &text,
         current_draw_color,
         font_type,
         line_height,
@@ -428,7 +434,7 @@ unsafe extern "C-unwind" fn get_string_width(state: *mut ffi::lua_State) -> c_in
         Err(_) => panic!("Invalid font type"),
     };
 
-    let job = build_layout_job(text, Srgba::WHITE, font_type, line_height, None);
+    let job = build_layout_job(&text, Srgba::WHITE, font_type, line_height, None);
     let width = ctx.fonts().get_text_width(job, ctx.window().scale_factor());
 
     unsafe { ffi::lua_pushnumber(state, width as f64) };
@@ -451,6 +457,13 @@ fn get_index_at_cur(
         ctx.window().scale_factor(),
     );
 
+    // NOTE: parley returns a UTF-8 byte offset, not a character count. PoB uses
+    // this value with string.sub(), which is byte-indexed, so ASCII works fine.
+    // For multi-byte characters (e.g. Chinese, 3 bytes each) the offset points
+    // into the middle of a character; the resulting invalid UTF-8 is replaced
+    // with U+FFFD by str_from_stack!(). Fixing this properly requires returning
+    // a character count here instead.
+    //
     // convert to lua's 1-based indexing
     Ok(index + 1)
 }
