@@ -16,6 +16,12 @@ pub fn get_screen_size(l: &Lua, _: ()) -> LuaResult<(u32, u32)> {
     Ok(size)
 }
 
+pub fn get_virtual_screen_size(l: &Lua, _: ()) -> LuaResult<(u32, u32)> {
+    let ctx = l.app_data_ref::<&'static Context>().unwrap();
+    let LogicalSize { width, height, .. } = ctx.window().logical_size();
+    Ok((width, height))
+}
+
 pub fn get_screen_scale(l: &Lua, _: ()) -> LuaResult<f32> {
     let ctx = l.app_data_ref::<&'static Context>().unwrap();
     let scale_factor = ctx.window().scale_factor();

@@ -3108,6 +3108,7 @@ dependencies = [
  "clap",
  "dds",
  "directories",
+ "dunce",
  "env_logger",
  "euclid",
  "fast_image_resize",
