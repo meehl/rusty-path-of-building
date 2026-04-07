@@ -6,28 +6,36 @@ use crate::{
     util::{change_working_directory, get_executable_dir},
 };
 
-pub fn get_user_path(l: &Lua, _: ()) -> LuaResult<PathBuf> {
+/// Convert a PathBuf to a forward-slash string suitable for Lua.
+/// Strips the \\?\ extended-length prefix on Windows and normalizes
+/// backslashes to forward slashes.
+fn path_to_lua_string(path: PathBuf) -> String {
+    let simplified = dunce::simplified(&path).to_path_buf();
+    simplified.to_string_lossy().replace('\\', "/")
+}
+
+pub fn get_user_path(l: &Lua, _: ()) -> LuaResult<String> {
     let ctx = l.app_data_ref::<&'static Context>().unwrap();
-    Ok(ctx.script_dir().join("userdata"))
+    Ok(path_to_lua_string(ctx.script_dir().join("userdata")))
 }
 
 // parent directory of Launch.lua script
-pub fn get_script_path(l: &Lua, _: ()) -> LuaResult<PathBuf> {
+pub fn get_script_path(l: &Lua, _: ()) -> LuaResult<String> {
     let ctx = l.app_data_ref::<&'static Context>().unwrap();
-    Ok(ctx.script_dir().to_owned())
+    Ok(path_to_lua_string(ctx.script_dir().to_owned()))
 }
 
 // parent directory of executable
-pub fn get_runtime_path(_: &Lua, _: ()) -> LuaResult<PathBuf> {
+pub fn get_runtime_path(_: &Lua, _: ()) -> LuaResult<String> {
     match get_executable_dir() {
-        Ok(exe_path) => Ok(exe_path),
-        Err(_) => Ok(PathBuf::new()),
+        Ok(exe_path) => Ok(path_to_lua_string(exe_path)),
+        Err(_) => Ok(String::new()),
     }
 }
 
-pub fn get_work_dir(l: &Lua, _: ()) -> LuaResult<PathBuf> {
+pub fn get_work_dir(l: &Lua, _: ()) -> LuaResult<String> {
     let ctx = l.app_data_ref::<&'static Context>().unwrap();
-    Ok(ctx.current_working_dir().to_path_buf())
+    Ok(path_to_lua_string(ctx.current_working_dir().to_path_buf()))
 }
 
 // NOTE: unused
