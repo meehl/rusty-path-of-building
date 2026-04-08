@@ -37,12 +37,18 @@ regex = "1.11.2"
 reqwest = { version = "0.13.2", features = ["blocking"] }
 swash = "0.2.5"
 tar = "0.4.44"
-wgpu = { version = "27.0.1", default-features = false, features = ["std", "parking_lot", "vulkan", "wgsl"] }
+wgpu = { version = "27.0.1", default-features = false, features = ["std", "parking_lot", "wgsl"] }
 winit = "0.30"
 zstd = "0.13.3"
 
 [target.'cfg(unix)'.dependencies]
 smithay-clipboard = "0.7.3"
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+wgpu = { version = "27.0.1", default-features = false, features = ["vulkan"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+wgpu = { version = "27.0.1", default-features = false, features = ["metal"] }
 
 [features]
 profile-with-puffin = ["profiling/profile-with-puffin", "dep:puffin_http"]
