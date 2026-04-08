@@ -48,7 +48,7 @@ Then reload your shell or run `source ~/.bash_profile`.
 cargo run <poe1|poe2>
 ```
 
-Waiting for download the Path of Building files to:
+Path of Building files are automatically downloaded to the following directories on first startup:
 
 - poe1: `~/Library/Application Support/RustyPathOfBuilding1`
 - poe2: `~/Library/Application Support/RustyPathOfBuilding2`
