@@ -5,7 +5,7 @@ use raw_window_handle::RawDisplayHandle;
 /// `smithay_clipboard`: Used on wayland
 /// `arboard`: All other platforms (check arboard docs for platform support)
 pub struct Clipboard {
-    #[cfg(target_family = "unix")]
+    #[cfg(target_os = "linux")]
     smithay: Option<smithay_clipboard::Clipboard>,
     arboard: Option<arboard::Clipboard>,
     // fallback if everything else fails. only supports intra-application copy/paste
@@ -15,7 +15,7 @@ pub struct Clipboard {
 impl Clipboard {
     pub fn new(_raw_display_handle: Option<RawDisplayHandle>) -> Self {
         Self {
-            #[cfg(target_family = "unix")]
+            #[cfg(target_os = "linux")]
             smithay: create_smithay_clipboard(_raw_display_handle),
             arboard: create_arboard_clipboard(),
             fallback: None,
@@ -24,7 +24,7 @@ impl Clipboard {
 
     /// Sets the text content of clipboard
     pub fn set_text(&mut self, text: String) {
-        #[cfg(target_family = "unix")]
+        #[cfg(target_os = "linux")]
         if let Some(clipboard) = &mut self.smithay {
             clipboard.store(text);
             return;
@@ -40,7 +40,7 @@ impl Clipboard {
 
     /// Gets the text content of clipboard
     pub fn get_text(&mut self) -> Option<String> {
-        #[cfg(target_family = "unix")]
+        #[cfg(target_os = "linux")]
         if let Some(clipboard) = &mut self.smithay {
             return clipboard.load().ok();
         }
@@ -57,7 +57,7 @@ impl Clipboard {
     }
 }
 
-#[cfg(target_family = "unix")]
+#[cfg(target_os = "linux")]
 fn create_smithay_clipboard(
     raw_display_handle: Option<RawDisplayHandle>,
 ) -> Option<smithay_clipboard::Clipboard> {
