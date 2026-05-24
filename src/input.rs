@@ -8,8 +8,8 @@ use winit::{
     keyboard::{Key, ModifiersState, NamedKey, SmolStr},
 };
 
-const DOUBLE_CLICK_DURATION: Duration = Duration::from_millis(400);
-const DOUBLE_CLICK_MOVE_THRESHOLD: f32 = 4.0;
+const DOUBLE_CLICK_DURATION: Duration = Duration::from_millis(500);
+const DOUBLE_CLICK_MOVE_THRESHOLD: f32 = 5.0;
 
 #[derive(Debug, Clone)]
 struct MousePressState {
