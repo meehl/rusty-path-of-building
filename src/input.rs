@@ -60,7 +60,10 @@ impl InputState {
         match self.mouse_last_pressed.entry(button) {
             std::collections::hash_map::Entry::Occupied(mut entry) => {
                 let last = entry.get();
-                let is_double = now.duration_since(last.time) < DOUBLE_CLICK_DURATION;
+                let delta = (last.pos - pos).abs();
+                let is_double = now.duration_since(last.time) < DOUBLE_CLICK_DURATION
+                    && delta.x <= DOUBLE_CLICK_MOVE_THRESHOLD
+                    && delta.y <= DOUBLE_CLICK_MOVE_THRESHOLD;
                 if is_double {
                     // Reset so that a triple-click is not treated as two consecutive
                     // double-clicks; the next click starts a fresh timing window.
