@@ -8,6 +8,15 @@ use winit::{
     keyboard::{Key, ModifiersState, NamedKey, SmolStr},
 };
 
+const DOUBLE_CLICK_DURATION: Duration = Duration::from_millis(400);
+const DOUBLE_CLICK_MOVE_THRESHOLD: f32 = 4.0;
+
+#[derive(Debug, Clone)]
+struct MousePressState {
+    time: Instant,
+    pos: LogicalPoint<f32>,
+}
+
 /// Current state of various keyboard and mouse inputs for the application.
 #[derive(Default)]
 pub struct InputState {
@@ -18,7 +27,7 @@ pub struct InputState {
     /// HashSet of currently pressed mouse buttons.
     mouse_pressed: HashSet<MouseButton>,
     /// HashMap of mouse buttons (keys) with the last time they were pressed.
-    mouse_last_pressed: HashMap<MouseButton, Instant>,
+    mouse_last_pressed: HashMap<MouseButton, MousePressState>,
     /// Current cursor position relative to the top-left corner of the window.
     cursor_pos: LogicalPoint<f32>,
 }
@@ -41,22 +50,28 @@ impl InputState {
     /// Updates [`Self::mouse_pressed`](field@Self::mouse_pressed) based on provided
     /// `button` and `is_pressed`.
     pub fn set_mouse_pressed(&mut self, button: MouseButton, is_pressed: bool) -> bool {
-        if is_pressed {
-            self.mouse_pressed.insert(button);
-        } else {
+        if !is_pressed {
             self.mouse_pressed.remove(&button);
+            return false;
         }
-
+        self.mouse_pressed.insert(button);
         let now = Instant::now();
-        let last = self.mouse_last_pressed.entry(button);
-
-        match last {
-            std::collections::hash_map::Entry::Occupied(mut occupied_entry) => {
-                let last = occupied_entry.insert(now);
-                now.duration_since(last) < Duration::from_millis(400)
+        let pos = self.cursor_pos;
+        match self.mouse_last_pressed.entry(button) {
+            std::collections::hash_map::Entry::Occupied(mut entry) => {
+                let last = entry.get();
+                let is_double = now.duration_since(last.time) < DOUBLE_CLICK_DURATION;
+                if is_double {
+                    // Reset so that a triple-click is not treated as two consecutive
+                    // double-clicks; the next click starts a fresh timing window.
+                    entry.remove();
+                } else {
+                    entry.insert(MousePressState { time: now, pos });
+                }
+                is_double
             }
-            std::collections::hash_map::Entry::Vacant(vacant_entry) => {
-                vacant_entry.insert(now);
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                entry.insert(MousePressState { time: now, pos });
                 false
             }
         }
@@ -75,6 +90,11 @@ impl InputState {
     /// Sets [`Self::cursor_pos`] to the provided `pos`.
     pub fn set_mouse_pos(&mut self, pos: LogicalPoint<f32>) {
         self.cursor_pos = pos;
+        self.mouse_last_pressed.retain(|_, state| {
+            let dx = pos.x - state.pos.x;
+            let dy = pos.y - state.pos.y;
+            dx * dx + dy * dy <= (DOUBLE_CLICK_MOVE_THRESHOLD * DOUBLE_CLICK_MOVE_THRESHOLD)
+        });
     }
 
     /// Clears all pressed keys, buttons, and modifier states. Used when the
@@ -82,6 +102,7 @@ impl InputState {
     pub fn clear_pressed(&mut self) {
         self.keys_pressed.clear();
         self.mouse_pressed.clear();
+        self.mouse_last_pressed.clear();
         self.key_modifiers = ModifiersState::empty();
     }
 }
