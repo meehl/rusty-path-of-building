@@ -93,11 +93,6 @@ impl InputState {
     /// Sets [`Self::cursor_pos`] to the provided `pos`.
     pub fn set_mouse_pos(&mut self, pos: LogicalPoint<f32>) {
         self.cursor_pos = pos;
-        self.mouse_last_pressed.retain(|_, state| {
-            let dx = pos.x - state.pos.x;
-            let dy = pos.y - state.pos.y;
-            dx * dx + dy * dy <= (DOUBLE_CLICK_MOVE_THRESHOLD * DOUBLE_CLICK_MOVE_THRESHOLD)
-        });
     }
 
     /// Clears all pressed keys, buttons, and modifier states. Used when the
