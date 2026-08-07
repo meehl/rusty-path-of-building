@@ -15,8 +15,8 @@ use crate::{
         rendering::PoBString,
         search_handle::new_search_handle,
         window::{
-            get_dpi_scale_override, get_screen_scale, get_screen_size, set_dpi_scale_override,
-            set_foreground, set_window_title,
+            get_dpi_scale_override, get_screen_scale, get_screen_size, get_virtual_screen_size,
+            set_dpi_scale_override, set_foreground, set_window_title,
         },
     },
     lua::Context,
@@ -91,6 +91,10 @@ pub fn register_globals(lua: &Lua) -> LuaResult<()> {
 
     // window
     globals.set("GetScreenSize", lua.create_function(get_screen_size)?)?;
+    globals.set(
+        "GetVirtualScreenSize",
+        lua.create_function(get_virtual_screen_size)?,
+    )?;
     globals.set("GetScreenScale", lua.create_function(get_screen_scale)?)?;
     globals.set("SetWindowTitle", lua.create_function(set_window_title)?)?;
     globals.set("SetForeground", lua.create_function(set_foreground)?)?;
