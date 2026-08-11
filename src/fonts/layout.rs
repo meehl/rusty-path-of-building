@@ -1,6 +1,6 @@
 use crate::{color::Srgba, dpi::LogicalPoint, fonts::rasterizer::RasterizedGlyph};
 use ordered_float::OrderedFloat;
-use parley::FontFamily;
+use parley::{FontFamily, FontFamilyName};
 
 #[derive(Copy, Clone, Default, Debug, Hash, PartialEq)]
 pub enum Alignment {
@@ -72,11 +72,26 @@ impl std::hash::Hash for LayoutJob<'_> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.segments.hash(state);
         match &self.font_family {
-            FontFamily::Named(cow) => {
+            FontFamily::Single(FontFamilyName::Named(cow)) => {
                 cow.hash(state);
             }
-            FontFamily::Generic(generic_family) => {
+            FontFamily::Single(FontFamilyName::Generic(generic_family)) => {
                 generic_family.hash(state);
+            }
+            FontFamily::Source(cow) => {
+                cow.hash(state);
+            }
+            FontFamily::List(cow) => {
+                for name in cow.iter() {
+                    match name {
+                        FontFamilyName::Named(cow) => {
+                            cow.hash(state);
+                        }
+                        FontFamilyName::Generic(generic_family) => {
+                            generic_family.hash(state);
+                        }
+                    }
+                }
             }
         }
         self.font_size.hash(state);

@@ -12,7 +12,7 @@ use crate::{
     renderer::primitives::{ClippedPrimitive, DrawPrimitive, TextPrimitive},
     util::replace_in_matching_lines,
 };
-use parley::{FontFamily, GenericFamily};
+use parley::{FontFamily, FontFamilyName, GenericFamily};
 use regex::Regex;
 use std::{
     fs,
@@ -111,7 +111,7 @@ impl InstallMode {
         app_state: &mut AppState,
     ) -> Box<dyn Iterator<Item = ClippedPrimitive>> {
         let mut job = LayoutJob::new(
-            FontFamily::Generic(GenericFamily::SansSerif),
+            FontFamily::Single(FontFamilyName::Generic(GenericFamily::SansSerif)),
             32.0,
             34.0,
             Some(Alignment::Center),

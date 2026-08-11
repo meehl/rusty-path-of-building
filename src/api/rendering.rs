@@ -11,7 +11,7 @@ use mlua::{
     LightUserData, Lua, Result as LuaResult, UserDataRefMut, Value,
     ffi::{self},
 };
-use parley::FontFamily;
+use parley::{FontFamily, FontFamilyName};
 use regex::Regex;
 use std::{borrow::Cow, sync::LazyLock};
 
@@ -483,19 +483,27 @@ fn build_layout_job<'a>(
     let mut font_weight = None;
     let mut font_style = FontStyle::default();
     let font_family = match font_type {
-        PoBFontType::Fixed => FontFamily::Named(Cow::Borrowed("Bitstream Vera Sans Mono")),
-        PoBFontType::Var => FontFamily::Named(Cow::Borrowed("Liberation Sans")),
+        PoBFontType::Fixed => FontFamily::Single(FontFamilyName::Named(Cow::Borrowed(
+            "Bitstream Vera Sans Mono",
+        ))),
+        PoBFontType::Var => {
+            FontFamily::Single(FontFamilyName::Named(Cow::Borrowed("Liberation Sans")))
+        }
         PoBFontType::VarBold => {
             font_weight = Some(700.0);
-            FontFamily::Named(Cow::Borrowed("Liberation Sans"))
+            FontFamily::Single(FontFamilyName::Named(Cow::Borrowed("Liberation Sans")))
         }
-        PoBFontType::Fontin => FontFamily::Named(Cow::Borrowed("Fontin")),
-        PoBFontType::FontinItalic => FontFamily::Named(Cow::Borrowed("Fontin")),
-        PoBFontType::FontinSmallcaps => FontFamily::Named(Cow::Borrowed("Fontin SmallCaps")),
+        PoBFontType::Fontin => FontFamily::Single(FontFamilyName::Named(Cow::Borrowed("Fontin"))),
+        PoBFontType::FontinItalic => {
+            FontFamily::Single(FontFamilyName::Named(Cow::Borrowed("Fontin")))
+        }
+        PoBFontType::FontinSmallcaps => {
+            FontFamily::Single(FontFamilyName::Named(Cow::Borrowed("Fontin SmallCaps")))
+        }
         PoBFontType::FontinSmallcapsItalic => {
             font_style = FontStyle::Italic;
             // use regular Smallcaps with "faux italics"
-            FontFamily::Named(Cow::Borrowed("Fontin SmallCaps"))
+            FontFamily::Single(FontFamilyName::Named(Cow::Borrowed("Fontin SmallCaps")))
         }
     };
 

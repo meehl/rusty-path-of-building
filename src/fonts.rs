@@ -10,8 +10,8 @@ use crate::{
 use ahash::HashMap;
 use ordered_float::OrderedFloat;
 use parley::{
-    FontContext, FontFamily, FontStack, FontWeight, GenericFamily, LayoutContext, StyleProperty,
-    TextStyle, fontique::Blob,
+    FontContext, FontFamily, FontFamilyName, FontWeight, GenericFamily, LayoutContext,
+    StyleProperty, TextStyle, fontique::Blob,
 };
 use std::sync::Arc;
 
@@ -122,21 +122,21 @@ impl Fonts {
         self.preload_text(
             &common_chars,
             font_size,
-            FontFamily::Generic(GenericFamily::Monospace),
+            FontFamily::Single(FontFamilyName::Generic(GenericFamily::Monospace)),
             None,
             parley::FontStyle::Normal,
         );
         self.preload_text(
             &common_chars,
             font_size,
-            FontFamily::Generic(GenericFamily::SansSerif),
+            FontFamily::Single(FontFamilyName::Generic(GenericFamily::SansSerif)),
             None,
             parley::FontStyle::Normal,
         );
         self.preload_text(
             &common_chars,
             font_size,
-            FontFamily::Generic(GenericFamily::SansSerif),
+            FontFamily::Single(FontFamilyName::Generic(GenericFamily::SansSerif)),
             Some(FontWeight::BOLD),
             parley::FontStyle::Normal,
         );
@@ -153,7 +153,7 @@ impl Fonts {
         profiling::scope!("preload_text");
 
         let style = TextStyle {
-            font_stack: FontStack::Single(font_family),
+            font_family,
             font_weight: font_weight.unwrap_or(FontWeight::NORMAL),
             font_style,
             font_size,
@@ -200,7 +200,7 @@ impl Fonts {
 
         let default_style = TextStyle::default();
         let style = TextStyle {
-            font_stack: parley::FontStack::Single(job.font_family),
+            font_family: job.font_family,
             font_size: job.font_size.into(),
             line_height: parley::LineHeight::Absolute(job.line_height.into()),
             font_weight: job
@@ -239,7 +239,7 @@ impl Fonts {
                     parley::Alignment::End
                 }
             };
-            parley_layout.align(None, alignment, parley::AlignmentOptions::default());
+            parley_layout.align(alignment, parley::AlignmentOptions::default());
         }
 
         let mut layout_rows = Vec::new();
