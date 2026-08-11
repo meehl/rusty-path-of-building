@@ -291,7 +291,7 @@ pub struct TextureOptions {
     pub magnification: wgpu::FilterMode,
     pub minification: wgpu::FilterMode,
     pub wrap_mode: wgpu::AddressMode,
-    pub mipmap_mode: wgpu::FilterMode,
+    pub mipmap_mode: wgpu::MipmapFilterMode,
     pub generate_mipmaps: bool,
 }
 
@@ -300,7 +300,7 @@ impl TextureOptions {
         magnification: wgpu::FilterMode::Linear,
         minification: wgpu::FilterMode::Linear,
         wrap_mode: wgpu::AddressMode::Repeat,
-        mipmap_mode: wgpu::FilterMode::Linear,
+        mipmap_mode: wgpu::MipmapFilterMode::Linear,
         generate_mipmaps: false,
     };
 
@@ -308,7 +308,7 @@ impl TextureOptions {
         magnification: wgpu::FilterMode::Linear,
         minification: wgpu::FilterMode::Linear,
         wrap_mode: wgpu::AddressMode::ClampToEdge,
-        mipmap_mode: wgpu::FilterMode::Linear,
+        mipmap_mode: wgpu::MipmapFilterMode::Linear,
         generate_mipmaps: false,
     };
 }

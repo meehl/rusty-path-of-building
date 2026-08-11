@@ -117,14 +117,17 @@ impl Renderer {
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("pipeline_layout"),
-            bind_group_layouts: &[&globals_bind_group_layout, &texture_bind_group_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[
+                Some(&globals_bind_group_layout),
+                Some(&texture_bind_group_layout),
+            ],
+            immediate_size: 0,
         });
 
         let depth_stencil = output_depth_format.map(|format| wgpu::DepthStencilState {
             format,
-            depth_write_enabled: false,
-            depth_compare: wgpu::CompareFunction::Always,
+            depth_write_enabled: None,
+            depth_compare: None,
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState::default(),
         });
@@ -135,7 +138,7 @@ impl Renderer {
             vertex: wgpu::VertexState {
                 entry_point: Some("vs_main"),
                 module: &shader_module,
-                buffers: &[wgpu::VertexBufferLayout {
+                buffers: &[Some(wgpu::VertexBufferLayout {
                     // 4x f32, 2x u32 -> 6 * 4 bytes
                     array_stride: 6 * 4,
                     step_mode: wgpu::VertexStepMode::Vertex,
@@ -144,7 +147,7 @@ impl Renderer {
                     // 2: uint color
                     // 3: uint layer_idx
                     attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Uint32, 3 => Uint32],
-                }],
+                })],
                 compilation_options: wgpu::PipelineCompilationOptions::default()
             },
             primitive: wgpu::PrimitiveState {
@@ -172,7 +175,7 @@ impl Renderer {
                 })],
                 compilation_options: wgpu::PipelineCompilationOptions::default()
             }),
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         });
 
@@ -442,7 +445,8 @@ impl Renderer {
                 {
                     let size = mesh.indices.len() * std::mem::size_of::<u32>();
                     let slice = index_offset..(index_offset + size);
-                    staging_index_buffer[slice.clone()]
+                    staging_index_buffer
+                        .slice(slice.clone())
                         .copy_from_slice(bytemuck::cast_slice(&mesh.indices));
                     self.index_buffer.slices.push(slice);
                     index_offset += size;
@@ -450,7 +454,8 @@ impl Renderer {
                 {
                     let size = mesh.vertices.len() * std::mem::size_of::<Vertex>();
                     let slice = vertex_offset..(vertex_offset + size);
-                    staging_vertex_buffer[slice.clone()]
+                    staging_vertex_buffer
+                        .slice(slice.clone())
                         .copy_from_slice(bytemuck::cast_slice(&mesh.vertices));
                     self.vertex_buffer.slices.push(slice);
                     vertex_offset += size;

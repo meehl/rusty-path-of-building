@@ -246,11 +246,6 @@ impl ApplicationHandler<GraphicsContext> for App {
                                     self.state.window.request_redraw();
                                 }
                             }
-                            // Reconfigure the surface if it's lost or outdated
-                            Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
-                                self.needs_reconfigure = true;
-                                self.state.window.request_redraw();
-                            }
                             Err(err) => {
                                 log::error!("Unable to render: {err}");
                             }

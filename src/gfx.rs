@@ -31,9 +31,12 @@ impl GraphicsContext {
     pub async fn new(window: Arc<Window>) -> anyhow::Result<Self> {
         let size = window.inner_size();
 
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
-            ..Default::default()
+            flags: Default::default(),
+            memory_budget_thresholds: Default::default(),
+            backend_options: Default::default(),
+            display: None,
         });
 
         let surface = instance.create_surface(Arc::clone(&window)).unwrap();
@@ -43,6 +46,7 @@ impl GraphicsContext {
                 power_preference: wgpu::PowerPreference::default(),
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
+                apply_limit_buckets: true,
             })
             .await?;
 
@@ -104,11 +108,11 @@ impl GraphicsContext {
             format: surface_format,
             width: size.width,
             height: size.height,
-            //present_mode: surface_caps.present_modes[0],
             present_mode: wgpu::PresentMode::Fifo,
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
+            color_space: wgpu::SurfaceColorSpace::Auto,
         };
 
         let (blit_texture, blit_texture_view) =
@@ -144,19 +148,27 @@ impl GraphicsContext {
         }
     }
 
-    pub fn render(
-        &mut self,
-        render_job: RenderJob,
-        scale_factor: f32,
-    ) -> Result<(), wgpu::SurfaceError> {
+    pub fn render(&mut self, render_job: RenderJob, scale_factor: f32) -> anyhow::Result<()> {
         profiling::scope!("render");
 
         if !self.is_surface_configured {
             return Ok(());
         }
 
-        let output = self.surface.get_current_texture()?;
-        let suboptimal = output.suboptimal;
+        let output = match self.surface.get_current_texture() {
+            wgpu::CurrentSurfaceTexture::Success(surface_tex) => surface_tex,
+            wgpu::CurrentSurfaceTexture::Suboptimal(surface_tex) => surface_tex,
+            wgpu::CurrentSurfaceTexture::Timeout
+            | wgpu::CurrentSurfaceTexture::Occluded
+            | wgpu::CurrentSurfaceTexture::Validation => {
+                // TODO: Skip this frame for now
+                return Ok(());
+            }
+            wgpu::CurrentSurfaceTexture::Outdated | wgpu::CurrentSurfaceTexture::Lost => {
+                self.surface.configure(&self.device, &self.config);
+                return Ok(());
+            }
+        };
 
         let surface_view = output
             .texture
@@ -209,6 +221,7 @@ impl GraphicsContext {
                 timestamp_writes: None,
                 label: Some("main render pass"),
                 occlusion_query_set: None,
+                multiview_mask: None,
             });
 
             self.renderer.render(
@@ -232,15 +245,10 @@ impl GraphicsContext {
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
-
         self.window.pre_present_notify();
-        output.present();
+        self.queue.present(output);
 
-        if suboptimal {
-            Err(wgpu::SurfaceError::Outdated)
-        } else {
-            Ok(())
-        }
+        Ok(())
     }
 }
 
