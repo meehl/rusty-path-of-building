@@ -12,7 +12,7 @@ use crate::{
     window::WindowState,
 };
 use clap::Parser;
-use mlua::{Function, Lua, Result as LuaResult, Table, ThreadStatus};
+use mlua::{Function, Lua, Result as LuaResult, Table, thread::ThreadStatus};
 use std::{
     cell::{Cell, RefCell},
     path::PathBuf,

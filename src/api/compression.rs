@@ -2,7 +2,7 @@ use flate2::{
     Compression,
     read::{ZlibDecoder, ZlibEncoder},
 };
-use mlua::{IntoLuaMulti, Lua, MultiValue, Result as LuaResult, String as LuaString, Value};
+use mlua::{IntoLuaMulti, Lua, LuaString, MultiValue, Result as LuaResult, Value};
 use std::io::Read;
 
 pub fn inflate(l: &Lua, compressed: LuaString) -> LuaResult<MultiValue> {
