@@ -14,7 +14,7 @@ anyhow = "1.0"
 arboard = { version = "3.6.1", default-features = false }
 bytemuck = "1.23.2"
 clap = { version = "4.5.46", features = ["derive"] }
-dds = "0.1.0"
+dds = "0.2.0"
 directories = "6.0.0"
 env_logger = "0.10"
 euclid = { version = "0.22.11", features = ["bytemuck"] }
