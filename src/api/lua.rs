@@ -7,7 +7,7 @@ pub fn protected_call(l: &Lua, (func, args): (Function, MultiValue)) -> LuaResul
         // callers expect first return value to be Nil on success
         Ok(return_values) => Ok(std::iter::once(Value::Nil).chain(return_values).collect()),
         // otherwise it is set to error message.
-        Err(err) => Ok(err.to_string().into_lua_multi(l)?),
+        Err(err) => err.to_string().into_lua_multi(l),
     }
 }
 
@@ -38,7 +38,7 @@ pub fn protected_load_module(l: &Lua, (name, args): (String, MultiValue)) -> Lua
         // on success, callers expect a Nil followed by return values
         Ok(res) => Ok(std::iter::once(Value::Nil).chain(res).collect()),
         // otherwise it is set to error message.
-        Err(err) => Ok(err.to_string().into_lua_multi(l)?),
+        Err(err) => err.to_string().into_lua_multi(l),
     };
     change_working_directory(current_dir)?;
     result
