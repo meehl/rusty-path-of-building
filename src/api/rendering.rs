@@ -471,7 +471,7 @@ fn get_index_at_cur(
 }
 
 pub static ESCAPE_STR_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\^(?<idx>[0-9])|\^[x|X](?<hex>[0-9A-Fa-f]{6})").unwrap());
+    LazyLock::new(|| Regex::new(r"\^(?<idx>[0-9])|\^[xX](?<hex>[0-9A-Fa-f]{6})").unwrap());
 
 fn build_layout_job<'a>(
     text: &'a str,
