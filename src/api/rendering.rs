@@ -687,30 +687,42 @@ impl std::str::FromStr for PoBFontType {
     }
 }
 
+#[inline(always)]
+fn hex_byte(a: u8, b: u8) -> u8 {
+    (hex_digit(a) << 4) | hex_digit(b)
+}
+
+#[inline(always)]
+fn hex_digit(c: u8) -> u8 {
+    match c {
+        b'0'..=b'9' => c - b'0',
+        b'a'..=b'f' => c - b'a' + 10,
+        b'A'..=b'F' => c - b'A' + 10,
+        _ => unreachable!("invalid hex digit"),
+    }
+}
+
 impl Srgba {
     fn from_escape_code(escape_str: &str) -> Srgba {
-        if let Some(caps) = ESCAPE_STR_REGEX.captures(escape_str) {
-            if let Some(idx) = caps.name("idx") {
-                return match idx.as_str() {
-                    "0" => Srgba::from_rgb(0, 0, 0),       //black
-                    "1" => Srgba::from_rgb(255, 0, 0),     //red
-                    "2" => Srgba::from_rgb(0, 255, 0),     //green
-                    "3" => Srgba::from_rgb(0, 0, 255),     //blue
-                    "4" => Srgba::from_rgb(255, 255, 0),   //yellow
-                    "5" => Srgba::from_rgb(255, 0, 255),   //purple
-                    "6" => Srgba::from_rgb(0, 255, 255),   //aqua
-                    "7" => Srgba::from_rgb(255, 255, 255), //white
-                    "8" => Srgba::from_rgb(178, 178, 178), //gray
-                    "9" => Srgba::from_rgb(102, 102, 102), //dark gray
-                    _ => unreachable!(),
-                };
+        let bytes = escape_str.as_bytes();
+
+        match bytes {
+            [b'^', b'0'] => Self::from_rgb(0, 0, 0),
+            [b'^', b'1'] => Self::from_rgb(255, 0, 0),
+            [b'^', b'2'] => Self::from_rgb(0, 255, 0),
+            [b'^', b'3'] => Self::from_rgb(0, 0, 255),
+            [b'^', b'4'] => Self::from_rgb(255, 255, 0),
+            [b'^', b'5'] => Self::from_rgb(255, 0, 255),
+            [b'^', b'6'] => Self::from_rgb(0, 255, 255),
+            [b'^', b'7'] => Self::from_rgb(255, 255, 255),
+            [b'^', b'8'] => Self::from_rgb(178, 178, 178),
+            [b'^', b'9'] => Self::from_rgb(102, 102, 102),
+
+            [b'^', b'x' | b'X', r1, r2, g1, g2, b1, b2] => {
+                Self::from_rgb(hex_byte(*r1, *r2), hex_byte(*g1, *g2), hex_byte(*b1, *b2))
             }
-            if let Some(hex) = caps.name("hex")
-                && let Ok(hex_color) = Srgba::from_hex(hex.as_str())
-            {
-                return hex_color;
-            }
+
+            _ => Self::WHITE,
         }
-        Srgba::WHITE
     }
 }
