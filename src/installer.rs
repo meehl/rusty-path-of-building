@@ -220,7 +220,7 @@ fn fetch_compatibility_info(
     // Beta versions have a non-semver suffix and are filtered out by the regex.
     Ok(compatibility_table
         .pairs::<String, String>()
-        .filter_map(|p| p.ok())
+        .filter_map(Result::ok)
         .filter(|(pob_version, _)| VERSION_RE.is_match(pob_version))
         .map(|(pob_version, min_req_rpob_ver)| VersionReq {
             pob_ver: pob_version,
@@ -292,7 +292,7 @@ fn download_pob<P: AsRef<Path>>(
     ];
 
     download_and_extract_tarball(
-        &client,
+        client,
         pob_repo,
         &format!("v{pob_version}"),
         &rules,
@@ -313,7 +313,7 @@ fn download_pob<P: AsRef<Path>>(
                     format!("Downloading assets... ({})", format_bytes(downloaded))
                 }
                 DownloadEvent::Retrying { attempt } => {
-                    format!("Retrying... (Attempt {})", attempt)
+                    format!("Retrying... (Attempt {attempt})")
                 }
             };
             let _ = progress_tx.send(Progress::Status(msg));
@@ -391,7 +391,7 @@ fn is_higher_version(v1: &str, v2: &str) -> anyhow::Result<bool> {
     let parse_version = |v: &str| -> anyhow::Result<(u32, u32, u32)> {
         let caps = VERSION_RE
             .captures(v)
-            .ok_or_else(|| anyhow::anyhow!("Invalid semver format: {}", v))?;
+            .ok_or_else(|| anyhow::anyhow!("Invalid semver format: {v}"))?;
 
         let major = caps[1].parse::<u32>().unwrap();
         let minor = caps[2].parse::<u32>().unwrap();

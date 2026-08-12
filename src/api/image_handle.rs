@@ -74,7 +74,7 @@ unsafe fn push_image_handle(state: *mut ffi::lua_State) -> *mut ImageHandle {
     ptr
 }
 
-/// Puts ImageHandle on the Lua stack
+/// Puts `ImageHandle` on the Lua stack
 unsafe extern "C-unwind" fn new_image_handle(state: *mut ffi::lua_State) -> c_int {
     unsafe {
         push_image_handle(state);
@@ -87,7 +87,7 @@ unsafe extern "C-unwind" fn new_image_handle(state: *mut ffi::lua_State) -> c_in
     1
 }
 
-/// Get an ImageHandle from the Lua stack.
+/// Gets an `ImageHandle` from the Lua stack.
 #[inline]
 unsafe fn get_image_handle(state: *mut ffi::lua_State, index: c_int) -> *mut ImageHandle {
     unsafe {
@@ -114,7 +114,7 @@ pub unsafe fn image_handle_texture_id(
     unsafe { (*ptr).texture_id() }
 }
 
-// Drops the ImageHandle
+// Drops the `ImageHandle`
 unsafe extern "C-unwind" fn image_handle_gc(state: *mut ffi::lua_State) -> c_int {
     let ptr = unsafe { ffi::lua_touserdata(state, 1) } as *mut ImageHandle;
 

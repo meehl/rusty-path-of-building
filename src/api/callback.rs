@@ -12,16 +12,15 @@ pub fn get_callback(lua: &Lua, name: &str) -> LuaResult<Function> {
     if callback_function.is_function() {
         // function defined through `SetCallback`
         return Ok(callback_function.as_function().unwrap().clone());
-    } else {
-        // look for function in `MainObject`
-        let main_object: Table = callback_table.get("MainObject")?;
-        let callback_function: Value = main_object.get(name)?;
-        if callback_function.is_function() {
-            // these functions expect `MainObject` as first argument so we bind it here
-            return callback_function.as_function().unwrap().bind(main_object);
-        }
     }
-    Err(anyhow::anyhow!("Function '{}' not found", name).into())
+    // look for function in `MainObject`
+    let main_object: Table = callback_table.get("MainObject")?;
+    let callback_function: Value = main_object.get(name)?;
+    if callback_function.is_function() {
+        // these functions expect `MainObject` as first argument so we bind it here
+        return callback_function.as_function().unwrap().bind(main_object);
+    }
+    Err(anyhow::anyhow!("Function '{name}' not found").into())
 }
 
 pub fn set_main_object(l: &Lua, main_object: Table) -> LuaResult<()> {

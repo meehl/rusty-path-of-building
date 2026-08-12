@@ -108,7 +108,7 @@ unsafe extern "C-unwind" fn set_draw_color(state: *mut ffi::lua_State) -> c_int 
             ctx.layers().set_draw_color(color);
         }
         _ => panic!("Unexpected number of arguments"),
-    };
+    }
 
     0
 }
@@ -146,7 +146,7 @@ unsafe extern "C-unwind" fn set_viewport(state: *mut ffi::lua_State) -> c_int {
             ctx.layers().set_viewport(rect);
         }
         _ => panic!("Unexpected number of arguments"),
-    };
+    }
 
     0
 }
@@ -180,7 +180,7 @@ unsafe extern "C-unwind" fn set_draw_layer(state: *mut ffi::lua_State) -> c_int 
             }
         }
         _ => panic!("Unexpected number of arguments"),
-    };
+    }
 
     0
 }
@@ -313,13 +313,11 @@ unsafe extern "C-unwind" fn draw_string(state: *mut ffi::lua_State) -> c_int {
     let font_type = str_from_stack!(state, -nargs + 4);
     let text = str_from_stack!(state, -nargs + 5);
 
-    let alignment = match alignment.parse::<PoBTextAlignment>() {
-        Ok(alignment) => alignment,
-        Err(_) => panic!("Invalid alignment"),
+    let Ok(alignment) = alignment.parse::<PoBTextAlignment>() else {
+        panic!("Invalid alignment");
     };
-    let font_type = match font_type.parse::<PoBFontType>() {
-        Ok(font_type) => font_type,
-        Err(_) => panic!("Invalid font type"),
+    let Ok(font_type) = font_type.parse::<PoBFontType>() else {
+        panic!("Invalid font type");
     };
 
     let mut position = Point::new(x, y);
@@ -375,9 +373,8 @@ unsafe extern "C-unwind" fn get_string_width(state: *mut ffi::lua_State) -> c_in
     let font_type = str_from_stack!(state, -nargs + 1);
     let text = str_from_stack!(state, -nargs + 2);
 
-    let font_type = match font_type.parse::<PoBFontType>() {
-        Ok(font_type) => font_type,
-        Err(_) => panic!("Invalid font type"),
+    let Ok(font_type) = font_type.parse::<PoBFontType>() else {
+        panic!("Invalid font type");
     };
 
     let job = build_layout_job(text, Srgba::WHITE, font_type, line_height, None);
@@ -478,7 +475,7 @@ fn build_layout_job<'a>(
         font_style,
     );
 
-    for (color, segment) in PoBString(text).into_iter() {
+    for (color, segment) in PoBString(text) {
         job.append(segment, color.unwrap_or(current_color));
     }
 
@@ -600,10 +597,7 @@ impl std::str::FromStr for PoBTextAlignment {
             "RIGHT" => Ok(Self::Right),
             "CENTER_X" => Ok(Self::CenterX),
             "RIGHT_X" => Ok(Self::RightX),
-            _ => Err(anyhow::anyhow!(
-                "'{}' is not a valid TextFontType variant",
-                s
-            )),
+            _ => Err(anyhow::anyhow!("'{s}' is not a valid TextFontType variant")),
         }
     }
 }
@@ -631,10 +625,7 @@ impl std::str::FromStr for PoBFontType {
             "FONTIN SC ITALIC" => Ok(Self::FontinSmallcapsItalic),
             "FONTIN" => Ok(Self::Fontin),
             "FONTIN ITALIC" => Ok(Self::FontinItalic),
-            _ => Err(anyhow::anyhow!(
-                "'{}' is not a valid TextFontType variant",
-                s
-            )),
+            _ => Err(anyhow::anyhow!("'{s}' is not a valid TextFontType variant")),
         }
     }
 }

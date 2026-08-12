@@ -547,7 +547,7 @@ fn create_sampler(options: TextureOptions, device: &wgpu::Device) -> wgpu::Sampl
 }
 
 /// Adapted from `wgpu::Device::create_texture_with_data`.
-/// Doesn't upload any data for mip level > 0 if skip_mipmaps is true.
+/// Doesn't upload any data for mip level > 0 if `skip_mipmaps` is true.
 fn create_texture_with_data(
     device: &wgpu::Device,
     queue: &wgpu::Queue,

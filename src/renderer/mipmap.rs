@@ -2,7 +2,7 @@
 /// Assumes data to contain one mip level 0 image for each layer in RGBA format.
 pub fn generate_mipmap_chain(queue: &wgpu::Queue, texture: &wgpu::Texture, data: &[u8]) {
     assert!(!texture.format().is_compressed());
-    assert!(texture.format().components() == 4);
+    assert_eq!(texture.format().components(), 4);
 
     let size = texture.size();
     let block_size = texture.format().block_copy_size(None).unwrap_or(4);

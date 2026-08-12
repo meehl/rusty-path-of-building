@@ -19,7 +19,7 @@ pub fn new_search_handle(
         if handle.current.is_some() {
             return handle.into_lua(l);
         }
-    };
+    }
     Ok(Value::Nil)
 }
 

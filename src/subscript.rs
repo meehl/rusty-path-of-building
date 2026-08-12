@@ -65,14 +65,11 @@ impl SubscriptManager {
         self.scripts.retain_mut(|subscript| {
             subscript.handle_calls(lua);
 
-            if let Some(event) = subscript.try_join() {
+            subscript.try_join().is_none_or(|event| {
                 results.push(event);
                 // subscript has finished or errored, remove it
                 false
-            } else {
-                // subscript has not finished yet, keep it
-                true
-            }
+            })
         });
 
         results
@@ -149,7 +146,7 @@ impl Subscript {
                             })
                             .unwrap();
                         // this blocks until we receive return values
-                        let return_values = rx_return.recv().map_err(|e| anyhow!("{}", e))??;
+                        let return_values = rx_return.recv().map_err(|e| anyhow!("{e}"))??;
                         Ok(return_values)
                     })?,
                 )?;
@@ -165,7 +162,7 @@ impl Subscript {
                                 function_name: function_name.clone(),
                                 arguments: args.try_into()?,
                             })
-                            .map_err(|e| anyhow!("{}", e))?;
+                            .map_err(|e| anyhow!("{e}"))?;
                         Ok(())
                     })?,
                 )?;
@@ -227,12 +224,7 @@ impl Subscript {
     }
 
     fn try_join(&mut self) -> Option<SubscriptResult> {
-        if self
-            .handle
-            .as_ref()
-            .map(|h| h.is_finished())
-            .unwrap_or(false)
-        {
+        if self.handle.as_ref().is_some_and(JoinHandle::is_finished) {
             let event = match self.handle.take().unwrap().join() {
                 Ok(Ok(return_values)) => SubscriptResult::SubscriptFinished {
                     id: self.id,
@@ -272,14 +264,14 @@ pub fn register_subscript_globals(
     )| {
         let blocking_calls = func_list
             .split(',')
-            .map(|s| s.trim())
+            .map(str::trim)
             .filter(|&s| !s.is_empty())
             .map(String::from)
             .collect();
 
         let nonblocking_calls = sub_list
             .split(',')
-            .map(|s| s.trim())
+            .map(str::trim)
             .filter(|&s| !s.is_empty())
             .map(String::from)
             .collect();
@@ -351,7 +343,7 @@ impl TryFrom<MultiValue> for NativeMultiValue {
             })
             .collect::<Result<VecDeque<_>, _>>()?;
 
-        Ok(NativeMultiValue(native))
+        Ok(Self(native))
     }
 }
 

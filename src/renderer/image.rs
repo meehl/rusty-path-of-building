@@ -103,7 +103,7 @@ impl std::fmt::Debug for ImageData {
             .field("height", &self.height)
             .field("array_layers", &self.array_layers)
             .field("mipmap_count", &self.mipmap_count)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -153,7 +153,7 @@ fn dds_format_to_wgpu(format: dds::Format) -> anyhow::Result<wgpu::TextureFormat
         dds::Format::BC3_UNORM => wgpu::TextureFormat::Bc3RgbaUnorm,
         dds::Format::BC7_UNORM => wgpu::TextureFormat::Bc7RgbaUnorm,
         dds::Format::R8G8B8A8_UNORM => wgpu::TextureFormat::Rgba8Unorm,
-        _ => anyhow::bail!("Unsupported DDS format: {:?}", format),
+        _ => anyhow::bail!("Unsupported DDS format: {format:?}"),
     })
 }
 

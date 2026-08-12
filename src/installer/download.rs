@@ -19,7 +19,7 @@ pub enum DownloadEvent {
 
 /// Build a reqwest blocking client
 pub fn build_client() -> Result<Client, reqwest::Error> {
-    Client::builder().timeout(Duration::from_secs(60)).build()
+    Client::builder().timeout(Duration::from_mins(1)).build()
 }
 
 // Rate-limit-aware GET.
@@ -194,9 +194,8 @@ pub fn download_and_extract_tarball(
         }
 
         // Strip root folder before matching against rules
-        let relative = match entry_str.split_once('/') {
-            Some((_, rest)) => rest,
-            None => continue,
+        let Some((_, relative)) = entry_str.split_once('/') else {
+            continue;
         };
 
         let dest: Option<PathBuf> = rules.iter().find_map(|rule| match rule {

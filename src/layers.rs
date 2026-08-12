@@ -123,7 +123,7 @@ impl Layers {
     pub fn add_text(&mut self, mut text: TextPrimitive, is_absolute_position: bool) {
         if !is_absolute_position {
             text.translate(self.viewport.min.to_vector());
-        };
+        }
 
         let clipped_primitive = ClippedPrimitive {
             clip_rect: self.viewport,

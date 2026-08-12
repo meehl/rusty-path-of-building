@@ -92,7 +92,7 @@ where
     where
         T: Zero,
     {
-        Quad {
+        Self {
             p0: Point::zero(),
             p1: Point::new(size.width, Zero::zero()),
             p2: Point::new(size.width, size.height),
@@ -107,7 +107,7 @@ where
 {
     /// Constructor, setting all points to zero.
     pub fn zero() -> Self {
-        Quad::new(Point::zero(), Point::zero(), Point::zero(), Point::zero())
+        Self::new(Point::zero(), Point::zero(), Point::zero(), Point::zero())
     }
 }
 

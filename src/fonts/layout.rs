@@ -72,14 +72,11 @@ impl std::hash::Hash for LayoutJob<'_> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.segments.hash(state);
         match &self.font_family {
-            FontFamily::Single(FontFamilyName::Named(cow)) => {
+            FontFamily::Single(FontFamilyName::Named(cow)) | FontFamily::Source(cow) => {
                 cow.hash(state);
             }
             FontFamily::Single(FontFamilyName::Generic(generic_family)) => {
                 generic_family.hash(state);
-            }
-            FontFamily::Source(cow) => {
-                cow.hash(state);
             }
             FontFamily::List(cow) => {
                 for name in cow.iter() {

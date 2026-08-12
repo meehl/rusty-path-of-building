@@ -59,10 +59,10 @@ fn find_nearby_launch_script() -> Option<PathBuf> {
     }
 
     for candidate in candidates {
-        if candidate.try_exists().is_ok_and(|exists| exists) {
-            if let Some(Ok(candidate)) = candidate.parent().map(Path::canonicalize) {
-                return Some(candidate);
-            }
+        if candidate.try_exists().is_ok_and(|exists| exists)
+            && let Some(Ok(candidate)) = candidate.parent().map(Path::canonicalize)
+        {
+            return Some(candidate);
         }
     }
 

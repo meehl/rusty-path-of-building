@@ -103,7 +103,7 @@ impl TextureManager {
         id
     }
 
-    /// Reserves a new TextureId for later assignment.
+    /// Reserves a new `TextureId` for later assignment.
     pub fn reserve(&mut self, name: String, options: TextureOptions) -> TextureId {
         let id = self.next_id;
         self.next_id += 1;
@@ -228,7 +228,7 @@ impl WrappedTextureManager {
                             .unwrap()
                             .set(id, ImageDelta::new(image, options));
                     }
-                    Err(e) => log::warn!("Unable to load image fron {}: {}", &image_path, e),
+                    Err(e) => log::warn!("Unable to load image fron {image_path}: {e}"),
                 });
 
             TextureHandle::new(manager, id)
@@ -239,7 +239,7 @@ impl WrappedTextureManager {
                     TextureHandle::new(manager, id)
                 }
                 Err(e) => {
-                    log::warn!("Unable to load image fron {}: {}", &image_path, e);
+                    log::warn!("Unable to load image fron {image_path}: {e}");
                     bail!(e);
                 }
             }
@@ -265,7 +265,7 @@ impl WrappedTextureManager {
                             .unwrap()
                             .set(texture_id, ImageDelta::new(image, options));
                     }
-                    Err(e) => log::warn!("Unable to load image fron {}: {}", &image_path, e),
+                    Err(e) => log::warn!("Unable to load image fron {image_path}: {e}"),
                 });
         } else {
             match load_image_file(Path::new(&image_path)) {
@@ -276,7 +276,7 @@ impl WrappedTextureManager {
                         .set(texture_id, ImageDelta::new(image, options));
                 }
                 Err(e) => {
-                    log::warn!("Unable to load image fron {}: {}", &image_path, e);
+                    log::warn!("Unable to load image fron {image_path}: {e}");
                     bail!(e);
                 }
             }

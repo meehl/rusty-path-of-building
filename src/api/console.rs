@@ -34,9 +34,9 @@ fn print_table(table: &Table, indent: usize, recursive: bool) -> LuaResult<()> {
         let (key, value) = pair?;
 
         if key.is_string() {
-            write!(lock, "{0:>1$}\"{2}\" = ", "", inner_ind, key.to_string()?,)?;
+            write!(lock, "{0:>1$}\"{2}\" = ", "", inner_ind, key.to_string()?)?;
         } else {
-            write!(lock, "{0:>1$}{2} = ", "", inner_ind, key.to_string()?,)?;
+            write!(lock, "{0:>1$}{2} = ", "", inner_ind, key.to_string()?)?;
         }
 
         if value.is_table() {

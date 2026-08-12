@@ -57,15 +57,12 @@ impl Tessellator {
             return;
         }
 
-        let start_new_mesh = match out_clipped_meshes.last() {
-            None => true,
-            Some(last_clipped_mesh) => {
-                // append to previous mesh if clip_rect and texture_id match.
-                // otherwise, start a new mesh.
-                !(last_clipped_mesh.clip_rect == clip_rect
-                    && last_clipped_mesh.mesh.texture_id == primitive.texture_id())
-            }
-        };
+        let start_new_mesh = out_clipped_meshes.last().is_none_or(|last_clipped_mesh| {
+            // append to previous mesh if clip_rect and texture_id match.
+            // otherwise, start a new mesh.
+            !(last_clipped_mesh.clip_rect == clip_rect
+                && last_clipped_mesh.mesh.texture_id == primitive.texture_id())
+        });
 
         if start_new_mesh {
             out_clipped_meshes.push(ClippedMesh {
@@ -78,17 +75,19 @@ impl Tessellator {
 
         match primitive {
             DrawPrimitive::Rect(rect_primitive) => {
-                self.convert_rect_primitive(rect_primitive, &mut last_clipped_mesh.mesh)
+                self.convert_rect_primitive(rect_primitive, &mut last_clipped_mesh.mesh);
             }
             DrawPrimitive::Quad(quad_primitive) => {
-                self.convert_quad_primitive(quad_primitive, &mut last_clipped_mesh.mesh)
+                self.convert_quad_primitive(quad_primitive, &mut last_clipped_mesh.mesh);
             }
-            DrawPrimitive::Text(text_primitive) => self.convert_text_primitive(
-                text_primitive,
-                font_atlas_size,
-                pixels_per_point,
-                &mut last_clipped_mesh.mesh,
-            ),
+            DrawPrimitive::Text(text_primitive) => {
+                self.convert_text_primitive(
+                    text_primitive,
+                    font_atlas_size,
+                    pixels_per_point,
+                    &mut last_clipped_mesh.mesh,
+                );
+            }
         }
 
         // This can be empty if a new mesh was started but the conversion from a text primitive

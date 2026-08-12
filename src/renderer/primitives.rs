@@ -35,13 +35,13 @@ pub enum DrawPrimitive {
 impl DrawPrimitive {
     pub fn texture_id(&self) -> TextureId {
         match self {
-            DrawPrimitive::Rect(rect_primitive) => rect_primitive
+            Self::Rect(rect_primitive) => rect_primitive
                 .texture
                 .map_or_else(TextureId::default, |tex| tex.texture_id),
-            DrawPrimitive::Quad(quad_primitive) => quad_primitive
+            Self::Quad(quad_primitive) => quad_primitive
                 .texture
                 .map_or_else(TextureId::default, |tex| tex.texture_id),
-            _ => TextureId::default(),
+            Self::Text(_) => TextureId::default(),
         }
     }
 }

@@ -118,7 +118,7 @@ impl GlyphRasterizer {
         self.cached_glyphs.clear();
     }
 
-    /// Gets a swash::FontRef from FontData
+    /// Gets a [`swash::FontRef`] from [`FontData`]
     fn get_font_ref<'a>(&mut self, font: &'a FontData) -> swash::FontRef<'a> {
         let font_blob_id = font.data.id();
 

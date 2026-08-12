@@ -47,29 +47,29 @@ pub enum AppMode {
 impl AppMode {
     pub fn frame(&mut self, state: &mut AppState) -> anyhow::Result<ModeFrameOutput> {
         match self {
-            AppMode::Install(mode) => mode.frame(state),
-            AppMode::PoB(mode) => mode.frame(state),
+            Self::Install(mode) => mode.frame(state),
+            Self::PoB(mode) => mode.frame(state),
         }
     }
 
     pub fn update(&mut self, state: &mut AppState) -> anyhow::Result<Option<ModeTransition>> {
         match self {
-            AppMode::Install(mode) => mode.update(state),
-            AppMode::PoB(mode) => mode.update(state),
+            Self::Install(mode) => mode.update(state),
+            Self::PoB(mode) => mode.update(state),
         }
     }
 
     pub fn handle_event(&mut self, state: &mut AppState, event: AppEvent) -> anyhow::Result<()> {
         match self {
-            AppMode::Install(mode) => mode.handle_event(state, event),
-            AppMode::PoB(mode) => mode.handle_event(state, event),
+            Self::Install(mode) => mode.handle_event(state, event),
+            Self::PoB(mode) => mode.handle_event(state, event),
         }
     }
 
     pub fn can_exit(&mut self, state: &mut AppState) -> bool {
         match self {
-            AppMode::Install(_) => true,
-            AppMode::PoB(mode) => mode.can_exit(state),
+            Self::Install(_) => true,
+            Self::PoB(mode) => mode.can_exit(state),
         }
     }
 }

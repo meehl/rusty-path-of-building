@@ -15,7 +15,7 @@ use clap::Parser;
 use mlua::{Function, Lua, Result as LuaResult, Table, thread::ThreadStatus};
 use std::{
     cell::{Cell, RefCell},
-    path::PathBuf,
+    path::{Path, PathBuf},
     rc::Rc,
 };
 use winit::keyboard::SmolStr;
@@ -77,7 +77,7 @@ impl Context {
         self.input.set(&ctx.app.input);
         self.fonts.set(&mut ctx.app.fonts);
         self.texture_manager.set(&mut ctx.app.texture_manager);
-        self.script_dir.set(&mut ctx.app.script_dir);
+        self.script_dir.set(&ctx.app.script_dir);
         self.current_working_dir
             .set(&mut ctx.pob.current_working_dir);
         self.layers.set(&mut ctx.pob.layers);
@@ -131,14 +131,14 @@ pub enum PoBEvent {
 impl std::fmt::Display for PoBEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PoBEvent::Init => write!(f, "Init"),
-            PoBEvent::Exit => write!(f, "Exit"),
-            PoBEvent::Frame => write!(f, "Frame"),
-            PoBEvent::KeyDown(_, _) => write!(f, "KeyDown"),
-            PoBEvent::KeyUp(_) => write!(f, "KeyUp"),
-            PoBEvent::Char(_) => write!(f, "Char"),
-            PoBEvent::SubFinished { .. } => write!(f, "SubFinished"),
-            PoBEvent::SubError { .. } => write!(f, "SubError"),
+            Self::Init => write!(f, "Init"),
+            Self::Exit => write!(f, "Exit"),
+            Self::Frame => write!(f, "Frame"),
+            Self::KeyDown(_, _) => write!(f, "KeyDown"),
+            Self::KeyUp(_) => write!(f, "KeyUp"),
+            Self::Char(_) => write!(f, "Char"),
+            Self::SubFinished { .. } => write!(f, "SubFinished"),
+            Self::SubError { .. } => write!(f, "SubError"),
         }
     }
 }
@@ -176,7 +176,7 @@ impl LuaInstance {
         })
     }
 
-    fn create_lua_state(script_dir: &PathBuf) -> LuaResult<Lua> {
+    fn create_lua_state(script_dir: &Path) -> LuaResult<Lua> {
         // SAFETY: use `unsafe_new` to allow loading of C modules
         let lua = unsafe { Lua::unsafe_new() };
 
@@ -308,7 +308,7 @@ impl LuaInstance {
     }
 
     /// Adds "${script_dir}/lua" to package path
-    pub fn register_package_paths(lua: &Lua, script_dir: &PathBuf) -> LuaResult<()> {
+    pub fn register_package_paths(lua: &Lua, script_dir: &Path) -> LuaResult<()> {
         let package: Table = lua.globals().get("package")?;
         let mut package_path: String = package.get("path")?;
         package_path.push(';');

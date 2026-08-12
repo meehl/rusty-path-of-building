@@ -81,11 +81,9 @@ impl WindowState {
     }
 
     pub fn get_clipboard_text(&mut self) -> Option<String> {
-        if let Some(clipboard) = &mut self.clipboard {
-            clipboard.get_text()
-        } else {
-            None
-        }
+        self.clipboard
+            .as_mut()
+            .and_then(|clipboard| clipboard.get_text())
     }
 
     pub fn request_redraw(&self) {

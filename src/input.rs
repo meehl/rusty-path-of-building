@@ -22,11 +22,11 @@ struct MousePressState {
 pub struct InputState {
     /// Current state(s) of modifier keys. (Shift, Control, Alt, Super)
     pub key_modifiers: ModifiersState,
-    /// HashSet of currently pressed keyboard keys.
+    /// `HashSet` of currently pressed keyboard keys.
     keys_pressed: HashSet<Key>,
-    /// HashSet of currently pressed mouse buttons.
+    /// `HashSet` of currently pressed mouse buttons.
     mouse_pressed: HashSet<MouseButton>,
-    /// HashMap of mouse buttons (keys) with the last time they were pressed.
+    /// `HashMap` of mouse buttons (keys) with the last time they were pressed.
     mouse_last_pressed: HashMap<MouseButton, MousePressState>,
     /// Current cursor position relative to the top-left corner of the window.
     cursor_pos: LogicalPoint<f32>,
@@ -105,7 +105,7 @@ impl InputState {
     }
 }
 
-/// Attempts to convert the provided string `s` to a [winit::keyboard::Key].
+/// Attempts to convert the provided string `s` to a [`winit::keyboard::Key`].
 /// Returns [None] if no matching Key found.
 pub fn str_as_key(s: &str) -> Option<Key> {
     Some(match s.to_uppercase().as_str() {
@@ -188,7 +188,7 @@ pub fn str_as_key(s: &str) -> Option<Key> {
     })
 }
 
-/// Attempts to convert the provided [winit::keyboard::Key] `key` to a string
+/// Attempts to convert the provided [`winit::keyboard::Key`] `key` to a string
 /// representation that PoB recognizes.
 ///
 /// Returns [None] if no matching string found.
@@ -257,10 +257,10 @@ pub fn str_as_mousebutton(s: &str) -> Option<MouseButton> {
     })
 }
 
-/// Attempts to convert the provided [MouseButton] to a [SmolStr] that the PoB Lua
+/// Attempts to convert the provided [`MouseButton`] to a [`SmolStr`] that the PoB Lua
 /// backend recognizes.
 ///
-/// Returns [None] if no matching [MouseButton] was found.
+/// Returns [None] if no matching [`MouseButton`] was found.
 pub fn mousebutton_as_str(button: MouseButton) -> Option<SmolStr> {
     Some(match button {
         MouseButton::Left => SmolStr::new("LEFTBUTTON"),

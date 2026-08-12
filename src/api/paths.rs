@@ -27,7 +27,7 @@ pub fn get_runtime_path(_: &Lua, _: ()) -> LuaResult<PathBuf> {
 
 pub fn get_work_dir(l: &Lua, _: ()) -> LuaResult<PathBuf> {
     let ctx = l.app_data_ref::<&'static Context>().unwrap();
-    Ok(ctx.current_working_dir().to_path_buf())
+    Ok(ctx.current_working_dir().clone())
 }
 
 // NOTE: unused

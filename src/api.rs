@@ -79,7 +79,7 @@ pub fn register_globals(lua: &Lua) -> LuaResult<()> {
     globals.set("NewFileSearch", lua.create_function(new_search_handle)?)?;
 
     // image handle
-    register_image_handle_api(&lua)?;
+    register_image_handle_api(lua)?;
 
     // clipboard
     globals.set("Copy", lua.create_function(copy)?)?;
