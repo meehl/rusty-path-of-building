@@ -1,14 +1,14 @@
 use crate::{
-    api::image_handle::ImageHandle,
+    api::image_handle::image_handle_texture_id,
     color::Srgba,
     dpi::Uv,
     fonts::{Alignment, FontStyle, LayoutJob},
     lua::Context,
     math::{Point, Quad, Rect, Size},
 };
-use core::ffi::{c_int, c_void};
+use core::ffi::c_int;
 use mlua::{
-    LightUserData, Lua, Result as LuaResult, UserDataRefMut, Value,
+    Lua, Result as LuaResult,
     ffi::{self},
 };
 use parley::{FontFamily, FontFamilyName};
@@ -51,17 +51,6 @@ pub fn register_globals(lua: &Lua) -> LuaResult<()> {
         "DrawStringCursorIndex",
         lua.create_function_mut(get_index_at_cur)?,
     )?;
-
-    // NOTE: mlua wraps UserData in a special way to maintain safety guarantees.
-    // This wrapper is not exposed by mlua, making it difficult to access the
-    // underlying user data from within C functions.
-    // This is a helper function that unwraps an ImageHandle and returns a pointer to it
-    // See: https://github.com/mlua-rs/mlua/discussions/545#discussioncomment-12530475
-    let get_img_handle = lua.create_function(|_, mut ud: UserDataRefMut<ImageHandle>| {
-        let vec: *mut ImageHandle = &mut *ud;
-        Ok(Value::LightUserData(LightUserData(vec as *mut c_void)))
-    })?;
-    lua.set_named_registry_value("get_img_handle", get_img_handle)?;
     Ok(())
 }
 
@@ -86,43 +75,6 @@ macro_rules! i32_from_stack {
     ($s:ident, $i:expr) => {
         unsafe { ffi::luaL_checkinteger($s, $i) } as i32
     };
-}
-
-macro_rules! img_handle_from_stack {
-    ($s:ident, $i:expr) => {
-        unsafe {
-            match ffi::lua_type($s, $i) {
-                ffi::LUA_TNIL => None,
-                ffi::LUA_TUSERDATA => {
-                    let img_handle = lua_toimghandle($s, $i);
-                    if !img_handle.is_null() {
-                        if let ImageHandle::Loaded(ref handle) = *img_handle {
-                            Some(handle.id())
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                }
-                t => panic!("Expected Nil or ImageHandle, got {:?}", t),
-            }
-        }
-    };
-}
-
-unsafe extern "C" fn lua_toimghandle(state: *mut ffi::lua_State, idx: c_int) -> *mut ImageHandle {
-    unsafe {
-        let idx = ffi::lua_absindex(state, idx);
-        ffi::lua_getfield(state, ffi::LUA_REGISTRYINDEX, c"get_img_handle".as_ptr());
-        ffi::lua_pushvalue(state, idx);
-        let img_handle = match ffi::lua_pcall(state, 1, 1, 0) {
-            ffi::LUA_OK => ffi::lua_touserdata(state, -1) as *mut ImageHandle,
-            _ => std::ptr::null_mut(),
-        };
-        ffi::lua_pop(state, 1);
-        img_handle
-    }
 }
 
 unsafe extern "C-unwind" fn set_draw_color(state: *mut ffi::lua_State) -> c_int {
@@ -247,7 +199,7 @@ unsafe extern "C-unwind" fn draw_image(state: *mut ffi::lua_State) -> c_int {
     let parse_uv = matches!(nargs, 9 | 10 | 11);
     let parse_layer_idx = matches!(nargs, 6 | 7 | 10 | 11);
 
-    let texture_id = img_handle_from_stack!(state, -nargs);
+    let texture_id = unsafe { image_handle_texture_id(state, -nargs) };
 
     // left, top, width, height
     let x = f32_from_stack!(state, -nargs + 1);
@@ -282,7 +234,7 @@ unsafe extern "C-unwind" fn draw_image(state: *mut ffi::lua_State) -> c_int {
 }
 
 unsafe extern "C-unwind" fn draw_image_quad(state: *mut ffi::lua_State) -> c_int {
-    //profiling::scope!("draw_image_quad", format!("args: {:?}", args));
+    //profiling::scope!("draw_image_quad");
     let lua_instance = unsafe { Lua::get_or_init_from_ptr(state) };
     let ctx = lua_instance.app_data_ref::<&'static Context>().unwrap();
 
@@ -295,7 +247,7 @@ unsafe extern "C-unwind" fn draw_image_quad(state: *mut ffi::lua_State) -> c_int
     let parse_uv = matches!(nargs, 17 | 18 | 19);
     let parse_layer_idx = matches!(nargs, 10 | 11 | 18 | 19);
 
-    let texture_id = img_handle_from_stack!(state, -nargs);
+    let texture_id = unsafe { image_handle_texture_id(state, -nargs) };
 
     // x1, y1, x2, y2, ...
     let x1 = f32_from_stack!(state, -nargs + 1);

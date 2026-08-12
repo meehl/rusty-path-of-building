@@ -5,7 +5,7 @@ use crate::{
         clipboard::{copy, paste},
         compression::{deflate, inflate},
         console::{console_clear, console_execute, console_print_table, console_printf},
-        image_handle::new_image_handle,
+        image_handle::register_image_handle_api,
         input::{get_cursor_pos, is_key_down},
         lua::{load_module, protected_call, protected_load_module},
         paths::{
@@ -79,7 +79,7 @@ pub fn register_globals(lua: &Lua) -> LuaResult<()> {
     globals.set("NewFileSearch", lua.create_function(new_search_handle)?)?;
 
     // image handle
-    globals.set("NewImageHandle", lua.create_function(new_image_handle)?)?;
+    register_image_handle_api(&lua)?;
 
     // clipboard
     globals.set("Copy", lua.create_function(copy)?)?;
