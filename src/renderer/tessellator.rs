@@ -1,13 +1,6 @@
 use crate::{
-    dpi::{ConvertToLogical, ConvertToPhysical, NormalizedQuad, NormalizedRect, Uv},
-    renderer::{
-        mesh::{ClippedMesh, Mesh},
-        primitives::{
-            ClippedPrimitive, DrawPrimitive, QuadPrimitive, QuadTexture, RectPrimitive,
-            RectTexture, TextPrimitive,
-        },
-        textures::TextureId,
-    },
+    draw_commands::DrawCommand,
+    renderer::mesh::{ClippedMesh, Mesh},
 };
 
 /// Converts [`DrawPrimitive`]s into [`Mesh`]es.
@@ -17,37 +10,32 @@ pub struct Tessellator {
 }
 
 impl Tessellator {
-    pub fn convert_clipped_primitives(
-        &mut self,
-        clipped_primitives: impl Iterator<Item = ClippedPrimitive>,
-        pixels_per_point: f32,
-    ) -> Vec<ClippedMesh> {
+    pub fn convert_draw_commands(&mut self, draw_commands: Vec<DrawCommand>) -> Vec<ClippedMesh> {
         profiling::scope!("convert_primitives");
 
         let mut clipped_meshes = Vec::with_capacity(self.last_clipped_meshes_size);
 
-        for clipped_primitive in clipped_primitives {
-            self.convert_clipped_primitive(
-                clipped_primitive,
-                pixels_per_point,
-                &mut clipped_meshes,
-            );
+        for cmd in draw_commands {
+            self.convert_draw_command(cmd, &mut clipped_meshes);
         }
 
         self.last_clipped_meshes_size = clipped_meshes.len();
         clipped_meshes
     }
 
-    pub fn convert_clipped_primitive(
+    pub fn convert_draw_command(
         &mut self,
-        clipped_primitive: ClippedPrimitive,
-        pixels_per_point: f32,
+        cmd: DrawCommand,
         out_clipped_meshes: &mut Vec<ClippedMesh>,
     ) {
-        let ClippedPrimitive {
+        let DrawCommand {
+            positions,
+            uvs,
+            color,
+            texture_id,
+            texture_layer_idx,
             clip_rect,
-            primitive,
-        } = clipped_primitive;
+        } = cmd;
 
         if clip_rect.is_empty() {
             return;
@@ -57,7 +45,7 @@ impl Tessellator {
             // append to previous mesh if clip_rect and texture_id match.
             // otherwise, start a new mesh.
             !(last_clipped_mesh.clip_rect == clip_rect
-                && last_clipped_mesh.mesh.texture_id == primitive.texture_id())
+                && last_clipped_mesh.mesh.texture_id == texture_id)
         });
 
         if start_new_mesh {
@@ -69,101 +57,15 @@ impl Tessellator {
 
         let last_clipped_mesh = out_clipped_meshes.last_mut().unwrap();
 
-        match primitive {
-            DrawPrimitive::Rect(rect_primitive) => {
-                self.convert_rect_primitive(rect_primitive, &mut last_clipped_mesh.mesh);
-            }
-            DrawPrimitive::Quad(quad_primitive) => {
-                self.convert_quad_primitive(quad_primitive, &mut last_clipped_mesh.mesh);
-            }
-            DrawPrimitive::Text(text_primitive) => {
-                self.convert_text_primitive(
-                    text_primitive,
-                    pixels_per_point,
-                    &mut last_clipped_mesh.mesh,
-                );
-            }
-        }
+        last_clipped_mesh
+            .mesh
+            .add_quad(positions, uvs, color, texture_layer_idx);
+        last_clipped_mesh.mesh.texture_id = texture_id;
 
         // This can be empty if a new mesh was started but the conversion from a text primitive
         // didn't add any vertices. Our renderer doesn't support empty meshes so remove it
         if last_clipped_mesh.mesh.is_empty() {
             out_clipped_meshes.pop();
-        }
-    }
-
-    fn convert_rect_primitive(&self, rect_primitive: RectPrimitive, out: &mut Mesh) {
-        let RectPrimitive {
-            rect,
-            color,
-            texture,
-        } = rect_primitive;
-
-        let (texture_id, uv, layer_idx) = match texture {
-            Some(RectTexture {
-                texture_id,
-                uv,
-                layer_idx,
-            }) => (texture_id, uv, layer_idx),
-            None => (TextureId::default(), NormalizedRect::white_uv(), 0),
-        };
-
-        out.add_rect(rect, uv, color, layer_idx);
-        out.texture_id = texture_id;
-    }
-
-    fn convert_quad_primitive(&self, quad_primitive: QuadPrimitive, out: &mut Mesh) {
-        let QuadPrimitive {
-            quad,
-            color,
-            texture,
-        } = quad_primitive;
-
-        let (texture_id, uv, layer_idx) = match texture {
-            Some(QuadTexture {
-                texture_id,
-                uv,
-                layer_idx,
-            }) => (texture_id, uv, layer_idx),
-            None => (TextureId::default(), NormalizedQuad::white_uv(), 0),
-        };
-
-        out.add_quad(quad, uv, color, layer_idx);
-        out.texture_id = texture_id;
-    }
-
-    fn convert_text_primitive(
-        &self,
-        text_primitive: TextPrimitive,
-        pixels_per_point: f32,
-        out: &mut Mesh,
-    ) {
-        let TextPrimitive {
-            pos: layout_pos,
-            layout,
-        } = text_primitive;
-
-        if layout.rows.is_empty() {
-            return;
-        }
-
-        out.vertices.reserve(layout.num_of_vertices);
-        out.indices.reserve(layout.num_of_indices);
-
-        // Make sure the layout origin aligns with the physical pixel grid so
-        // that each glyph aligns correctly. Glyphs are positioned relative
-        // to the layout origin and assume that it ends up on the start of
-        // a physical pixel.
-        let layout_pos = layout_pos
-            .to_physical::<f32, _>(pixels_per_point)
-            .round()
-            .to_logical(pixels_per_point);
-
-        for row in &layout.rows {
-            for glyph in &row.glyphs {
-                let rect = glyph.rect.translate(layout_pos.to_vector());
-                out.add_rect(rect, glyph.uv, glyph.color, glyph.texture_layer_idx);
-            }
         }
     }
 }

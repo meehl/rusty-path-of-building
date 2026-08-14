@@ -1,4 +1,7 @@
-use crate::{color::Srgba, dpi::LogicalPoint, fonts::rasterizer::RasterizedGlyph};
+use crate::{
+    color::Srgba,
+    dpi::{LogicalPoint, LogicalRect, NormalizedRect},
+};
 use ordered_float::OrderedFloat;
 use parley::{FontFamily, FontFamilyName};
 
@@ -99,33 +102,28 @@ impl std::hash::Hash for LayoutJob<'_> {
     }
 }
 
-#[derive(Default)]
-pub struct LayoutRow {
-    pub glyphs: Vec<RasterizedGlyph>,
+pub struct PositionedGlyph {
+    // relative to layout origin
+    // TODO: introduce new "layout space"?
+    pub rect: LogicalRect<f32>,
+    pub uv: NormalizedRect,
+    pub layer_idx: u32,
+    pub color: Srgba,
 }
 
 pub struct Layout {
-    pub job_hash: u64,
+    pub glyphs: Vec<PositionedGlyph>,
+    pub width: f32,
+    // kept for parley's cursor helper
     pub parley_layout: parley::Layout<Srgba>,
-    pub rows: Vec<LayoutRow>,
-    pub num_of_vertices: usize,
-    pub num_of_indices: usize,
 }
 
 impl Layout {
     pub fn width(&self) -> f32 {
-        self.parley_layout.full_width()
+        self.width
     }
 
-    /// Returns text index at cursor position
-    pub fn cursor_index(&self, cursor: LogicalPoint<f32>) -> usize {
-        let cursor = parley::Cursor::from_point(&self.parley_layout, cursor.x, cursor.y);
-        cursor.index()
-    }
-}
-
-impl std::hash::Hash for Layout {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.job_hash.hash(state);
+    pub fn cursor_index_at(&self, point: LogicalPoint<f32>) -> usize {
+        parley::Cursor::from_point(&self.parley_layout, point.x, point.y).index()
     }
 }

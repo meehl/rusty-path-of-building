@@ -14,8 +14,6 @@ pub struct Vertex {
     pub uv: NormalizedPoint,
     pub color: Srgba,
     /// Index into texture array
-    /// TODO: Remove from Vertex and put into Mesh. Use push constant to set index
-    /// before each draw call. Not sure if actually faster, profiling needed.
     pub layer_idx: u32,
 }
 
@@ -27,6 +25,7 @@ pub struct Mesh {
 }
 
 impl Mesh {
+    #[allow(dead_code)]
     #[inline]
     pub fn add_rect(
         &mut self,

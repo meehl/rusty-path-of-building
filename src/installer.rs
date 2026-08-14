@@ -3,13 +3,14 @@ use crate::{
     args::Game,
     color::Srgba,
     dpi::{LogicalPoint, LogicalRect},
+    draw_commands::DrawCommand,
     fonts::{Alignment, FontStyle, LayoutJob},
     installer::download::{
         DownloadEvent, ExtractionRule, build_client, download_and_extract_tarball,
         download_file_to_disk, fetch_file_contents,
     },
     mode::{AppEvent, ModeFrameOutput, ModeTransition},
-    renderer::primitives::{ClippedPrimitive, DrawPrimitive, TextPrimitive},
+    renderer::textures::TextureId,
     util::replace_in_matching_lines,
 };
 use parley::{FontFamily, FontFamilyName, GenericFamily};
@@ -67,10 +68,10 @@ impl InstallMode {
     }
 
     pub fn frame(&mut self, app_state: &mut AppState) -> anyhow::Result<ModeFrameOutput> {
-        let primitives = self.draw_current_progress(app_state);
+        let draw_commands = self.draw_current_progress(app_state);
 
         Ok(ModeFrameOutput {
-            primitives,
+            draw_commands,
             can_elide: false,
             should_continue: true,
         })
@@ -106,10 +107,12 @@ impl InstallMode {
         Ok(())
     }
 
-    fn draw_current_progress(
-        &self,
-        app_state: &mut AppState,
-    ) -> Box<dyn Iterator<Item = ClippedPrimitive>> {
+    fn draw_current_progress(&self, app_state: &mut AppState) -> Vec<DrawCommand> {
+        let mut draw_commands = Vec::new();
+
+        let screen_size = app_state.window.logical_size().cast::<f32>();
+        let pos = LogicalPoint::new(screen_size.width / 2.0, screen_size.height / 2.0);
+
         let mut job = LayoutJob::new(
             FontFamily::Single(FontFamilyName::Generic(GenericFamily::SansSerif)),
             32.0,
@@ -122,18 +125,19 @@ impl InstallMode {
         job.append(&self.status, Srgba::WHITE);
 
         let layout = app_state.fonts.layout(job, app_state.window.scale_factor());
+        for glyph in &layout.glyphs {
+            draw_commands.push(DrawCommand {
+                positions: glyph.rect.translate(pos.to_vector()).into(),
+                uvs: glyph.uv.into(),
+                color: glyph.color,
+                // font atlas always lives at default texture ID
+                texture_id: TextureId::default(),
+                texture_layer_idx: glyph.layer_idx,
+                clip_rect: LogicalRect::from_size(app_state.window.logical_size().cast()),
+            });
+        }
 
-        let screen_size = app_state.window.logical_size().cast::<f32>();
-        let pos = LogicalPoint::new(screen_size.width / 2.0, screen_size.height / 2.0);
-
-        let primitive = TextPrimitive::new(pos, layout);
-
-        let clipped_primitive = ClippedPrimitive {
-            clip_rect: LogicalRect::from_size(app_state.window.logical_size().cast()),
-            primitive: DrawPrimitive::Text(primitive),
-        };
-
-        Box::new(vec![clipped_primitive].into_iter())
+        draw_commands
     }
 }
 

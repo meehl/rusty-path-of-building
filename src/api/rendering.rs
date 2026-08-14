@@ -1,7 +1,7 @@
 use crate::{
     api::image_handle::image_handle_texture_id,
     color::Srgba,
-    dpi::Uv,
+    dpi::LogicalPoint,
     fonts::{Alignment, FontStyle, LayoutJob},
     lua::Context,
     math::{Point, Quad, Rect, Size},
@@ -88,7 +88,7 @@ unsafe extern "C-unwind" fn set_draw_color(state: *mut ffi::lua_State) -> c_int 
         1 => {
             let esc_str = str_from_stack!(state, -nargs);
             let color = Srgba::from_escape_code(esc_str);
-            ctx.layers().set_draw_color(color);
+            ctx.recorder().set_draw_color(color);
         }
         // rgb
         3 => {
@@ -96,7 +96,7 @@ unsafe extern "C-unwind" fn set_draw_color(state: *mut ffi::lua_State) -> c_int 
             let g = f32_from_stack!(state, -nargs + 1);
             let b = f32_from_stack!(state, -nargs + 2);
             let color = Srgba::new_f32(r, g, b, 1.0);
-            ctx.layers().set_draw_color(color);
+            ctx.recorder().set_draw_color(color);
         }
         // rgba
         4 => {
@@ -105,7 +105,7 @@ unsafe extern "C-unwind" fn set_draw_color(state: *mut ffi::lua_State) -> c_int 
             let b = f32_from_stack!(state, -nargs + 2);
             let a = f32_from_stack!(state, -nargs + 3);
             let color = Srgba::new_f32(r, g, b, a);
-            ctx.layers().set_draw_color(color);
+            ctx.recorder().set_draw_color(color);
         }
         _ => panic!("Unexpected number of arguments"),
     }
@@ -118,7 +118,7 @@ unsafe extern "C-unwind" fn get_draw_color(state: *mut ffi::lua_State) -> c_int 
     let lua_instance = unsafe { Lua::get_or_init_from_ptr(state) };
     let ctx = lua_instance.app_data_ref::<&'static Context>().unwrap();
 
-    let color: [f32; 4] = ctx.layers().get_draw_color().into();
+    let color: [f32; 4] = ctx.recorder().get_draw_color().into();
     unsafe { ffi::lua_pushnumber(state, color[0] as f64) };
     unsafe { ffi::lua_pushnumber(state, color[1] as f64) };
     unsafe { ffi::lua_pushnumber(state, color[2] as f64) };
@@ -135,7 +135,7 @@ unsafe extern "C-unwind" fn set_viewport(state: *mut ffi::lua_State) -> c_int {
     let nargs = unsafe { ffi::lua_gettop(state) };
     match nargs {
         0 => ctx
-            .layers()
+            .recorder()
             .set_viewport_from_size(ctx.window().logical_size()),
         4 => {
             let x = f32_from_stack!(state, -nargs);
@@ -143,7 +143,7 @@ unsafe extern "C-unwind" fn set_viewport(state: *mut ffi::lua_State) -> c_int {
             let w = f32_from_stack!(state, -nargs + 2);
             let h = f32_from_stack!(state, -nargs + 3);
             let rect = Rect::from_origin_and_size(Point::new(x, y), Size::new(w, h));
-            ctx.layers().set_viewport(rect);
+            ctx.recorder().set_viewport(rect);
         }
         _ => panic!("Unexpected number of arguments"),
     }
@@ -161,7 +161,7 @@ unsafe extern "C-unwind" fn set_draw_layer(state: *mut ffi::lua_State) -> c_int 
     match nargs {
         1 => {
             let layer = i32_from_stack!(state, -nargs);
-            ctx.layers().set_draw_layer(layer, 0);
+            ctx.recorder().set_draw_layer(layer, 0);
         }
         2 => {
             let layer = match unsafe { ffi::lua_type(state, -nargs) } {
@@ -174,9 +174,9 @@ unsafe extern "C-unwind" fn set_draw_layer(state: *mut ffi::lua_State) -> c_int 
             };
             let sublayer = i32_from_stack!(state, -nargs + 1);
             if let Some(layer) = layer {
-                ctx.layers().set_draw_layer(layer, sublayer);
+                ctx.recorder().set_draw_layer(layer, sublayer);
             } else {
-                ctx.layers().set_draw_sublayer(sublayer);
+                ctx.recorder().set_draw_sublayer(sublayer);
             }
         }
         _ => panic!("Unexpected number of arguments"),
@@ -216,9 +216,9 @@ unsafe extern "C-unwind" fn draw_image(state: *mut ffi::lua_State) -> c_int {
         let u2 = f32_from_stack!(state, -nargs + i + 2);
         let v2 = f32_from_stack!(state, -nargs + i + 3);
         i += 4;
-        Rect::new(Point::new(u1, v1), Point::new(u2, v2))
+        Some(Rect::new(Point::new(u1, v1), Point::new(u2, v2)))
     } else {
-        Rect::default_uv()
+        None
     };
 
     let layer_idx = if parse_layer_idx {
@@ -228,7 +228,7 @@ unsafe extern "C-unwind" fn draw_image(state: *mut ffi::lua_State) -> c_int {
         0
     };
 
-    ctx.layers().draw_rect(texture_id, rect, uv, layer_idx);
+    ctx.recorder().draw_image(rect, texture_id, uv, layer_idx);
 
     0
 }
@@ -277,14 +277,14 @@ unsafe extern "C-unwind" fn draw_image_quad(state: *mut ffi::lua_State) -> c_int
         let u4 = f32_from_stack!(state, -nargs + i + 6);
         let v4 = f32_from_stack!(state, -nargs + i + 7);
         i += 8;
-        Quad::new(
+        Some(Quad::new(
             Point::new(u1, v1),
             Point::new(u2, v2),
             Point::new(u3, v3),
             Point::new(u4, v4),
-        )
+        ))
     } else {
-        Quad::default_uv()
+        None
     };
 
     let layer_idx = if parse_layer_idx {
@@ -294,7 +294,8 @@ unsafe extern "C-unwind" fn draw_image_quad(state: *mut ffi::lua_State) -> c_int
         0
     };
 
-    ctx.layers().draw_quad(texture_id, quad, uv, layer_idx);
+    ctx.recorder()
+        .draw_image_quad(quad, texture_id, uv, layer_idx);
 
     0
 }
@@ -320,7 +321,7 @@ unsafe extern "C-unwind" fn draw_string(state: *mut ffi::lua_State) -> c_int {
         panic!("Invalid font type");
     };
 
-    let mut position = Point::new(x, y);
+    let mut position = LogicalPoint::new(x, y);
     let mut is_absolute_position = false;
     // the position needs to be adjusted for some alignments to match PoBs behavior
     let screen_size = ctx.window().logical_size();
@@ -340,7 +341,7 @@ unsafe extern "C-unwind" fn draw_string(state: *mut ffi::lua_State) -> c_int {
         PoBTextAlignment::RightX => Alignment::Max,
     };
 
-    let current_draw_color = ctx.layers().get_draw_color();
+    let current_draw_color = ctx.recorder().get_draw_color();
     let job = build_layout_job(
         text,
         current_draw_color,
@@ -352,12 +353,32 @@ unsafe extern "C-unwind" fn draw_string(state: *mut ffi::lua_State) -> c_int {
     // NOTE: color escape codes modify the current draw color.
     // set current draw color to color of last segment to match PoB's behavior
     if let Some(last_segment) = job.segments.last() {
-        ctx.layers().set_draw_color(last_segment.color);
+        ctx.recorder().set_draw_color(last_segment.color);
     }
 
+    // TODO: align to physical grid?
+    //
+    // Make sure the layout origin aligns with the physical pixel grid so
+    // that each glyph aligns correctly. Glyphs are positioned relative
+    // to the layout origin and assume that it ends up on the start of
+    // a physical pixel.
+    /*
+    let position = position
+        .to_physical::<f32, _>(pixels_per_point)
+        .round()
+        .to_logical(pixels_per_point);
+    */
+
     let layout = ctx.fonts().layout(job, ctx.window().scale_factor());
-    ctx.layers()
-        .draw_text(position, layout, is_absolute_position);
+    for glyph in &layout.glyphs {
+        ctx.recorder().draw_glyph(
+            glyph.rect.translate(position.to_vector()),
+            glyph.uv,
+            glyph.color,
+            glyph.layer_idx,
+            is_absolute_position,
+        );
+    }
 
     0
 }
@@ -378,7 +399,8 @@ unsafe extern "C-unwind" fn get_string_width(state: *mut ffi::lua_State) -> c_in
     };
 
     let job = build_layout_job(text, Srgba::WHITE, font_type, line_height, None);
-    let width = ctx.fonts().get_text_width(job, ctx.window().scale_factor());
+    let layout = ctx.fonts().layout(job, ctx.window().scale_factor());
+    let width = layout.width();
 
     unsafe { ffi::lua_pushnumber(state, width as f64) };
     1
@@ -394,11 +416,8 @@ fn get_index_at_cur(
     let font_type = font_type.parse::<PoBFontType>()?;
 
     let job = build_layout_job(&text, Srgba::WHITE, font_type, line_height, None);
-    let index_stripped = ctx.fonts().get_text_index_at_cursor(
-        job,
-        Point::new(cur_x, cur_y),
-        ctx.window().scale_factor(),
-    );
+    let layout = ctx.fonts().layout(job, ctx.window().scale_factor());
+    let index_stripped = layout.cursor_index_at(Point::new(cur_x, cur_y));
 
     // build_layout_job() strips all color escape strings from the original string. The
     // resulting [`LayoutJob`] is then passed to get_text_index_at_cursor() which returns an

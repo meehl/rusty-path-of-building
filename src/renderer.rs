@@ -14,7 +14,6 @@ use wgpu::util::DeviceExt;
 pub mod image;
 pub mod mesh;
 mod mipmap;
-pub mod primitives;
 pub mod tessellator;
 pub mod textures;
 

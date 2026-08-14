@@ -1,15 +1,15 @@
 use crate::{
     app::AppState,
     dpi::{LogicalRect, LogicalSize},
+    draw_commands::DrawCommandRecorder,
     input::{key_as_str, mousebutton_as_str},
-    layers::Layers,
     lua::{LuaInstance, PoBContext, PoBEvent},
     mode::{AppEvent, ModeFrameOutput, ModeTransition},
 };
 use std::path::PathBuf;
 
 pub struct PoBState {
-    pub layers: Layers,
+    pub recorder: DrawCommandRecorder,
     pub current_working_dir: PathBuf,
     pub needs_restart: bool,
     pub is_dpi_aware: bool,
@@ -28,7 +28,7 @@ pub struct PoBMode {
 impl PoBMode {
     pub fn new(app_state: &mut AppState) -> anyhow::Result<Self> {
         let mut state = PoBState {
-            layers: Layers::default(),
+            recorder: DrawCommandRecorder::default(),
             current_working_dir: PathBuf::default(),
             needs_restart: false,
             is_dpi_aware: false,
@@ -51,7 +51,7 @@ impl PoBMode {
         profiling::scope!("frame");
 
         // reset layers and viewport
-        self.state.layers.reset();
+        self.state.recorder.reset();
         self.reset_viewport(app_state.window.logical_size());
 
         let mut ctx = PoBContext::new(app_state, &mut self.state);
@@ -60,11 +60,12 @@ impl PoBMode {
         self.lua_instance.handle_subscripts(&mut ctx);
 
         // run PoB's draw code.
-        // this will "fill up" up the layers with draw primitives
+        // this will "fill up" up the layers with draw commands
         self.lua_instance.handle_event(PoBEvent::Frame, &mut ctx)?;
 
         // check if draw prmitives are identical to primitives from last frame
-        let layers_hash = self.state.layers.get_hash();
+        let (layers_hash, layers) = self.state.recorder.finish();
+        //let layers_hash = self.state.layers.get_hash();
         let identical = layers_hash == self.previous_layers_hash;
         self.previous_layers_hash = layers_hash;
 
@@ -73,7 +74,7 @@ impl PoBMode {
         let should_continue = has_active_subscript || has_active_coroutine;
 
         Ok(ModeFrameOutput {
-            primitives: self.state.layers.consume_layers(),
+            draw_commands: layers.values().flatten().copied().collect(),
             can_elide: identical,
             should_continue,
         })
@@ -154,7 +155,7 @@ impl PoBMode {
 
     fn reset_viewport(&mut self, size: LogicalSize<u32>) {
         self.state
-            .layers
+            .recorder
             .set_viewport(LogicalRect::from_size(size).cast());
     }
 }

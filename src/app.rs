@@ -114,10 +114,9 @@ impl App {
         {
             RenderJob::Skip
         } else {
-            let meshes = self.tessellator.convert_clipped_primitives(
-                mode_output.primitives,
-                self.state.window.scale_factor(),
-            );
+            let meshes = self
+                .tessellator
+                .convert_draw_commands(mode_output.draw_commands);
 
             RenderJob::Render {
                 meshes,

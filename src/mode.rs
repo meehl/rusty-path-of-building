@@ -1,6 +1,4 @@
-use crate::{
-    app::AppState, installer::InstallMode, pob::PoBMode, renderer::primitives::ClippedPrimitive,
-};
+use crate::{app::AppState, draw_commands::DrawCommand, installer::InstallMode, pob::PoBMode};
 use winit::{event::MouseButton, keyboard::Key};
 
 pub enum AppEvent {
@@ -32,7 +30,7 @@ pub enum ModeTransition {
 }
 
 pub struct ModeFrameOutput {
-    pub primitives: Box<dyn Iterator<Item = ClippedPrimitive>>,
+    pub draw_commands: Vec<DrawCommand>,
     pub can_elide: bool,
     /// Indicates that this should be redrawn again next frame even if user is not interacting with
     /// window

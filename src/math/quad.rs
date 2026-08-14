@@ -1,4 +1,4 @@
-use crate::math::{Point, Size, Vector};
+use crate::math::{Corners, Point, Rect, Size, Vector};
 use bytemuck::{Pod, Zeroable};
 use euclid::num::Zero;
 use std::fmt;
@@ -119,5 +119,19 @@ where
     #[inline]
     pub fn translate(&self, by: Vector<T, U>) -> Self {
         Self::new(self.p0 + by, self.p1 + by, self.p2 + by, self.p3 + by)
+    }
+}
+
+impl<T, U> From<Rect<T, U>> for Quad<T, U>
+where
+    T: Copy,
+{
+    fn from(value: Rect<T, U>) -> Self {
+        Self::new(
+            value.top_left(),
+            value.top_right(),
+            value.bottom_right(),
+            value.bottom_left(),
+        )
     }
 }
