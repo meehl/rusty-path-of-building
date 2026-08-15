@@ -15,7 +15,6 @@ use parley::{
 };
 use std::sync::Arc;
 
-pub use atlas::FontAtlasSize;
 pub use layout::{Alignment, FontStyle, Layout, LayoutJob};
 
 mod atlas;
@@ -64,7 +63,7 @@ impl Fonts {
             definitions,
             font_context: FontContext::new(),
             layout_context: LayoutContext::new(),
-            atlas: FontAtlas::new(1024),
+            atlas: FontAtlas::new(1024, 1024),
             glyph_rasterizer: GlyphRasterizer::new(),
             layout_cache: LayoutCache::default(),
         };
@@ -96,10 +95,6 @@ impl Fonts {
 
     /// Needs to be called at beginning of each frame.
     pub fn begin_frame(&mut self) {
-        // recreate atlas when it becomes too full or overflowed
-        if self.atlas.capacity() > 0.9 {
-            self.clear_atlas();
-        }
         self.layout_cache.flush();
     }
 
@@ -185,10 +180,6 @@ impl Fonts {
                 }
             }
         }
-    }
-
-    pub fn font_atlas(&self) -> &FontAtlas {
-        &self.atlas
     }
 
     pub fn layout(&mut self, job: LayoutJob, pixels_per_point: f32) -> Arc<Layout> {
@@ -288,13 +279,6 @@ impl Fonts {
         layout
     }
 
-    /// Clear atlas and invalidate caches depend on atlas state
-    fn clear_atlas(&mut self) {
-        self.atlas.clear();
-        self.glyph_rasterizer.clear();
-        self.layout_cache.clear();
-    }
-
     /// Width of laid out text
     pub fn get_text_width(&mut self, job: LayoutJob, pixels_per_point: f32) -> i32 {
         let layout = self.layout(job, pixels_per_point);
@@ -351,9 +335,5 @@ impl LayoutCache {
         self.cache
             .retain(|_key, cached| cached.generation == self.current_generation);
         self.current_generation = self.current_generation.wrapping_add(1);
-    }
-
-    pub fn clear(&mut self) {
-        self.cache.clear();
     }
 }

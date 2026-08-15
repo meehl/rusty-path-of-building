@@ -102,8 +102,6 @@ impl App {
 
         let mode_output = self.current_mode.frame(&mut self.state)?;
 
-        let font_atlas_size = self.state.fonts.font_atlas().size();
-
         if let Some(font_image_delta) = self.state.fonts.font_atlas_delta() {
             self.state
                 .texture_manager
@@ -118,7 +116,6 @@ impl App {
         } else {
             let meshes = self.tessellator.convert_clipped_primitives(
                 mode_output.primitives,
-                font_atlas_size,
                 self.state.window.scale_factor(),
             );
 

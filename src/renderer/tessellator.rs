@@ -1,6 +1,5 @@
 use crate::{
-    dpi::{ConvertToLogical, ConvertToPhysical, Normalize, NormalizedQuad, NormalizedRect, Uv},
-    fonts::FontAtlasSize,
+    dpi::{ConvertToLogical, ConvertToPhysical, NormalizedQuad, NormalizedRect, Uv},
     renderer::{
         mesh::{ClippedMesh, Mesh},
         primitives::{
@@ -21,7 +20,6 @@ impl Tessellator {
     pub fn convert_clipped_primitives(
         &mut self,
         clipped_primitives: impl Iterator<Item = ClippedPrimitive>,
-        font_atlas_size: FontAtlasSize,
         pixels_per_point: f32,
     ) -> Vec<ClippedMesh> {
         profiling::scope!("convert_primitives");
@@ -31,7 +29,6 @@ impl Tessellator {
         for clipped_primitive in clipped_primitives {
             self.convert_clipped_primitive(
                 clipped_primitive,
-                font_atlas_size,
                 pixels_per_point,
                 &mut clipped_meshes,
             );
@@ -44,7 +41,6 @@ impl Tessellator {
     pub fn convert_clipped_primitive(
         &mut self,
         clipped_primitive: ClippedPrimitive,
-        font_atlas_size: FontAtlasSize,
         pixels_per_point: f32,
         out_clipped_meshes: &mut Vec<ClippedMesh>,
     ) {
@@ -83,7 +79,6 @@ impl Tessellator {
             DrawPrimitive::Text(text_primitive) => {
                 self.convert_text_primitive(
                     text_primitive,
-                    font_atlas_size,
                     pixels_per_point,
                     &mut last_clipped_mesh.mesh,
                 );
@@ -140,7 +135,6 @@ impl Tessellator {
     fn convert_text_primitive(
         &self,
         text_primitive: TextPrimitive,
-        font_atlas_size: FontAtlasSize,
         pixels_per_point: f32,
         out: &mut Mesh,
     ) {
@@ -168,8 +162,7 @@ impl Tessellator {
         for row in &layout.rows {
             for glyph in &row.glyphs {
                 let rect = glyph.rect.translate(layout_pos.to_vector());
-                let normalized_uv = glyph.uv.normalize(font_atlas_size);
-                out.add_rect(rect, normalized_uv, glyph.color, 0);
+                out.add_rect(rect, glyph.uv, glyph.color, glyph.texture_layer_idx);
             }
         }
     }

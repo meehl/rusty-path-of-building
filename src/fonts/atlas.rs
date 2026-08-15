@@ -1,137 +1,149 @@
+use std::num::NonZeroU32;
+
 use crate::{
     color::Srgba,
-    math::{Point, Rect, Size},
+    dpi::{Normalize, NormalizedRect},
+    math::{Point, Size},
     renderer::{
-        image::{ImageData, ImageDelta},
+        image::{DataOrder, ImageData, ImageDelta},
         textures::TextureOptions,
     },
 };
-use image::{GenericImage, RgbaImage, SubImage, imageops};
+use image::{GenericImage, RgbaImage, SubImage};
 
 pub struct FontAtlasSpace;
 pub type FontAtlasPoint = Point<u32, FontAtlasSpace>;
 pub type FontAtlasSize = Size<u32, FontAtlasSpace>;
-pub type FontAtlasRect = Rect<u32, FontAtlasSpace>;
 
-pub struct FontAtlas {
-    // max width/height of atlas texture
-    max_texture_side: u32,
+pub struct AllocatedGlyph<'a> {
+    pub sub_image: SubImage<&'a mut RgbaImage>,
+    pub layer_idx: u32,
+    pub uv: NormalizedRect,
+}
+
+struct Layer {
     image: RgbaImage,
     // position of next allocation
     cursor: FontAtlasPoint,
     current_row_height: u32,
+}
+
+pub struct FontAtlas {
+    layer_size: FontAtlasSize,
+    // maximum amount of layers
+    max_layers: u32,
+    layers: Vec<Layer>,
     // atlas has been altered and needs to be reuploaded to the GPU
-    // TODO: only mark changed region as dirty and perform partial texture update
+    // TODO: only mark changed regions as dirty and perform partial texture update
     dirty: bool,
-    // atlas has overflowed and needs to be recreated
-    overflowed: bool,
 }
 
 impl FontAtlas {
-    pub fn new(max_texture_side: u32) -> Self {
-        // start out with maximum width and let height grow as needed
-        let width = max_texture_side;
-        let initial_height = 256;
-
+    pub fn new(layer_size: u32, max_layers: u32) -> Self {
         let mut atlas = Self {
-            max_texture_side,
-            image: RgbaImage::new(width, initial_height),
-            cursor: FontAtlasPoint::zero(),
-            current_row_height: 0,
+            layer_size: Size::new(layer_size, layer_size),
+            max_layers,
+            layers: Vec::new(),
             dirty: false,
-            overflowed: false,
         };
 
+        atlas.push_layer();
         atlas.initialize();
         atlas
     }
 
-    fn initialize(&mut self) {
-        // Puts white pixel at (0, 0).
-        // NOTE: Rendering a solid color shape is done by setting the texture to
-        // the font atlas and sampling the white pixel at (0, 0).
-        let mut sub_image = self.allocate(FontAtlasSize::new(1, 1));
-        sub_image.put_pixel(0, 0, Srgba::WHITE.into());
+    /// Adds a new empty layer
+    fn push_layer(&mut self) {
+        self.layers.push(Layer {
+            image: RgbaImage::new(self.layer_size.width, self.layer_size.height),
+            cursor: FontAtlasPoint::zero(),
+            current_row_height: 0,
+        });
     }
 
-    // TODO: use an actual bin packing algorithm for tighter packing
-    /// Returns a mutable view into the atlas of given size.
-    pub fn allocate(&mut self, size: FontAtlasSize) -> SubImage<&mut RgbaImage> {
+    /// Initializes the atlas.
+    ///
+    /// Puts a white pixel at (0, 0) of layer 0 for solid color texturing.
+    fn initialize(&mut self) {
+        let mut allocation = self.allocate(FontAtlasSize::new(1, 1));
+        allocation.sub_image.put_pixel(0, 0, Srgba::WHITE.into());
+    }
+
+    /// Allocates a new glyph
+    pub fn allocate(&mut self, requested_size: FontAtlasSize) -> AllocatedGlyph<'_> {
         const PADDING: u32 = 1;
 
-        if self.cursor.x + size.width > self.image.width() {
-            self.cursor.x = 0;
-            self.cursor.y += self.current_row_height + PADDING;
-            self.current_row_height = 0;
-        }
+        let mut idx = self.layers.len() - 1;
 
-        self.current_row_height = self.current_row_height.max(size.height);
+        {
+            let layer = &mut self.layers[idx];
 
-        let required_atlas_height = self.cursor.y + self.current_row_height;
-        if required_atlas_height > self.max_texture_side {
-            log::warn!("font atlas overflowed!");
-            // start overwriting old glyphs
-            self.cursor = Point::new(0, self.image.height() / 3);
-            // setting this flag causes atlas to be recreated next frame
-            self.overflowed = true;
-        } else if required_atlas_height > self.image().height() {
-            // increase height
-            let mut new_height = self.image.height();
-            while new_height < required_atlas_height {
-                new_height *= 2;
+            // start new row if new allocation doesn't fit current row
+            if layer.cursor.x + requested_size.width > self.layer_size.width {
+                layer.cursor.x = 0;
+                layer.cursor.y += layer.current_row_height + PADDING;
+                layer.current_row_height = 0;
             }
-            self.image = extend_image_height(&self.image, new_height, Srgba::TRANSPARENT);
+
+            // add or evict layer if new allocation doesn't fit on this layer
+            if layer.cursor.y + requested_size.height > self.layer_size.height {
+                if (self.layers.len() as u32) < self.max_layers {
+                    self.push_layer();
+                    idx = self.layers.len() - 1;
+                } else {
+                    // just choose a sufficiently large layer size and count to
+                    // avoid panic. a more sophisticated approach can be implemented
+                    // later if needed
+                    panic!("font atlas reached maximum size!");
+                }
+            }
         }
 
-        let pos = self.cursor;
-        self.cursor.x += size.width + PADDING;
-
+        let layer = &mut self.layers[idx];
+        layer.current_row_height = layer.current_row_height.max(requested_size.height);
+        let pos = layer.cursor;
+        layer.cursor.x += requested_size.width + PADDING;
         self.dirty = true;
 
-        self.image.sub_image(pos.x, pos.y, size.width, size.height)
+        AllocatedGlyph {
+            sub_image: layer.image.sub_image(
+                pos.x,
+                pos.y,
+                requested_size.width,
+                requested_size.height,
+            ),
+            layer_idx: idx as u32,
+            uv: NormalizedRect::new(
+                pos.normalize(self.layer_size),
+                (pos + requested_size.to_vector()).normalize(self.layer_size),
+            ),
+        }
     }
 
     pub fn take_delta(&mut self) -> Option<ImageDelta> {
-        let dirty = std::mem::replace(&mut self.dirty, false);
-        if dirty {
-            Some(ImageDelta::new(
-                ImageData::from(self.image.clone()),
-                TextureOptions::LINEAR,
-            ))
-        } else {
-            None
+        if !std::mem::replace(&mut self.dirty, false) {
+            return None;
         }
-    }
 
-    pub fn capacity(&self) -> f32 {
-        if self.overflowed {
-            1.0
-        } else {
-            (self.cursor.y + self.current_row_height) as f32 / self.max_texture_side as f32
+        let mut bytes = Vec::with_capacity(
+            self.layers.len() * (self.layer_size.width * self.layer_size.height * 4) as usize,
+        );
+
+        for layer in &self.layers {
+            bytes.extend_from_slice(layer.image.as_raw());
         }
-    }
 
-    pub fn clear(&mut self) {
-        self.image.fill(0);
-        self.cursor = FontAtlasPoint::zero();
-        self.current_row_height = 0;
-        self.dirty = false;
-        self.overflowed = false;
-        self.initialize();
+        Some(ImageDelta::new(
+            ImageData {
+                format: wgpu::TextureFormat::Rgba8Unorm,
+                width: self.layer_size.width,
+                height: self.layer_size.height,
+                array_layers: self.layers.len() as u32,
+                mipmap_count: NonZeroU32::new(1).expect("1 is non-zero"),
+                data_order: DataOrder::default(),
+                bytes,
+            },
+            TextureOptions::LINEAR,
+        ))
     }
-
-    pub fn image(&self) -> &RgbaImage {
-        &self.image
-    }
-
-    pub fn size(&self) -> FontAtlasSize {
-        FontAtlasSize::new(self.image.width(), self.image.height())
-    }
-}
-
-fn extend_image_height(image: &RgbaImage, new_height: u32, fill_color: Srgba) -> RgbaImage {
-    let width = image.width();
-    let mut extended_image = RgbaImage::from_pixel(width, new_height, fill_color.into());
-    imageops::overlay(&mut extended_image, image, 0, 0);
-    extended_image
 }

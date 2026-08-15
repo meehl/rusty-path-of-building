@@ -1,13 +1,11 @@
 use crate::{
     color::Srgba,
     dpi::{
-        ConvertToLogical, LogicalRect, LogicalVector, PhysicalPoint, PhysicalRect, PhysicalVector,
+        ConvertToLogical, LogicalRect, LogicalVector, NormalizedRect, PhysicalPoint, PhysicalRect,
+        PhysicalVector,
     },
-    fonts::{
-        atlas::{FontAtlas, FontAtlasRect},
-        glyph_key::GlyphKey,
-    },
-    math::{Point, Size},
+    fonts::{atlas::FontAtlas, glyph_key::GlyphKey},
+    math::Size,
 };
 use ahash::HashMap;
 use image::GenericImage;
@@ -51,10 +49,11 @@ impl<'a> StyleKey<'a> {
         }
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CachedGlyph {
-    // absolute uv rect within font atlas
-    pub uv: FontAtlasRect,
+    pub rect: PhysicalRect<u32>,
+    pub uv: NormalizedRect,
+    pub texture_layer_idx: u32,
     // offset from top/left to baseline
     pub baseline_offset: PhysicalVector<i32>,
 }
@@ -62,7 +61,8 @@ pub struct CachedGlyph {
 pub struct RasterizedGlyph {
     // NOTE: this is relative to the layout origin
     pub rect: LogicalRect<f32>,
-    pub uv: FontAtlasRect,
+    pub uv: NormalizedRect,
+    pub texture_layer_idx: u32,
     pub color: Srgba,
 }
 
@@ -75,12 +75,13 @@ impl RasterizedGlyph {
     ) -> Self {
         let glyph_rect = PhysicalRect::from_origin_and_size(
             position + cached.baseline_offset,
-            cached.uv.cast_unit().cast().size(),
+            cached.rect.cast().size(),
         );
 
         RasterizedGlyph {
             rect: glyph_rect.to_logical(pixels_per_point),
             uv: cached.uv,
+            texture_layer_idx: cached.texture_layer_idx,
             color,
         }
     }
@@ -109,13 +110,6 @@ impl GlyphRasterizer {
             cached_glyphs: Default::default(),
             scratch: Default::default(),
         }
-    }
-
-    pub fn clear(&mut self) {
-        self.swash_keys.clear();
-        self.style_ids.clear();
-        self.next_style_id = 0;
-        self.cached_glyphs.clear();
     }
 
     /// Gets a [`swash::FontRef`] from [`FontData`]
@@ -226,10 +220,12 @@ impl GlyphRasterizer {
                 return None;
             };
 
-            let atlas_region = write_to_atlas(image, atlas);
+            let (glyph_rect, atlas_uv, atlas_layer_idx) = write_to_atlas(image, atlas);
 
             let cached_glyph = CachedGlyph {
-                uv: atlas_region,
+                rect: glyph_rect,
+                uv: atlas_uv,
+                texture_layer_idx: atlas_layer_idx,
                 baseline_offset: PhysicalVector::new(image.placement.left, -image.placement.top),
             };
             cached_glyphs.insert(glyph_key, Some(cached_glyph));
@@ -244,9 +240,13 @@ impl GlyphRasterizer {
     }
 }
 
-/// Writes rasterized glyph to atlas and returns region it wrote into
-fn write_to_atlas(image: &swash::scale::image::Image, atlas: &mut FontAtlas) -> FontAtlasRect {
-    let mut atlas_region = atlas.allocate(Size::new(image.placement.width, image.placement.height));
+/// Writes rasterized glyph to atlas and returns the UV coordinates of it
+fn write_to_atlas(
+    image: &swash::scale::image::Image,
+    atlas: &mut FontAtlas,
+) -> (PhysicalRect<u32>, NormalizedRect, u32) {
+    let mut allocated_glyph =
+        atlas.allocate(Size::new(image.placement.width, image.placement.height));
 
     match image.content {
         swash::scale::image::Content::Mask => {
@@ -256,7 +256,11 @@ fn write_to_atlas(image: &swash::scale::image::Image, atlas: &mut FontAtlas) -> 
                     let a = image.data[i];
                     // SAFETY: allocated atlas region and swash image have the same size
                     unsafe {
-                        atlas_region.unsafe_put_pixel(x, y, Srgba::new(255, 255, 255, a).into())
+                        allocated_glyph.sub_image.unsafe_put_pixel(
+                            x,
+                            y,
+                            Srgba::new(255, 255, 255, a).into(),
+                        )
                     };
                     i += 1;
                 }
@@ -265,8 +269,9 @@ fn write_to_atlas(image: &swash::scale::image::Image, atlas: &mut FontAtlas) -> 
         _ => unreachable!(),
     };
 
-    FontAtlasRect::from_origin_and_size(
-        Point::new(atlas_region.offsets().0, atlas_region.offsets().1),
-        Size::new(image.placement.width, image.placement.height),
+    (
+        PhysicalRect::from_size(Size::new(image.placement.width, image.placement.height)),
+        allocated_glyph.uv,
+        allocated_glyph.layer_idx,
     )
 }
