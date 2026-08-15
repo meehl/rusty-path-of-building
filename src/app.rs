@@ -1,13 +1,14 @@
 use crate::{
     args::Game,
+    batcher::build_render_job,
     dpi::{ConvertToLogical, PhysicalPoint, PhysicalSize},
     fonts::{FontData, FontDefinitions, Fonts},
-    gfx::{GraphicsContext, RenderJob},
+    gfx::GraphicsContext,
     input::InputState,
     installer::InstallMode,
     mode::{AppEvent, AppMode, ModeTransition},
     pob::PoBMode,
-    renderer::{tessellator::Tessellator, textures::WrappedTextureManager},
+    renderer::{RenderJob, textures::WrappedTextureManager},
     window::WindowState,
 };
 use anyhow::Result;
@@ -19,7 +20,7 @@ use winit::{
 };
 
 struct FrameOutput {
-    pub render_job: RenderJob,
+    pub render_job: Option<RenderJob>,
     pub should_continue: bool,
 }
 
@@ -43,7 +44,6 @@ pub struct App {
     gfx_context: Option<GraphicsContext>,
     state: AppState,
     game: Game,
-    tessellator: Tessellator,
     needs_reconfigure: bool,
     force_render: bool,
     current_mode: AppMode,
@@ -76,7 +76,6 @@ impl App {
             gfx_context: None,
             state,
             game,
-            tessellator: Tessellator::default(),
             needs_reconfigure: true,
             force_render: true,
             current_mode,
@@ -112,16 +111,14 @@ impl App {
 
         let render_job = if mode_output.can_elide && textures_delta.is_empty() && !self.force_render
         {
-            RenderJob::Skip
+            None
         } else {
-            let meshes = self
-                .tessellator
-                .convert_draw_commands(mode_output.draw_commands);
-
-            RenderJob::Render {
-                meshes,
+            Some(build_render_job(
+                &mode_output.draw_commands,
                 textures_delta,
-            }
+                // TODO: find better way to determine this and how to pass it in
+                32,
+            ))
         };
 
         Ok(FrameOutput {

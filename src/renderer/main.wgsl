@@ -1,8 +1,11 @@
+enable wgpu_binding_array;
+
 // Vertex shader bindings
 struct VertexOutput {
     @location(0) tex_coord: vec2<f32>,
     @location(1) color: vec4<f32>, // linear
-    @location(2) @interpolate(flat) layer_idx: u32,
+    @location(2) @interpolate(flat) texture_idx: u32,
+    @location(3) @interpolate(flat) layer_idx: u32,
     @builtin(position) position: vec4<f32>,
 };
 
@@ -36,18 +39,21 @@ fn vs_main(
     @location(0) a_pos: vec2<f32>,
     @location(1) a_tex_coord: vec2<f32>,
     @location(2) a_color: u32, // non-linear
-    @location(3) a_layer_idx: u32,
+    @location(3) a_texture_idx: u32,
+    @location(4) a_layer_idx: u32,
 ) -> VertexOutput {
     var out: VertexOutput;
     out.tex_coord = a_tex_coord;
+    out.texture_idx = a_texture_idx;
     out.layer_idx = a_layer_idx;
     out.color = unpack_color(a_color);
     out.position = position_from_screen(a_pos);
     return out;
 }
 
-@group(1) @binding(0) var r_tex_color: texture_2d_array<f32>;
-@group(1) @binding(1) var r_tex_sampler: sampler;
+// TODO: substitute array size based on device limits
+@group(1) @binding(0) var textures: binding_array<texture_2d_array<f32>, 32>;
+@group(1) @binding(1) var samplers: binding_array<sampler, 32>;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
@@ -56,7 +62,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // Vertex colors, texture samples, and the output color are all in sRGB.
     // Texture formats and output surface formats are selected such that no automatic
     // conversion between linear <-> sRGB is performed.
-    let tex_color = textureSample(r_tex_color, r_tex_sampler, in.tex_coord, in.layer_idx);
+    let tex_color = textureSample(textures[in.texture_idx], samplers[in.texture_idx], in.tex_coord, in.layer_idx);
     var out_color = in.color * tex_color;
     return out_color;
 }

@@ -1,26 +1,64 @@
 use crate::{
-    dpi::{ConvertToLogical, ConvertToPhysical, LogicalSize, PhysicalRect, PhysicalSize},
+    color::Srgba,
+    dpi::{
+        ConvertToLogical, ConvertToPhysical, LogicalPoint, LogicalRect, LogicalSize,
+        NormalizedPoint, PhysicalRect, PhysicalSize,
+    },
     math::Point,
     renderer::{
         image::ImageData,
-        mesh::{ClippedMesh, Vertex},
         textures::{TextureId, TextureOptions, TexturesDelta},
     },
+    util::calculate_hash,
 };
 use ahash::HashMap;
-use std::{borrow::Cow, num::NonZeroU64, ops::Range};
+use std::{
+    borrow::Cow,
+    num::{NonZeroU32, NonZeroU64},
+    ops::Range,
+};
 use wgpu::util::DeviceExt;
 
 pub mod image;
-pub mod mesh;
 mod mipmap;
-pub mod tessellator;
 pub mod textures;
 
+// TODO:
+const MAX_SLOTS: u32 = 32;
+// TODO: use font atlas as dummy texture for now
+const DUMMY_TEXTURE_ID: TextureId = 0;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct Vertex {
+    pub pos: LogicalPoint<f32>,
+    pub uv: NormalizedPoint,
+    pub color: Srgba,
+    /// Index into batch's texture array
+    pub texture_slot: u32,
+    /// Index into texture array
+    pub layer_idx: u32,
+}
+
+pub struct Batch {
+    pub clip_rect: LogicalRect<f32>,
+    pub textures: Vec<TextureId>,
+    /// Points into combined index buffer of `RenderJob`
+    pub index_range: Range<u32>,
+}
+
+pub struct RenderJob {
+    pub vertices: Vec<Vertex>,
+    pub indices: Vec<u32>,
+    pub batches: Vec<Batch>,
+    pub textures_delta: TexturesDelta,
+}
+
 #[derive(Debug)]
-struct Texture {
+struct TextureEntry {
     texture: wgpu::Texture,
-    bind_group: wgpu::BindGroup,
+    view: wgpu::TextureView,
+    options: TextureOptions,
 }
 
 #[repr(C)]
@@ -32,16 +70,17 @@ struct Globals {
 pub struct Renderer {
     pipeline: wgpu::RenderPipeline,
 
-    index_buffer: SlicedBuffer,
-    vertex_buffer: SlicedBuffer,
+    index_buffer: Buffer,
+    vertex_buffer: Buffer,
 
     globals_buffer: wgpu::Buffer,
     previous_globals: Globals,
     globals_bind_group: wgpu::BindGroup,
-    texture_bind_group_layout: wgpu::BindGroupLayout,
+    textures_bind_group_layout: wgpu::BindGroupLayout,
 
-    textures: HashMap<TextureId, Texture>,
+    textures: HashMap<TextureId, TextureEntry>,
     samplers: HashMap<TextureOptions, wgpu::Sampler>,
+    batch_bind_group_cache: HashMap<u64, wgpu::BindGroup>,
 }
 
 impl Renderer {
@@ -91,7 +130,7 @@ impl Renderer {
             }],
         });
 
-        let texture_bind_group_layout =
+        let textures_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("texture_bind_group_layout"),
                 entries: &[
@@ -103,13 +142,13 @@ impl Renderer {
                             sample_type: wgpu::TextureSampleType::Float { filterable: true },
                             view_dimension: wgpu::TextureViewDimension::D2Array,
                         },
-                        count: None,
+                        count: Some(NonZeroU32::new(MAX_SLOTS).unwrap()),
                     },
                     wgpu::BindGroupLayoutEntry {
                         binding: 1,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                        count: None,
+                        count: Some(NonZeroU32::new(MAX_SLOTS).unwrap()),
                     },
                 ],
             });
@@ -118,7 +157,7 @@ impl Renderer {
             label: Some("pipeline_layout"),
             bind_group_layouts: &[
                 Some(&globals_bind_group_layout),
-                Some(&texture_bind_group_layout),
+                Some(&textures_bind_group_layout),
             ],
             immediate_size: 0,
         });
@@ -138,14 +177,15 @@ impl Renderer {
                 entry_point: Some("vs_main"),
                 module: &shader_module,
                 buffers: &[Some(wgpu::VertexBufferLayout {
-                    // 4x f32, 2x u32 -> 6 * 4 bytes
-                    array_stride: 6 * 4,
+                    // 4x f32, 3x u32 -> 7 * 4 bytes
+                    array_stride: 7 * 4,
                     step_mode: wgpu::VertexStepMode::Vertex,
                     // 0: vec2 position
                     // 1: vec2 texture coordinates
                     // 2: uint color
-                    // 3: uint layer_idx
-                    attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Uint32, 3 => Uint32],
+                    // 3: uint texture_idx
+                    // 4: uint layer_idx
+                    attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Uint32, 3 => Uint32, 4 => Uint32],
                 })],
                 compilation_options: wgpu::PipelineCompilationOptions::default()
             },
@@ -178,14 +218,14 @@ impl Renderer {
             cache: None,
         });
 
-        let vertex_buffer = SlicedBuffer::new(
+        let vertex_buffer = Buffer::new(
             device,
             wgpu::BufferUsages::VERTEX,
             NonZeroU64::new(2048).expect("2048 is non-zero"),
             NonZeroU64::new(std::mem::size_of::<Vertex>() as u64)
                 .expect("size of vertex is non-zero"),
         );
-        let index_buffer = SlicedBuffer::new(
+        let index_buffer = Buffer::new(
             device,
             wgpu::BufferUsages::INDEX,
             NonZeroU64::new(2048 * 3).expect("2048 * 3 is non-zero"),
@@ -201,25 +241,24 @@ impl Renderer {
                 screen_size: LogicalSize::zero(),
             },
             globals_bind_group,
-            texture_bind_group_layout,
+            textures_bind_group_layout,
             textures: HashMap::default(),
             samplers: HashMap::default(),
+            batch_bind_group_cache: Default::default(),
         }
     }
 
     pub fn render(
-        &self,
+        &mut self,
+        device: &wgpu::Device,
         render_pass: &mut wgpu::RenderPass<'static>,
-        paint_jobs: &[ClippedMesh],
+        render_job: &RenderJob,
         screen_size: PhysicalSize<u32>,
         pixels_per_point: f32,
     ) {
         profiling::scope!("render");
 
         let screen_rect = PhysicalRect::from_origin_and_size(Point::zero(), screen_size);
-        let mut index_buffer_slices = self.index_buffer.slices.iter();
-        let mut vertex_buffer_slices = self.vertex_buffer.slices.iter();
-
         render_pass.set_viewport(
             0.0,
             0.0,
@@ -230,18 +269,30 @@ impl Renderer {
         );
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &self.globals_bind_group, &[]);
+        render_pass.set_index_buffer(
+            self.index_buffer.buffer.slice(..),
+            wgpu::IndexFormat::Uint32,
+        );
+        render_pass.set_vertex_buffer(0, self.vertex_buffer.buffer.slice(..));
 
-        for ClippedMesh { clip_rect, mesh } in paint_jobs {
-            let phys_clip_rect = clip_rect.to_physical::<f32, _>(pixels_per_point).round();
+        for batch in &render_job.batches {
+            // set textures array bind group
+            let bind_group = self.get_or_build_batch_bind_group(device, batch);
+            render_pass.set_bind_group(1, bind_group, &[]);
+
+            // scissor
+            let phys_clip_rect = batch
+                .clip_rect
+                .to_physical::<f32, _>(pixels_per_point)
+                .round();
             let scissor = phys_clip_rect
                 // NOTE: can't cast to u32 directly because negative values cause a panic
                 .cast::<i32>()
                 .intersection(&screen_rect.to_i32())
                 .map(|s| s.to_u32());
 
+            // skip batch if scissor doesn't intersect screen
             let Some(scissor) = scissor else {
-                index_buffer_slices.next().unwrap();
-                vertex_buffer_slices.next().unwrap();
                 continue;
             };
 
@@ -252,27 +303,8 @@ impl Renderer {
                 scissor.height(),
             );
 
-            let index_buffer_slice = index_buffer_slices.next().unwrap();
-            let vertex_buffer_slice = vertex_buffer_slices.next().unwrap();
-
-            if let Some(Texture { bind_group, .. }) = self.textures.get(&mesh.texture_id) {
-                render_pass.set_bind_group(1, bind_group, &[]);
-                render_pass.set_index_buffer(
-                    self.index_buffer
-                        .buffer
-                        .slice(index_buffer_slice.start as u64..index_buffer_slice.end as u64),
-                    wgpu::IndexFormat::Uint32,
-                );
-                render_pass.set_vertex_buffer(
-                    0,
-                    self.vertex_buffer
-                        .buffer
-                        .slice(vertex_buffer_slice.start as u64..vertex_buffer_slice.end as u64),
-                );
-                render_pass.draw_indexed(0..mesh.indices.len() as u32, 0, 0..1);
-            } else {
-                log::warn!("Missing texture: {:?}", mesh.texture_id);
-            }
+            // draw batch
+            render_pass.draw_indexed(batch.index_range.clone(), 0, 0..1);
         }
 
         render_pass.set_scissor_rect(0, 0, screen_size.width, screen_size.height);
@@ -287,6 +319,10 @@ impl Renderer {
         textures_delta: &TexturesDelta,
     ) {
         profiling::scope!("update_textures");
+
+        if !textures_delta.update.is_empty() {
+            self.batch_bind_group_cache.clear();
+        }
 
         for (id, image_delta) in &textures_delta.update {
             let ImageData {
@@ -341,36 +377,21 @@ impl Renderer {
                 mipmap::generate_mipmap_chain(queue, &texture, bytes);
             }
 
-            let texture_view = texture.create_view(&wgpu::TextureViewDescriptor {
+            let view = texture.create_view(&wgpu::TextureViewDescriptor {
                 dimension: Some(wgpu::TextureViewDimension::D2Array),
                 ..Default::default()
             });
 
-            let sampler = self
-                .samplers
+            self.samplers
                 .entry(image_delta.options)
                 .or_insert_with(|| create_sampler(image_delta.options, device));
 
-            let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label,
-                layout: &self.texture_bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&texture_view),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(sampler),
-                    },
-                ],
-            });
-
             self.textures.insert(
                 *id,
-                Texture {
+                TextureEntry {
                     texture,
-                    bind_group,
+                    view,
+                    options: image_delta.options,
                 },
             );
         }
@@ -378,6 +399,10 @@ impl Renderer {
 
     pub fn free_textures(&mut self, textures_delta: &TexturesDelta) {
         profiling::scope!("free_textures");
+
+        if !textures_delta.free.is_empty() {
+            self.batch_bind_group_cache.clear();
+        }
 
         for id in &textures_delta.free {
             if let Some(texture) = self.textures.remove(id) {
@@ -392,7 +417,7 @@ impl Renderer {
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        paint_jobs: &[ClippedMesh],
+        render_job: &RenderJob,
         screen_size: PhysicalSize<u32>,
         pixels_per_point: f32,
     ) {
@@ -412,67 +437,90 @@ impl Renderer {
             self.previous_globals = uniform_buffer_content;
         }
 
-        // count how many vertices & indices need to be rendered
-        let (vertex_count, index_count) = {
-            paint_jobs.iter().fold((0, 0), |acc, clipped_mesh| {
-                (
-                    acc.0 + clipped_mesh.mesh.vertices.len(),
-                    acc.1 + clipped_mesh.mesh.indices.len(),
-                )
-            })
-        };
+        let vertex_count = render_job.vertices.len();
+        let index_count = render_job.indices.len();
+
+        if !(index_count > 0 && vertex_count > 0) {
+            return;
+        }
 
         // update index and vertex buffers
-        if index_count > 0 && vertex_count > 0 {
-            self.index_buffer.slices.clear();
-            self.vertex_buffer.slices.clear();
+        let mut staging_index_buffer = self.index_buffer.create_staging_buffer(
+            device,
+            queue,
+            NonZeroU64::new(index_count as u64).expect("index_count > 0"),
+        );
+        let mut staging_vertex_buffer = self.vertex_buffer.create_staging_buffer(
+            device,
+            queue,
+            NonZeroU64::new(vertex_count as u64).expect("vertex_count > 0"),
+        );
 
-            let mut staging_index_buffer = self.index_buffer.create_staging_buffer(
-                device,
-                queue,
-                NonZeroU64::new(index_count as u64).expect("index_count > 0"),
-            );
-            let mut staging_vertex_buffer = self.vertex_buffer.create_staging_buffer(
-                device,
-                queue,
-                NonZeroU64::new(vertex_count as u64).expect("vertex_count > 0"),
-            );
+        staging_index_buffer
+            .slice(..)
+            .copy_from_slice(bytemuck::cast_slice(&render_job.indices));
 
-            let mut index_offset = 0;
-            let mut vertex_offset = 0;
-            for ClippedMesh { mesh, .. } in paint_jobs {
-                {
-                    let size = mesh.indices.len() * std::mem::size_of::<u32>();
-                    let slice = index_offset..(index_offset + size);
-                    staging_index_buffer
-                        .slice(slice.clone())
-                        .copy_from_slice(bytemuck::cast_slice(&mesh.indices));
-                    self.index_buffer.slices.push(slice);
-                    index_offset += size;
-                }
-                {
-                    let size = mesh.vertices.len() * std::mem::size_of::<Vertex>();
-                    let slice = vertex_offset..(vertex_offset + size);
-                    staging_vertex_buffer
-                        .slice(slice.clone())
-                        .copy_from_slice(bytemuck::cast_slice(&mesh.vertices));
-                    self.vertex_buffer.slices.push(slice);
-                    vertex_offset += size;
-                }
-            }
-        }
+        staging_vertex_buffer
+            .slice(..)
+            .copy_from_slice(bytemuck::cast_slice(&render_job.vertices));
+    }
+
+    fn get_or_build_batch_bind_group(
+        &mut self,
+        device: &wgpu::Device,
+        batch: &Batch,
+    ) -> &wgpu::BindGroup {
+        let key = calculate_hash(&batch.textures);
+
+        self.batch_bind_group_cache.entry(key).or_insert_with(|| {
+            let mut views: Vec<_> = batch
+                .textures
+                .iter()
+                .map(|id| &self.textures[id].view)
+                .collect();
+            let mut samplers: Vec<_> = batch
+                .textures
+                .iter()
+                .map(|id| {
+                    self.samplers
+                        .get(&self.textures[id].options)
+                        .expect("sampler is present from update_textures")
+                })
+                .collect();
+
+            // Metal doesn't support the PARTIALLY_BOUND_BINDING_ARRAY feature
+            // so we pad to up MAX_SLOTS with a dummy view/sampler
+            let dummy = &self.textures[&DUMMY_TEXTURE_ID];
+            let dummy_sampler = self.samplers.get(&dummy.options).unwrap();
+            views.resize(MAX_SLOTS as usize, &dummy.view);
+            samplers.resize(MAX_SLOTS as usize, dummy_sampler);
+
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("batch_textures_bind_group"),
+                layout: &self.textures_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureViewArray(&views),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::SamplerArray(&samplers),
+                    },
+                ],
+            })
+        })
     }
 }
 
-struct SlicedBuffer {
+struct Buffer {
     buffer: wgpu::Buffer,
-    slices: Vec<Range<usize>>,
     size: wgpu::BufferSize,
     usage: wgpu::BufferUsages,
     stride: NonZeroU64,
 }
 
-impl SlicedBuffer {
+impl Buffer {
     fn new(
         device: &wgpu::Device,
         usage: wgpu::BufferUsages,
@@ -490,7 +538,6 @@ impl SlicedBuffer {
 
         Self {
             buffer,
-            slices: Vec::with_capacity(64),
             size,
             usage,
             stride,

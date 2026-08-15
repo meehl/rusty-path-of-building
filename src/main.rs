@@ -6,6 +6,7 @@ use winit::event_loop::EventLoop;
 mod api;
 mod app;
 mod args;
+mod batcher;
 mod clipboard;
 mod color;
 mod dpi;

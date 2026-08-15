@@ -1,18 +1,13 @@
 use crate::{
     dpi::PhysicalSize,
-    renderer::{Renderer, mesh::ClippedMesh, textures::TexturesDelta},
+    renderer::{RenderJob, Renderer},
 };
 use std::sync::Arc;
 use wgpu::{Texture, TextureFormat, TextureView};
 use winit::window::Window;
 
-pub enum RenderJob {
-    Render {
-        meshes: Vec<ClippedMesh>,
-        textures_delta: TexturesDelta,
-    },
-    Skip,
-}
+const REQUIRED_TEXTURE_LAYERS: u32 = 1024;
+const REQUIRED_TEXTURE_ARRAY_SLOTS: u32 = 64;
 
 pub struct GraphicsContext {
     surface: wgpu::Surface<'static>,
@@ -50,9 +45,13 @@ impl GraphicsContext {
             })
             .await?;
 
-        let required_features = wgpu::Features::TEXTURE_COMPRESSION_BC;
+        let required_features = wgpu::Features::TEXTURE_COMPRESSION_BC
+            | wgpu::Features::TEXTURE_BINDING_ARRAY
+            | wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING;
         let required_limits = wgpu::Limits {
-            max_texture_array_layers: 1024,
+            max_texture_array_layers: REQUIRED_TEXTURE_LAYERS,
+            max_binding_array_elements_per_shader_stage: REQUIRED_TEXTURE_ARRAY_SLOTS,
+            max_binding_array_sampler_elements_per_shader_stage: REQUIRED_TEXTURE_ARRAY_SLOTS,
             ..Default::default()
         };
 
@@ -148,7 +147,11 @@ impl GraphicsContext {
         }
     }
 
-    pub fn render(&mut self, render_job: RenderJob, scale_factor: f32) -> anyhow::Result<()> {
+    pub fn render(
+        &mut self,
+        render_job: Option<RenderJob>,
+        scale_factor: f32,
+    ) -> anyhow::Result<()> {
         profiling::scope!("render");
 
         if !self.is_surface_configured {
@@ -180,24 +183,20 @@ impl GraphicsContext {
                 label: Some("Render Encoder"),
             });
 
-        // If render_job is [`RenderJob::Skip`], skip rendering and just
-        // blit the texture of the previous frame onto the surface texture.
-        if let RenderJob::Render {
-            meshes,
-            textures_delta,
-        } = render_job
-        {
+        // If render_job is `None`, skip rendering and just blit the texture
+        // of the previous frame onto the surface texture.
+        if let Some(render_job) = render_job {
             let screen_size = PhysicalSize::new(self.config.width, self.config.height);
 
             // upload new textures
             self.renderer
-                .update_textures(&self.device, &self.queue, &textures_delta);
+                .update_textures(&self.device, &self.queue, &render_job.textures_delta);
 
             // upload vertex, index, and uniform buffers
             self.renderer.update_buffers(
                 &self.device,
                 &self.queue,
-                &meshes,
+                &render_job,
                 screen_size,
                 scale_factor,
             );
@@ -225,13 +224,14 @@ impl GraphicsContext {
             });
 
             self.renderer.render(
+                &self.device,
                 &mut rpass.forget_lifetime(),
-                &meshes,
+                &render_job,
                 screen_size,
                 scale_factor,
             );
 
-            self.renderer.free_textures(&textures_delta);
+            self.renderer.free_textures(&render_job.textures_delta);
         }
 
         {
