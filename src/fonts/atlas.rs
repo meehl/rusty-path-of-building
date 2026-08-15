@@ -78,14 +78,14 @@ impl FontAtlas {
         {
             let layer = &mut self.layers[idx];
 
-            // start new row if new allocation doesn't fit current row
+            // start new row if new allocation doesn't fit on current row
             if layer.cursor.x + requested_size.width > self.layer_size.width {
                 layer.cursor.x = 0;
                 layer.cursor.y += layer.current_row_height + PADDING;
                 layer.current_row_height = 0;
             }
 
-            // add or evict layer if new allocation doesn't fit on this layer
+            // add new layer if new allocation doesn't fit on current layer
             if layer.cursor.y + requested_size.height > self.layer_size.height {
                 if (self.layers.len() as u32) < self.max_layers {
                     self.push_layer();
