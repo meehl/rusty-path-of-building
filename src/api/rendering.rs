@@ -1,7 +1,7 @@
 use crate::{
     api::image_handle::image_handle_texture_id,
     color::Srgba,
-    dpi::LogicalPoint,
+    dpi::{ConvertToLogical, ConvertToPhysical, LogicalPoint},
     fonts::{Alignment, FontStyle, LayoutJob},
     lua::Context,
     math::{Point, Quad, Rect, Size},
@@ -356,18 +356,12 @@ unsafe extern "C-unwind" fn draw_string(state: *mut ffi::lua_State) -> c_int {
         ctx.recorder().set_draw_color(last_segment.color);
     }
 
-    // TODO: align to physical grid?
-    //
-    // Make sure the layout origin aligns with the physical pixel grid so
-    // that each glyph aligns correctly. Glyphs are positioned relative
-    // to the layout origin and assume that it ends up on the start of
-    // a physical pixel.
-    /*
+    // Align layout origin with the physical pixel grid to reduce blurriness
+    let pixels_per_point = ctx.window().scale_factor();
     let position = position
         .to_physical::<f32, _>(pixels_per_point)
         .round()
         .to_logical(pixels_per_point);
-    */
 
     let layout = ctx.fonts().layout(job, ctx.window().scale_factor());
     for glyph in &layout.glyphs {
