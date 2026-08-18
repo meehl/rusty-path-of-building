@@ -153,7 +153,7 @@ impl DrawCommandRecorder {
         });
     }
 
-    pub fn finish(&mut self) -> (u64, &BTreeMap<(i32, i32), Vec<DrawCommand>>) {
+    pub fn finish(&self) -> (u64, &BTreeMap<(i32, i32), Vec<DrawCommand>>) {
         (self.hasher.finish(), &self.layers)
     }
 }
