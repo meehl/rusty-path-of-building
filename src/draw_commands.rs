@@ -1,58 +1,30 @@
-use std::{
-    collections::BTreeMap,
-    hash::{Hash, Hasher},
-};
+use std::{collections::BTreeMap, hash::Hasher};
 
 use ahash::AHasher;
 use euclid::Size2D;
-use ordered_float::OrderedFloat;
 
 use crate::{
     color::Srgba,
     dpi::{LogicalQuad, LogicalRect, LogicalSize, NormalizedQuad, NormalizedRect, Uv},
-    math::{Point, Quad, Rect},
     renderer::textures::TextureId,
 };
 
-#[derive(Copy, Clone, Debug)]
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct DrawCommand {
     pub positions: LogicalQuad<f32>,
     pub uvs: NormalizedQuad,
-    pub color: Srgba,
     pub texture_id: TextureId,
-    pub texture_layer_idx: u32,
     pub clip_rect: LogicalRect<f32>,
+    pub texture_layer_idx: u32,
+    pub color: Srgba,
 }
 
-impl Hash for DrawCommand {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        hash_quad(&self.positions, state);
-        hash_quad(&self.uvs, state);
-        self.color.hash(state);
-        self.texture_id.hash(state);
-        self.texture_layer_idx.hash(state);
-        hash_rect(&self.clip_rect, state);
+impl DrawCommand {
+    #[inline(always)]
+    fn hash_into<H: Hasher>(&self, state: &mut H) {
+        state.write(bytemuck::bytes_of(self));
     }
-}
-
-#[inline]
-fn hash_quad<H: Hasher, U>(quad: &Quad<f32, U>, state: &mut H) {
-    hash_point(&quad.p0, state);
-    hash_point(&quad.p1, state);
-    hash_point(&quad.p2, state);
-    hash_point(&quad.p3, state);
-}
-
-#[inline]
-fn hash_rect<H: Hasher, U>(rect: &Rect<f32, U>, state: &mut H) {
-    hash_point(&rect.min, state);
-    hash_point(&rect.max, state);
-}
-
-#[inline]
-fn hash_point<H: Hasher, U>(point: &Point<f32, U>, state: &mut H) {
-    OrderedFloat(point.x).hash(state);
-    OrderedFloat(point.y).hash(state);
 }
 
 #[derive(Default)]
@@ -66,7 +38,7 @@ pub struct DrawCommandRecorder {
 
 impl DrawCommandRecorder {
     fn push(&mut self, cmd: DrawCommand) {
-        cmd.hash(&mut self.hasher);
+        cmd.hash_into(&mut self.hasher);
         self.layers.entry(self.current_layer).or_default().push(cmd);
     }
 
