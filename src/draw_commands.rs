@@ -136,12 +136,14 @@ impl DrawCommandRecorder {
         layer_idx: u32,
         is_absolute_position: bool,
     ) {
-        if !is_absolute_position {
-            rect.translate(self.current_viewport.min.to_vector());
-        }
+        let rect = if is_absolute_position {
+            rect
+        } else {
+            rect.translate(self.current_viewport.min.to_vector())
+        };
 
         self.push(DrawCommand {
-            positions: rect.translate(self.current_viewport.min.to_vector()).into(),
+            positions: rect.into(),
             uvs: uv.into(),
             color,
             // font atlas always lives at default texture ID
