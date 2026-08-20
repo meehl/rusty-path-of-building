@@ -12,7 +12,7 @@ pub fn protected_call(l: &Lua, (func, args): (Function, MultiValue)) -> LuaResul
 }
 
 pub fn load_module(l: &Lua, (name, args): (String, MultiValue)) -> LuaResult<MultiValue> {
-    let ctx = l.app_data_ref::<&'static Context>().unwrap();
+    let ctx = l.app_data_ref::<Context>().unwrap();
     let mut module_path = ctx.script_dir().join(name);
     if module_path.extension().is_none() {
         module_path.set_extension("lua");
@@ -26,7 +26,7 @@ pub fn load_module(l: &Lua, (name, args): (String, MultiValue)) -> LuaResult<Mul
 }
 
 pub fn protected_load_module(l: &Lua, (name, args): (String, MultiValue)) -> LuaResult<MultiValue> {
-    let ctx = l.app_data_ref::<&'static Context>().unwrap();
+    let ctx = l.app_data_ref::<Context>().unwrap();
     let mut module_path = ctx.script_dir().join(name);
     if module_path.extension().is_none() {
         module_path.set_extension("lua");

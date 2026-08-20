@@ -57,8 +57,8 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new() -> &'static Self {
-        Box::leak(Box::new(Self {
+    pub fn new() -> Self {
+        Self {
             window: Cell::new(std::ptr::null_mut()),
             input: Cell::new(std::ptr::null()),
             fonts: Cell::new(std::ptr::null_mut()),
@@ -69,7 +69,7 @@ impl Context {
             needs_restart: Cell::new(std::ptr::null_mut()),
             should_exit: Cell::new(std::ptr::null_mut()),
             is_dpi_aware: Cell::new(std::ptr::null_mut()),
-        }))
+        }
     }
 
     pub fn set(&self, ctx: &mut PoBContext) {
@@ -199,7 +199,7 @@ impl LuaInstance {
 
     /// Loads and executes PoB's Launch.lua script
     pub fn launch(&self, pob_ctx: &mut PoBContext) -> LuaResult<()> {
-        let ctx = self.lua.app_data_ref::<&'static Context>().unwrap();
+        let ctx = self.lua.app_data_ref::<Context>().unwrap();
         ctx.set(pob_ctx);
 
         let script_dir = pob_ctx.app.script_dir.as_path();
@@ -221,7 +221,7 @@ impl LuaInstance {
     pub fn handle_subscripts(&self, pob_ctx: &mut PoBContext) {
         profiling::scope!("handle_subscripts");
 
-        let ctx = self.lua.app_data_ref::<&'static Context>().unwrap();
+        let ctx = self.lua.app_data_ref::<Context>().unwrap();
         ctx.set(pob_ctx);
         let subscript_events = self.subscript_manager.borrow_mut().process(self);
         ctx.clear();
@@ -265,7 +265,7 @@ impl LuaInstance {
     }
 
     pub fn can_exit(&self, pob_ctx: &mut PoBContext) -> bool {
-        let ctx = self.lua.app_data_ref::<&'static Context>().unwrap();
+        let ctx = self.lua.app_data_ref::<Context>().unwrap();
         ctx.set(pob_ctx);
 
         let can_exit = get_callback(&self.lua, "CanExit")
@@ -280,7 +280,7 @@ impl LuaInstance {
         profiling::scope!("handle_event", format!("{}", event));
 
         // "Plug" references into context
-        let ctx = self.lua.app_data_ref::<&'static Context>().unwrap();
+        let ctx = self.lua.app_data_ref::<Context>().unwrap();
         ctx.set(pob_ctx);
 
         // Call event handler in PoB application code

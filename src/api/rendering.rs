@@ -80,7 +80,7 @@ macro_rules! i32_from_stack {
 unsafe extern "C-unwind" fn set_draw_color(state: *mut ffi::lua_State) -> c_int {
     //profiling::scope!("set_draw_color");
     let lua_instance = unsafe { Lua::get_or_init_from_ptr(state) };
-    let ctx = lua_instance.app_data_ref::<&'static Context>().unwrap();
+    let ctx = lua_instance.app_data_ref::<Context>().unwrap();
 
     let nargs = unsafe { ffi::lua_gettop(state) };
     match nargs {
@@ -116,7 +116,7 @@ unsafe extern "C-unwind" fn set_draw_color(state: *mut ffi::lua_State) -> c_int 
 unsafe extern "C-unwind" fn get_draw_color(state: *mut ffi::lua_State) -> c_int {
     //profiling::scope!("get_draw_color");
     let lua_instance = unsafe { Lua::get_or_init_from_ptr(state) };
-    let ctx = lua_instance.app_data_ref::<&'static Context>().unwrap();
+    let ctx = lua_instance.app_data_ref::<Context>().unwrap();
 
     let color: [f32; 4] = ctx.recorder().get_draw_color().into();
     unsafe { ffi::lua_pushnumber(state, color[0] as f64) };
@@ -130,7 +130,7 @@ unsafe extern "C-unwind" fn get_draw_color(state: *mut ffi::lua_State) -> c_int 
 unsafe extern "C-unwind" fn set_viewport(state: *mut ffi::lua_State) -> c_int {
     //profiling::scope!("set_viewport");
     let lua_instance = unsafe { Lua::get_or_init_from_ptr(state) };
-    let ctx = lua_instance.app_data_ref::<&'static Context>().unwrap();
+    let ctx = lua_instance.app_data_ref::<Context>().unwrap();
 
     let nargs = unsafe { ffi::lua_gettop(state) };
     match nargs {
@@ -154,7 +154,7 @@ unsafe extern "C-unwind" fn set_viewport(state: *mut ffi::lua_State) -> c_int {
 unsafe extern "C-unwind" fn set_draw_layer(state: *mut ffi::lua_State) -> c_int {
     //profiling::scope!("set_draw_layer");
     let lua_instance = unsafe { Lua::get_or_init_from_ptr(state) };
-    let ctx = lua_instance.app_data_ref::<&'static Context>().unwrap();
+    let ctx = lua_instance.app_data_ref::<Context>().unwrap();
 
     let nargs = unsafe { ffi::lua_gettop(state) };
 
@@ -188,7 +188,7 @@ unsafe extern "C-unwind" fn set_draw_layer(state: *mut ffi::lua_State) -> c_int 
 unsafe extern "C-unwind" fn draw_image(state: *mut ffi::lua_State) -> c_int {
     //profiling::scope!("draw_image");
     let lua_instance = unsafe { Lua::get_or_init_from_ptr(state) };
-    let ctx = lua_instance.app_data_ref::<&'static Context>().unwrap();
+    let ctx = lua_instance.app_data_ref::<Context>().unwrap();
 
     let nargs = unsafe { ffi::lua_gettop(state) };
     if !matches!(nargs, 5 | 6 | 7 | 9 | 10 | 11) {
@@ -236,7 +236,7 @@ unsafe extern "C-unwind" fn draw_image(state: *mut ffi::lua_State) -> c_int {
 unsafe extern "C-unwind" fn draw_image_quad(state: *mut ffi::lua_State) -> c_int {
     //profiling::scope!("draw_image_quad");
     let lua_instance = unsafe { Lua::get_or_init_from_ptr(state) };
-    let ctx = lua_instance.app_data_ref::<&'static Context>().unwrap();
+    let ctx = lua_instance.app_data_ref::<Context>().unwrap();
 
     let nargs = unsafe { ffi::lua_gettop(state) };
     if !matches!(nargs, 9 | 10 | 11 | 17 | 18 | 19) {
@@ -303,7 +303,7 @@ unsafe extern "C-unwind" fn draw_image_quad(state: *mut ffi::lua_State) -> c_int
 unsafe extern "C-unwind" fn draw_string(state: *mut ffi::lua_State) -> c_int {
     //profiling::scope!("draw_string");
     let lua_instance = unsafe { Lua::get_or_init_from_ptr(state) };
-    let ctx = lua_instance.app_data_ref::<&'static Context>().unwrap();
+    let ctx = lua_instance.app_data_ref::<Context>().unwrap();
 
     let nargs = unsafe { ffi::lua_gettop(state) };
 
@@ -380,7 +380,7 @@ unsafe extern "C-unwind" fn draw_string(state: *mut ffi::lua_State) -> c_int {
 unsafe extern "C-unwind" fn get_string_width(state: *mut ffi::lua_State) -> c_int {
     //profiling::scope!("get_string_width");
     let lua_instance = unsafe { Lua::get_or_init_from_ptr(state) };
-    let ctx = lua_instance.app_data_ref::<&'static Context>().unwrap();
+    let ctx = lua_instance.app_data_ref::<Context>().unwrap();
 
     let nargs = unsafe { ffi::lua_gettop(state) };
 
@@ -405,7 +405,7 @@ fn get_index_at_cur(
     (line_height, font_type, text, cur_x, cur_y): (i32, String, String, f32, f32),
 ) -> LuaResult<usize> {
     //profiling::scope!("get_char_index_at_cur");
-    let ctx = l.app_data_ref::<&'static Context>().unwrap();
+    let ctx = l.app_data_ref::<Context>().unwrap();
 
     let font_type = font_type.parse::<PoBFontType>()?;
 

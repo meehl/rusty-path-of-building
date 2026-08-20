@@ -178,7 +178,7 @@ unsafe extern "C-unwind" fn image_handle_load(state: *mut ffi::lua_State) -> c_i
     let handle = unsafe { get_image_handle(state, 1) };
 
     let lua = unsafe { Lua::get_or_init_from_ptr(state) };
-    let ctx = lua.app_data_ref::<&'static Context>().unwrap();
+    let ctx = lua.app_data_ref::<Context>().unwrap();
 
     // Path
     let path_ptr = unsafe { ffi::luaL_checklstring(state, 2, ptr::null_mut()) };

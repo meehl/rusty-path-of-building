@@ -7,13 +7,13 @@ use crate::{
 };
 
 pub fn get_user_path(l: &Lua, _: ()) -> LuaResult<PathBuf> {
-    let ctx = l.app_data_ref::<&'static Context>().unwrap();
+    let ctx = l.app_data_ref::<Context>().unwrap();
     Ok(ctx.script_dir().join("userdata"))
 }
 
 // parent directory of Launch.lua script
 pub fn get_script_path(l: &Lua, _: ()) -> LuaResult<PathBuf> {
-    let ctx = l.app_data_ref::<&'static Context>().unwrap();
+    let ctx = l.app_data_ref::<Context>().unwrap();
     Ok(ctx.script_dir().to_owned())
 }
 
@@ -26,13 +26,13 @@ pub fn get_runtime_path(_: &Lua, _: ()) -> LuaResult<PathBuf> {
 }
 
 pub fn get_work_dir(l: &Lua, _: ()) -> LuaResult<PathBuf> {
-    let ctx = l.app_data_ref::<&'static Context>().unwrap();
+    let ctx = l.app_data_ref::<Context>().unwrap();
     Ok(ctx.current_working_dir().clone())
 }
 
 // NOTE: unused
 pub fn set_work_dir(l: &Lua, path: String) -> LuaResult<()> {
-    let ctx = l.app_data_ref::<&'static Context>().unwrap();
+    let ctx = l.app_data_ref::<Context>().unwrap();
     if change_working_directory(&path).is_ok() {
         *ctx.current_working_dir() = path.into();
     }

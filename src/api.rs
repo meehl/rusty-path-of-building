@@ -135,13 +135,13 @@ fn exit(l: &Lua, exit_msg: Option<String>) -> LuaResult<()> {
     if let Some(exit_msg) = exit_msg {
         println!("{exit_msg}");
     }
-    let ctx = l.app_data_ref::<&'static Context>().unwrap();
+    let ctx = l.app_data_ref::<Context>().unwrap();
     *ctx.should_exit() = true;
     Ok(())
 }
 
 fn restart(l: &Lua, _: ()) -> LuaResult<()> {
-    let ctx = l.app_data_ref::<&'static Context>().unwrap();
+    let ctx = l.app_data_ref::<Context>().unwrap();
     *ctx.needs_restart() = true;
     Ok(())
 }
@@ -154,7 +154,7 @@ fn open_url(l: &Lua, url: String) -> LuaResult<MultiValue> {
 }
 
 fn render_init(l: &Lua, features: Variadic<String>) -> LuaResult<()> {
-    let ctx = l.app_data_ref::<&'static Context>().unwrap();
+    let ctx = l.app_data_ref::<Context>().unwrap();
     for feature in features {
         if feature == "DPI_AWARE" {
             *ctx.is_dpi_aware() = true;
