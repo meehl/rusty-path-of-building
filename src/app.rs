@@ -1,19 +1,17 @@
 use crate::{
     args::Game,
     batcher::build_render_job,
-    dpi::{ConvertToLogical, PhysicalPoint, PhysicalSize},
+    dpi::{PhysicalPoint, PhysicalSize},
     fonts::{FontData, FontDefinitions, Fonts},
     gfx::GraphicsContext,
-    input::InputState,
-    installer::InstallMode,
-    mode::{AppEvent, AppMode, ModeTransition},
-    pob::PoBMode,
+    installer::Installer,
+    pob::PathOfBuilding,
     renderer::{RenderJob, textures::WrappedTextureManager},
-    window::WindowState,
+    stage::{ActiveStage, StageEvent, StageTransition},
 };
 use anyhow::Result;
-use std::path::PathBuf;
 use std::sync::Arc;
+use std::{cell::RefCell, path::PathBuf, rc::Rc};
 use winit::{
     application::ApplicationHandler, event::*, event_loop::ActiveEventLoop,
     platform::modifier_supplement::KeyEventExtModifierSupplement, window::Window,
@@ -21,32 +19,17 @@ use winit::{
 
 struct FrameOutput {
     pub render_job: Option<RenderJob>,
-    pub should_continue: bool,
-}
-
-pub struct AppState {
-    pub window: WindowState,
-    pub input: InputState,
-    pub fonts: Fonts,
-    pub texture_manager: WrappedTextureManager,
-    pub script_dir: PathBuf,
-    pub should_exit: bool,
-}
-
-impl AppState {
-    fn set_mouse_pos(&mut self, pos: PhysicalPoint<f32>) {
-        self.input
-            .set_mouse_pos(pos.to_logical(self.window.scale_factor()));
-    }
+    pub request_redraw: bool,
 }
 
 pub struct App {
     gfx_context: Option<GraphicsContext>,
-    state: AppState,
+    fonts: Rc<RefCell<Fonts>>,
+    texture_manager: Rc<RefCell<WrappedTextureManager>>,
+    stage: ActiveStage,
     game: Game,
+    script_dir: PathBuf,
     needs_reconfigure: bool,
-    force_render: bool,
-    current_mode: AppMode,
 }
 
 impl App {
@@ -54,81 +37,86 @@ impl App {
         let uses_custom_script_dir = custom_script_dir.is_some();
         let script_dir = custom_script_dir.unwrap_or_else(|| game.script_dir());
 
-        let mut state = AppState {
-            window: WindowState::default(),
-            input: InputState::default(),
-            fonts: Fonts::new(pob_font_definitions()),
-            texture_manager: WrappedTextureManager::new(),
-            script_dir,
-            should_exit: false,
-        };
+        let fonts = Rc::new(RefCell::new(Fonts::new(pob_font_definitions())));
+        let texture_manager = Rc::new(RefCell::new(WrappedTextureManager::new()));
 
-        let current_mode = if uses_custom_script_dir {
-            // Skip installer if custom script dir is provided.
-            // Used for local testing
-            let pob_mode = PoBMode::new(&mut state)?;
-            AppMode::PoB(pob_mode)
+        let stage = if uses_custom_script_dir {
+            // skip installer if custom script dir is provided. used for local testing.
+            let pob =
+                PathOfBuilding::new(&script_dir, Rc::clone(&fonts), Rc::clone(&texture_manager))?;
+            ActiveStage::Main(pob)
         } else {
-            AppMode::Install(InstallMode::new(game))
+            ActiveStage::Startup(Installer::new(game, Rc::clone(&fonts)))
         };
 
         Ok(Self {
             gfx_context: None,
-            state,
+            fonts,
+            texture_manager,
+            stage,
             game,
+            script_dir,
             needs_reconfigure: true,
-            force_render: true,
-            current_mode,
         })
     }
 
-    fn update(&mut self) -> anyhow::Result<()> {
-        let transition = self.current_mode.update(&mut self.state)?;
-        if let Some(transition) = transition {
-            self.current_mode = match transition {
-                ModeTransition::PoB => {
-                    let pob_mode = PoBMode::new(&mut self.state)?;
-                    AppMode::PoB(pob_mode)
+    fn update(&mut self, event_loop: &ActiveEventLoop) -> anyhow::Result<()> {
+        let transition = self.stage.update();
+        if let Some(transition) = transition? {
+            match transition {
+                StageTransition::ToMain => {
+                    self.stage = ActiveStage::Main(PathOfBuilding::new(
+                        &self.script_dir,
+                        Rc::clone(&self.fonts),
+                        Rc::clone(&self.texture_manager),
+                    )?);
+                    if let Some(gfx) = &self.gfx_context {
+                        self.stage.set_window(Arc::clone(&gfx.window));
+                    }
+                }
+                StageTransition::ToShutdown => {
+                    self.handle_event(StageEvent::Exit);
+                    event_loop.exit();
                 }
             };
         }
-
         Ok(())
     }
 
-    fn frame(&mut self) -> anyhow::Result<FrameOutput> {
-        self.state.fonts.begin_frame();
+    fn frame(&mut self, inhibit_elision: bool) -> anyhow::Result<FrameOutput> {
+        self.fonts.borrow_mut().begin_frame();
 
-        let mode_output = self.current_mode.frame(&mut self.state)?;
+        let stage_output = self.stage.frame()?;
 
-        if let Some(font_image_delta) = self.state.fonts.font_atlas_delta() {
-            self.state
-                .texture_manager
+        if let Some(font_image_delta) = self.fonts.borrow_mut().font_atlas_delta() {
+            self.texture_manager
+                .borrow()
                 .update_font_texture(font_image_delta);
         }
 
-        let textures_delta = self.state.texture_manager.take_delta();
+        let textures_delta = self.texture_manager.borrow().take_delta();
 
-        let render_job = if mode_output.can_elide && textures_delta.is_empty() && !self.force_render
+        let render_job = if stage_output.can_elide && textures_delta.is_empty() && !inhibit_elision
         {
             None
         } else {
             Some(build_render_job(
-                &mode_output.draw_commands,
+                &stage_output.draw_commands,
                 textures_delta,
-                // TODO: find better way to determine this and how to pass it in
+                stage_output.scale_factor,
+                // TODO: find better way to determine this value and how to pass it in
                 32,
             ))
         };
 
         Ok(FrameOutput {
             render_job,
-            should_continue: mode_output.should_continue,
+            request_redraw: stage_output.request_redraw,
         })
     }
 
-    fn handle_event(&mut self, event: AppEvent) {
-        if let Err(err) = self.current_mode.handle_event(&mut self.state, event) {
+    fn handle_event(&mut self, event: StageEvent) {
+        if let Err(err) = self.stage.handle_event(event) {
             log::error!("{err}");
         }
     }
@@ -160,10 +148,16 @@ impl App {
 
         let window = event_loop.create_window(window_attributes)?;
         let window = Arc::new(window);
-        self.state.window.set_window(Arc::clone(&window));
+        self.stage.set_window(Arc::clone(&window));
         self.gfx_context = Some(pollster::block_on(GraphicsContext::new(window))?);
 
         Ok(())
+    }
+
+    fn request_redraw(&self) {
+        if let Some(gfx) = &self.gfx_context {
+            gfx.window.request_redraw();
+        }
     }
 }
 
@@ -183,145 +177,130 @@ impl ApplicationHandler<GraphicsContext> for App {
     ) {
         match event {
             WindowEvent::CloseRequested => {
-                self.state.should_exit = self.current_mode.can_exit(&mut self.state);
-                if !self.state.should_exit {
-                    self.state.window.request_redraw();
+                if self.stage.can_exit() {
+                    self.handle_event(StageEvent::Exit);
+                    event_loop.exit();
                 }
             }
             WindowEvent::RedrawRequested => {
                 profiling::scope!("RedrawRequested");
 
-                if let Err(err) = self.update() {
+                if let Err(err) = self.update(event_loop) {
                     log::error!("{err}");
                     event_loop.exit();
                     return;
                 }
 
-                if self.state.should_exit {
-                    self.handle_event(AppEvent::Exit);
-                    event_loop.exit();
-                    return;
-                }
-
+                let mut inhibit_elision = false;
                 if self.needs_reconfigure {
                     if let Some(ref mut gfx) = self.gfx_context {
                         let size = gfx.window.inner_size();
                         gfx.resize(size.width, size.height);
+                        // resizing recreates the blip texture (previous frame) thus elision needs to
+                        // be inhibited for at least one frame.
+                        inhibit_elision = true;
                     }
                     self.needs_reconfigure = false;
-                    // Render at least one frame after reconfigure
-                    self.force_render = true;
                 }
 
-                let is_focused = self.state.window.is_focused;
-                let is_hovered = self.state.window.is_hovered;
-                let should_render = is_focused || is_hovered || self.force_render;
+                let FrameOutput {
+                    render_job,
+                    request_redraw,
+                } = match self.frame(inhibit_elision) {
+                    Ok(frame_output) => frame_output,
+                    Err(err) => {
+                        log::error!("{err}");
+                        event_loop.exit();
+                        return;
+                    }
+                };
 
-                if should_render {
-                    let FrameOutput {
-                        render_job,
-                        should_continue,
-                    } = match self.frame() {
-                        Ok(frame_output) => frame_output,
+                if let Some(ref mut gfx) = self.gfx_context {
+                    match gfx.render(render_job) {
+                        Ok(_) => {}
                         Err(err) => {
-                            log::error!("{err}");
-                            event_loop.exit();
-                            return;
-                        }
-                    };
-
-                    if let Some(ref mut gfx) = self.gfx_context {
-                        match gfx.render(render_job, self.state.window.scale_factor()) {
-                            Ok(_) => {
-                                self.force_render = should_continue;
-
-                                if is_focused || is_hovered || should_continue {
-                                    self.state.window.request_redraw();
-                                }
-                            }
-                            Err(err) => {
-                                log::error!("Unable to render: {err}");
-                            }
+                            log::error!("Unable to render: {err}");
                         }
                     }
+                }
+
+                if request_redraw {
+                    self.request_redraw();
                 }
 
                 profiling::finish_frame!();
             }
             WindowEvent::Resized(size) => {
-                self.state.window.size = PhysicalSize::new(size.width, size.height);
                 self.needs_reconfigure = true;
+                self.handle_event(StageEvent::Resized(PhysicalSize::new(
+                    size.width,
+                    size.height,
+                )));
+                self.request_redraw();
             }
             WindowEvent::Focused(focused) => {
-                self.state.window.is_focused = focused;
+                self.handle_event(StageEvent::FocusChanged(focused));
                 if focused {
-                    self.state.window.request_redraw();
+                    self.request_redraw();
                 } else {
-                    // Clear inputs on lost focus to avoid "stuck" keys on Wayland
-                    // systems.
-                    self.state.input.clear_pressed();
+                    // Clear inputs on lost focus to avoid "stuck" keys on Wayland systems.
+                    self.stage.clear_pressed();
                 }
             }
             WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
-                self.state.window.set_scale_factor(scale_factor as f32);
+                self.handle_event(StageEvent::ScaleFactorChanged(scale_factor));
+                self.request_redraw();
             }
             WindowEvent::KeyboardInput { event, .. } => {
                 let state = event.state;
 
-                // update input state
-                self.state
-                    .input
-                    .set_key_pressed(event.logical_key.clone(), state.is_pressed());
-
                 // forward KeyUp/KeyDown events
-                let app_event = match state {
-                    ElementState::Pressed => AppEvent::KeyDown {
+                let stage_event = match state {
+                    ElementState::Pressed => StageEvent::KeyDown {
                         key: event.logical_key.clone(),
                     },
-                    ElementState::Released => AppEvent::KeyUp {
+                    ElementState::Released => StageEvent::KeyUp {
                         key: event.logical_key.clone(),
                     },
                 };
-                self.handle_event(app_event);
+                self.handle_event(stage_event);
 
                 // handle text input
                 if let Some(text) = event.text_with_all_modifiers()
                     && state.is_pressed()
                 {
                     for ch in text.chars() {
-                        let event = AppEvent::CharacterInput { ch };
+                        let event = StageEvent::CharacterInput { ch };
                         self.handle_event(event);
                     }
                 }
+                self.request_redraw();
             }
             WindowEvent::ModifiersChanged(modifiers) => {
-                self.state.input.key_modifiers = modifiers.state();
+                self.handle_event(StageEvent::ModifiersChanged {
+                    state: modifiers.state(),
+                });
+                self.request_redraw();
             }
             WindowEvent::MouseInput { state, button, .. } => {
-                let is_double_click = self
-                    .state
-                    .input
-                    .set_mouse_pressed(button, state.is_pressed());
-
                 let event = match state {
-                    ElementState::Pressed => AppEvent::MouseDown {
-                        button,
-                        is_double_click,
-                    },
-                    ElementState::Released => AppEvent::MouseUp { button },
+                    ElementState::Pressed => StageEvent::MouseDown { button },
+                    ElementState::Released => StageEvent::MouseUp { button },
                 };
                 self.handle_event(event);
+                self.request_redraw();
             }
             WindowEvent::CursorMoved { position, .. } => {
                 let pos = PhysicalPoint::new(position.x as f32, position.y as f32);
-                self.state.set_mouse_pos(pos);
+                self.handle_event(StageEvent::MouseMoved { pos });
+                self.request_redraw();
             }
             WindowEvent::CursorEntered { .. } => {
-                self.state.window.is_hovered = true;
-                self.state.window.request_redraw();
+                self.handle_event(StageEvent::HoverChanged(true));
+                self.request_redraw();
             }
             WindowEvent::CursorLeft { .. } => {
-                self.state.window.is_hovered = false;
+                self.handle_event(StageEvent::HoverChanged(false));
             }
             WindowEvent::MouseWheel { delta, .. } => {
                 let delta = match delta {
@@ -330,8 +309,8 @@ impl ApplicationHandler<GraphicsContext> for App {
                         y as f32
                     }
                 };
-                let event = AppEvent::MouseWheel { delta };
-                self.handle_event(event);
+                self.handle_event(StageEvent::MouseWheel { delta });
+                self.request_redraw();
             }
             _ => {}
         }

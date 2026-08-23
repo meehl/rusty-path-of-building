@@ -6,7 +6,7 @@ use std::{
 use mlua::{Lua, Result as LuaResult, ffi};
 
 use crate::{
-    lua::Context,
+    pob::Context,
     renderer::textures::{TextureHandle, TextureId, TextureOptions},
 };
 
@@ -245,12 +245,18 @@ unsafe extern "C-unwind" fn image_handle_load(state: *mut ffi::lua_State) -> c_i
     match &mut handle.texture {
         Some(texture_handle) => {
             // Keep the existing TextureHandle and update underlying texture
-            let _ =
-                ctx.texture_manager()
-                    .update_texture(texture_handle.id(), path, options, is_async);
+            let _ = ctx.texture_manager.borrow().update_texture(
+                texture_handle.id(),
+                path,
+                options,
+                is_async,
+            );
         }
         None => {
-            if let Ok(texture_handle) = ctx.texture_manager().load_texture(path, options, is_async)
+            if let Ok(texture_handle) = ctx
+                .texture_manager
+                .borrow()
+                .load_texture(path, options, is_async)
             {
                 handle.texture = Some(texture_handle);
             }

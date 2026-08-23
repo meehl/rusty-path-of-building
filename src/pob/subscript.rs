@@ -1,11 +1,9 @@
-use crate::{api::get_callback, lua::LuaInstance};
+use crate::{pob::PathOfBuilding, pob::api::get_callback};
 use anyhow::{Result, anyhow};
-use mlua::{Function, Integer, IntoLuaMulti, Lua, MultiValue, Number, Result as LuaResult, Value};
+use mlua::{Function, Integer, IntoLuaMulti, Lua, MultiValue, Number, Value};
 use std::{
-    cell::RefCell,
     collections::VecDeque,
     path::PathBuf,
-    rc::Rc,
     sync::mpsc::{Receiver, Sender, TryRecvError, channel},
     thread::JoinHandle,
 };
@@ -22,23 +20,16 @@ pub enum SubscriptResult {
     },
 }
 
+#[derive(Default)]
 pub struct SubscriptManager {
     current_id: u64,
     scripts: Vec<Subscript>,
-    script_dir: PathBuf,
 }
 
 impl SubscriptManager {
-    pub fn new(script_dir: PathBuf) -> Self {
-        Self {
-            current_id: 0,
-            scripts: Vec::new(),
-            script_dir,
-        }
-    }
-
     pub fn push(
         &mut self,
+        script_dir: PathBuf,
         script_text: String,
         blocking_calls: Vec<String>,
         nonblocking_calls: Vec<String>,
@@ -53,13 +44,13 @@ impl SubscriptManager {
             blocking_calls,
             nonblocking_calls,
             arguments,
-            self.script_dir.clone(),
+            script_dir,
         );
         self.scripts.push(subscript);
         id
     }
 
-    pub fn process(&mut self, lua: &LuaInstance) -> Vec<SubscriptResult> {
+    pub fn process(&mut self, lua: &Lua) -> Vec<SubscriptResult> {
         let mut results = vec![];
 
         self.scripts.retain_mut(|subscript| {
@@ -77,6 +68,10 @@ impl SubscriptManager {
 
     pub fn has_running_subscripts(&self) -> bool {
         !self.scripts.is_empty()
+    }
+
+    pub fn is_running(&self, subscript_id: u64) -> bool {
+        self.scripts.iter().any(|ss| ss.id == subscript_id)
     }
 }
 
@@ -130,7 +125,8 @@ impl Subscript {
             let lua = unsafe { Lua::unsafe_new() };
 
             // add ./lua to package.path and package.cpath
-            LuaInstance::register_package_paths(&lua, &script_dir)?;
+            // TODO: this is awkward, move package path registration out of PoB?
+            PathOfBuilding::register_package_paths(&lua, &script_dir)?;
 
             for function_name in blocking_calls {
                 let thread_tx = tx.clone();
@@ -245,68 +241,6 @@ impl Subscript {
             None
         }
     }
-}
-
-pub fn register_subscript_globals(
-    lua: &Lua,
-    subscripts: &Rc<RefCell<SubscriptManager>>,
-) -> LuaResult<()> {
-    let globals = lua.globals();
-
-    // ssID = LaunchSubScript("<scriptText>", "<funcList>", "<subList>"[, ...])
-    let subscripts_clone = Rc::clone(subscripts);
-    let launch_sub_script = move |_: &Lua,
-                                  (script_text, func_list, sub_list, args): (
-        String,
-        String,
-        String,
-        MultiValue,
-    )| {
-        let blocking_calls = func_list
-            .split(',')
-            .map(str::trim)
-            .filter(|&s| !s.is_empty())
-            .map(String::from)
-            .collect();
-
-        let nonblocking_calls = sub_list
-            .split(',')
-            .map(str::trim)
-            .filter(|&s| !s.is_empty())
-            .map(String::from)
-            .collect();
-
-        let arguments = args.try_into()?;
-        let subscript_id = subscripts_clone.borrow_mut().push(
-            script_text,
-            blocking_calls,
-            nonblocking_calls,
-            arguments,
-        );
-        Ok(subscript_id)
-    };
-
-    let subscripts_clone = Rc::clone(subscripts);
-    let is_subscript_running = move |_: &Lua, subscript_id: u64| {
-        Ok(subscripts_clone
-            .borrow()
-            .scripts
-            .iter()
-            .any(|ss| ss.id == subscript_id))
-    };
-
-    let abort_subscript = |_: &Lua, _subscript_id: u64| -> LuaResult<()> { unimplemented!() };
-
-    globals.set(
-        "LaunchSubScript",
-        lua.create_function_mut(launch_sub_script)?,
-    )?;
-    globals.set(
-        "IsSubScriptRunning",
-        lua.create_function(is_subscript_running)?,
-    )?;
-    globals.set("AbortSubScript", lua.create_function(abort_subscript)?)?;
-    Ok(())
 }
 
 // used to move arguments and return values between lua instances

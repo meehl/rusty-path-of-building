@@ -1,29 +1,32 @@
 use crate::{
-    app::AppState,
     args::Game,
     color::Srgba,
     dpi::{LogicalPoint, LogicalRect},
     draw_commands::DrawCommand,
-    fonts::{Alignment, FontStyle, LayoutJob},
+    fonts::{Alignment, FontStyle, Fonts, LayoutJob},
     installer::download::{
         DownloadEvent, ExtractionRule, build_client, download_and_extract_tarball,
         download_file_to_disk, fetch_file_contents,
     },
-    mode::{AppEvent, ModeFrameOutput, ModeTransition},
     renderer::textures::TextureId,
+    stage::{StageEvent, StageFrameOutput, StageTransition},
     util::replace_in_matching_lines,
+    window::WindowState,
 };
 use parley::{FontFamily, FontFamilyName, GenericFamily};
 use regex::Regex;
 use std::{
+    cell::RefCell,
     fs,
     path::Path,
+    rc::Rc,
     sync::{
-        LazyLock,
+        Arc, LazyLock,
         mpsc::{self, Receiver, TryRecvError},
     },
     thread,
 };
+use winit::window::Window;
 
 mod download;
 
@@ -40,16 +43,15 @@ enum Progress {
     Error(anyhow::Error),
 }
 
-/// Execution mode in which initial installation of PoB is performed.
-///
-/// Immediately transitions into PoB mode if already installed.
-pub struct InstallMode {
+pub struct Installer {
     progress_rx: Option<Receiver<Progress>>,
     status: String,
+    window_state: WindowState,
+    fonts: Rc<RefCell<Fonts>>,
 }
 
-impl InstallMode {
-    pub fn new(game: Game) -> Self {
+impl Installer {
+    pub fn new(game: Game, fonts: Rc<RefCell<Fonts>>) -> Self {
         let script_dir = game.script_dir();
         let (progress_tx, progress_rx) = mpsc::channel();
 
@@ -64,25 +66,28 @@ impl InstallMode {
         Self {
             progress_rx: Some(progress_rx),
             status: String::from("Starting installation..."),
+            window_state: WindowState::default(),
+            fonts,
         }
     }
 
-    pub fn frame(&mut self, app_state: &mut AppState) -> anyhow::Result<ModeFrameOutput> {
-        let draw_commands = self.draw_current_progress(app_state);
+    pub fn frame(&mut self) -> anyhow::Result<StageFrameOutput> {
+        let draw_commands = self.draw_current_progress();
 
-        Ok(ModeFrameOutput {
+        Ok(StageFrameOutput {
             draw_commands,
             can_elide: false,
-            should_continue: true,
+            request_redraw: true,
+            scale_factor: self.window_state.scale_factor(),
         })
     }
 
-    pub fn update(&mut self, _app_state: &mut AppState) -> anyhow::Result<Option<ModeTransition>> {
+    pub fn update(&mut self) -> anyhow::Result<Option<StageTransition>> {
         if let Some(progress_rx) = &self.progress_rx {
             loop {
                 match progress_rx.try_recv() {
                     Ok(Progress::Status(msg)) => self.status = msg,
-                    Ok(Progress::Complete) => return Ok(Some(ModeTransition::PoB)),
+                    Ok(Progress::Complete) => return Ok(Some(StageTransition::ToMain)),
                     Ok(Progress::Error(err)) => {
                         return Err(anyhow::anyhow!("Installation failed: {err}"));
                     }
@@ -99,18 +104,25 @@ impl InstallMode {
         Ok(None)
     }
 
-    pub fn handle_event(
-        &mut self,
-        _app_state: &mut AppState,
-        _event: AppEvent,
-    ) -> anyhow::Result<()> {
-        Ok(())
+    pub fn handle_event(&mut self, event: StageEvent) -> anyhow::Result<Option<StageTransition>> {
+        match event {
+            StageEvent::Resized(size) => self.window_state.size = size,
+            StageEvent::ScaleFactorChanged(factor) => {
+                self.window_state.set_scale_factor(factor as f32)
+            }
+            _ => {}
+        }
+        Ok(None)
     }
 
-    fn draw_current_progress(&self, app_state: &mut AppState) -> Vec<DrawCommand> {
+    pub fn set_window(&mut self, window: Arc<Window>) {
+        self.window_state.set_window(window);
+    }
+
+    fn draw_current_progress(&self) -> Vec<DrawCommand> {
         let mut draw_commands = Vec::new();
 
-        let screen_size = app_state.window.logical_size().cast::<f32>();
+        let screen_size = self.window_state.logical_size().cast::<f32>();
         let pos = LogicalPoint::new(screen_size.width / 2.0, screen_size.height / 2.0);
 
         let mut job = LayoutJob::new(
@@ -124,7 +136,10 @@ impl InstallMode {
 
         job.append(&self.status, Srgba::WHITE);
 
-        let layout = app_state.fonts.layout(job, app_state.window.scale_factor());
+        let layout = self
+            .fonts
+            .borrow_mut()
+            .layout(job, self.window_state.scale_factor());
         for glyph in &layout.glyphs {
             draw_commands.push(DrawCommand {
                 positions: glyph.rect.translate(pos.to_vector()).into(),
@@ -133,7 +148,7 @@ impl InstallMode {
                 // font atlas always lives at default texture ID
                 texture_id: TextureId::default(),
                 texture_layer_idx: glyph.layer_idx,
-                clip_rect: LogicalRect::from_size(app_state.window.logical_size().cast()),
+                clip_rect: LogicalRect::from_size(screen_size),
             });
         }
 

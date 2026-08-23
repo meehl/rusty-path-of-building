@@ -34,17 +34,17 @@ pub struct InputState {
 
 impl InputState {
     /// Updates [`Self::keys_pressed`] based on `is_pressed`.
-    pub fn set_key_pressed(&mut self, key: Key, is_pressed: bool) {
+    pub fn set_key_pressed(&mut self, key: &Key, is_pressed: bool) {
         if is_pressed {
-            self.keys_pressed.insert(key);
+            self.keys_pressed.insert(key.clone());
         } else {
-            self.keys_pressed.remove(&key);
+            self.keys_pressed.remove(key);
         }
     }
 
     /// Returns if the key is pressed (`true`) or not pressed (`false`).
-    pub fn key_pressed(&self, key: Key) -> bool {
-        self.keys_pressed.contains(&key)
+    pub fn key_pressed(&self, key: &Key) -> bool {
+        self.keys_pressed.contains(key)
     }
 
     /// Updates [`Self::mouse_pressed`](field@Self::mouse_pressed) based on provided

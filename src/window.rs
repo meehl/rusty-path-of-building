@@ -85,10 +85,4 @@ impl WindowState {
             .as_mut()
             .and_then(|clipboard| clipboard.get_text())
     }
-
-    pub fn request_redraw(&self) {
-        if let Some(ref window) = self.window {
-            window.request_redraw();
-        }
-    }
 }

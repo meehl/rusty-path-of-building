@@ -68,6 +68,7 @@ impl BatchBuilder {
 pub fn build_render_job(
     commands: &[DrawCommand],
     textures_delta: TexturesDelta,
+    scale_factor: f32,
     max_slots: u32,
 ) -> RenderJob {
     profiling::scope!("build_render_job");
@@ -83,6 +84,7 @@ pub fn build_render_job(
             indices,
             batches,
             textures_delta,
+            scale_factor,
         };
     };
 
@@ -159,5 +161,6 @@ pub fn build_render_job(
         indices,
         batches,
         textures_delta,
+        scale_factor,
     };
 }

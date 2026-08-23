@@ -52,6 +52,7 @@ pub struct RenderJob {
     pub indices: Vec<u32>,
     pub batches: Vec<Batch>,
     pub textures_delta: TexturesDelta,
+    pub scale_factor: f32,
 }
 
 #[derive(Debug)]

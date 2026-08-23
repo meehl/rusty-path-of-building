@@ -2,19 +2,19 @@ use mlua::{IntoLuaMulti, Lua, MultiValue, Result as LuaResult, Value};
 use std::{fs, path::PathBuf};
 
 use crate::{
-    lua::Context,
+    pob::Context,
     util::{change_working_directory, get_executable_dir},
 };
 
 pub fn get_user_path(l: &Lua, _: ()) -> LuaResult<PathBuf> {
     let ctx = l.app_data_ref::<Context>().unwrap();
-    Ok(ctx.script_dir().join("userdata"))
+    Ok(ctx.script_dir.join("userdata"))
 }
 
 // parent directory of Launch.lua script
 pub fn get_script_path(l: &Lua, _: ()) -> LuaResult<PathBuf> {
     let ctx = l.app_data_ref::<Context>().unwrap();
-    Ok(ctx.script_dir().to_owned())
+    Ok(ctx.script_dir.to_owned())
 }
 
 // parent directory of executable
@@ -27,14 +27,14 @@ pub fn get_runtime_path(_: &Lua, _: ()) -> LuaResult<PathBuf> {
 
 pub fn get_work_dir(l: &Lua, _: ()) -> LuaResult<PathBuf> {
     let ctx = l.app_data_ref::<Context>().unwrap();
-    Ok(ctx.current_working_dir().clone())
+    Ok(ctx.current_working_dir.to_owned())
 }
 
 // NOTE: unused
 pub fn set_work_dir(l: &Lua, path: String) -> LuaResult<()> {
-    let ctx = l.app_data_ref::<Context>().unwrap();
+    let mut ctx = l.app_data_mut::<Context>().unwrap();
     if change_working_directory(&path).is_ok() {
-        *ctx.current_working_dir() = path.into();
+        ctx.current_working_dir = path.into();
     }
     Ok(())
 }

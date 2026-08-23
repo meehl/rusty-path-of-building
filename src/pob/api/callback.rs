@@ -1,4 +1,4 @@
-use mlua::{Function, Lua, Result as LuaResult, Table, Value};
+use mlua::{FromLuaMulti, Function, IntoLuaMulti, Lua, Result as LuaResult, Table, Value};
 
 // During initialization, PoB calls `SetMainObject` with a callback table.
 // Functions defined in this table are used to call back into Lua from Rust.
@@ -40,4 +40,13 @@ pub fn get_custom_callback(l: &Lua, name: String) -> LuaResult<Function> {
     let callback_table: Table = l.named_registry_value(CALLBACK_REGISTRY_NAME)?;
     let callback_function: Function = callback_table.get(name)?;
     Ok(callback_function)
+}
+
+#[inline]
+pub fn call_callback<A, R>(lua: &Lua, name: &str, args: A) -> LuaResult<R>
+where
+    A: IntoLuaMulti,
+    R: FromLuaMulti,
+{
+    get_callback(lua, name)?.call(args)
 }

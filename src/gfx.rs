@@ -147,11 +147,7 @@ impl GraphicsContext {
         }
     }
 
-    pub fn render(
-        &mut self,
-        render_job: Option<RenderJob>,
-        scale_factor: f32,
-    ) -> anyhow::Result<()> {
+    pub fn render(&mut self, render_job: Option<RenderJob>) -> anyhow::Result<()> {
         profiling::scope!("render");
 
         if !self.is_surface_configured {
@@ -198,7 +194,7 @@ impl GraphicsContext {
                 &self.queue,
                 &render_job,
                 screen_size,
-                scale_factor,
+                render_job.scale_factor,
             );
 
             let rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -228,7 +224,7 @@ impl GraphicsContext {
                 &mut rpass.forget_lifetime(),
                 &render_job,
                 screen_size,
-                scale_factor,
+                render_job.scale_factor,
             );
 
             self.renderer.free_textures(&render_job.textures_delta);

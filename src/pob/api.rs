@@ -1,6 +1,7 @@
-pub use crate::api::callback::get_callback;
+pub use crate::pob::api::callback::{call_callback, get_callback};
 use crate::{
-    api::{
+    pob::Context,
+    pob::api::{
         callback::{get_custom_callback, set_custom_callback, set_main_object},
         clipboard::{copy, paste},
         compression::{deflate, inflate},
@@ -14,12 +15,12 @@ use crate::{
         },
         rendering::PoBString,
         search_handle::new_search_handle,
+        subscript::{abort_subscript, is_subscript_running, launch_subscript},
         window::{
             get_dpi_scale_override, get_screen_scale, get_screen_size, set_dpi_scale_override,
             set_foreground, set_window_title,
         },
     },
-    lua::Context,
 };
 use mlua::{IntoLuaMulti, Lua, MultiValue, Result as LuaResult, Variadic};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -34,6 +35,7 @@ mod lua;
 mod paths;
 mod rendering;
 mod search_handle;
+mod subscript;
 mod window;
 
 /// Register functions that can be called from lua
@@ -108,6 +110,17 @@ pub fn register_globals(lua: &Lua) -> LuaResult<()> {
     globals.set("LoadModule", lua.create_function(load_module)?)?;
     globals.set("PLoadModule", lua.create_function(protected_load_module)?)?;
 
+    // subscripts
+    globals.set(
+        "LaunchSubScript",
+        lua.create_function_mut(launch_subscript)?,
+    )?;
+    globals.set(
+        "IsSubScriptRunning",
+        lua.create_function(is_subscript_running)?,
+    )?;
+    globals.set("AbortSubScript", lua.create_function(abort_subscript)?)?;
+
     // NOTE: not used by PoB
     let set_cursor_pos = |_: &Lua, ()| -> LuaResult<()> { unimplemented!() };
     let show_cursor = |_: &Lua, ()| -> LuaResult<()> { unimplemented!() };
@@ -135,14 +148,14 @@ fn exit(l: &Lua, exit_msg: Option<String>) -> LuaResult<()> {
     if let Some(exit_msg) = exit_msg {
         println!("{exit_msg}");
     }
-    let ctx = l.app_data_ref::<Context>().unwrap();
-    *ctx.should_exit() = true;
+    let mut ctx = l.app_data_mut::<Context>().unwrap();
+    ctx.should_exit = true;
     Ok(())
 }
 
 fn restart(l: &Lua, _: ()) -> LuaResult<()> {
-    let ctx = l.app_data_ref::<Context>().unwrap();
-    *ctx.needs_restart() = true;
+    let mut ctx = l.app_data_mut::<Context>().unwrap();
+    ctx.needs_restart = true;
     Ok(())
 }
 
@@ -154,11 +167,7 @@ fn open_url(l: &Lua, url: String) -> LuaResult<MultiValue> {
 }
 
 fn render_init(l: &Lua, features: Variadic<String>) -> LuaResult<()> {
-    let ctx = l.app_data_ref::<Context>().unwrap();
-    for feature in features {
-        if feature == "DPI_AWARE" {
-            *ctx.is_dpi_aware() = true;
-        }
-    }
+    let mut ctx = l.app_data_mut::<Context>().unwrap();
+    ctx.is_dpi_aware = features.iter().any(|feat| feat == "DPI_AWARE");
     Ok(())
 }
