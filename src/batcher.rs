@@ -42,7 +42,7 @@ impl BatchBuilder {
             return Some(slot);
         }
 
-        if self.textures.len() as u32 > max_slots {
+        if self.textures.len() as u32 >= max_slots {
             return None;
         }
 
