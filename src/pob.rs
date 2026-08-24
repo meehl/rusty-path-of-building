@@ -6,7 +6,7 @@ use winit::window::Window;
 
 use crate::{
     args::Args,
-    dpi::{ConvertToLogical, PhysicalPoint},
+    dpi::PhysicalPoint,
     draw_commands::DrawCommandRecorder,
     fonts::Fonts,
     input::{InputState, key_as_str, mousebutton_as_str},
@@ -80,7 +80,7 @@ impl Context {
 
     fn set_mouse_pos(&mut self, pos: PhysicalPoint<f32>) {
         self.input_state
-            .set_mouse_pos(pos.to_logical(self.window_state.scale_factor()));
+            .set_mouse_pos(pos / self.window_state.scale_factor());
     }
 }
 

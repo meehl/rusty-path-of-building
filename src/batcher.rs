@@ -1,7 +1,7 @@
 use ahash::HashMap;
 
 use crate::{
-    dpi::LogicalRect,
+    dpi::{LogicalRect, ScaleFactor},
     draw_commands::DrawCommand,
     renderer::{
         Batch, RenderJob, Vertex,
@@ -68,7 +68,7 @@ impl BatchBuilder {
 pub fn build_render_job(
     commands: &[DrawCommand],
     textures_delta: TexturesDelta,
-    scale_factor: f32,
+    scale_factor: ScaleFactor<f32>,
     max_slots: u32,
 ) -> RenderJob {
     profiling::scope!("build_render_job");

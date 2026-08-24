@@ -8,19 +8,19 @@ pub struct GlyphKey {
     glyph_id: swash::GlyphId,
     style_id: StyleId,
     x_bin: SubpixelBin<4>,
-    pixels_per_point: OrderedFloat<f32>,
+    scale_factor: OrderedFloat<f32>,
 }
 
 impl GlyphKey {
     pub fn from_glyph(
         glyph: &Glyph,
         style_id: StyleId,
-        pixels_per_point: f32,
+        scale_factor: f32,
     ) -> (Self, PhysicalPoint<i32>) {
         // Use subpixel binning for x coordinate
-        let (x, x_bin) = SubpixelBin::<4>::new(glyph.x * pixels_per_point);
+        let (x, x_bin) = SubpixelBin::<4>::new(glyph.x * scale_factor);
         // No binning for y coordinate, just rounding
-        let y = (glyph.y * pixels_per_point).round() as i32;
+        let y = (glyph.y * scale_factor).round() as i32;
         let glyph_pos = PhysicalPoint::new(x, y);
 
         (
@@ -28,7 +28,7 @@ impl GlyphKey {
                 glyph_id: glyph.id as u16,
                 style_id,
                 x_bin,
-                pixels_per_point: OrderedFloat(pixels_per_point),
+                scale_factor: OrderedFloat(scale_factor),
             },
             glyph_pos,
         )

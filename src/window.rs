@@ -1,6 +1,6 @@
 use crate::{
     clipboard::Clipboard,
-    dpi::{ConvertToLogical, LogicalSize, PhysicalSize},
+    dpi::{LogicalSize, PhysicalSize, ScaleFactor},
 };
 use raw_window_handle::HasDisplayHandle;
 use std::sync::Arc;
@@ -11,8 +11,8 @@ pub struct WindowState {
     clipboard: Option<Clipboard>,
     pub window: Option<Arc<Window>>,
     pub size: PhysicalSize<u32>,
-    scale_factor: f32,
-    pub scale_factor_override: Option<f32>,
+    scale_factor: ScaleFactor<f32>,
+    scale_factor_override: Option<ScaleFactor<f32>>,
     pending_window_title: std::cell::Cell<Option<String>>,
     pub is_hovered: bool,
     pub is_focused: bool,
@@ -23,7 +23,7 @@ impl Default for WindowState {
         Self {
             window: None,
             size: Default::default(),
-            scale_factor: 1.0,
+            scale_factor: ScaleFactor::identity(),
             scale_factor_override: None,
             pending_window_title: std::cell::Cell::new(None),
             clipboard: None,
@@ -41,7 +41,7 @@ impl WindowState {
 
         let winit::dpi::PhysicalSize { width, height } = window.inner_size();
         self.size = PhysicalSize::new(width, height);
-        self.scale_factor = window.scale_factor() as f32;
+        self.scale_factor = ScaleFactor::new(window.scale_factor() as f32);
 
         let raw_display_handle = window.display_handle().ok().map(|h| h.as_raw());
         self.clipboard = Some(Clipboard::new(raw_display_handle));
@@ -56,16 +56,24 @@ impl WindowState {
         }
     }
 
-    pub fn logical_size(&self) -> LogicalSize<u32> {
-        self.size.to_logical(self.scale_factor())
+    pub fn logical_size(&self) -> LogicalSize<f32> {
+        self.size.cast() / self.scale_factor()
     }
 
-    pub fn scale_factor(&self) -> f32 {
+    pub fn scale_factor(&self) -> ScaleFactor<f32> {
         self.scale_factor_override.unwrap_or(self.scale_factor)
     }
 
     pub fn set_scale_factor(&mut self, scale_factor: f32) {
-        self.scale_factor = scale_factor;
+        self.scale_factor = ScaleFactor::new(scale_factor);
+    }
+
+    pub fn scale_factor_override(&self) -> Option<f32> {
+        self.scale_factor_override.map(|s| s.get())
+    }
+
+    pub fn set_scale_factor_override(&mut self, scale_factor: Option<f32>) {
+        self.scale_factor_override = scale_factor.map(ScaleFactor::new);
     }
 
     pub fn focus(&self) {

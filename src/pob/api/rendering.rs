@@ -1,6 +1,6 @@
 use crate::{
     color::Srgba,
-    dpi::{ConvertToLogical, ConvertToPhysical, LogicalPoint},
+    dpi::LogicalPoint,
     fonts::{Alignment, FontStyle, LayoutJob},
     math::{Point, Quad, Rect, Size},
     pob::Context,
@@ -357,13 +357,10 @@ unsafe extern "C-unwind" fn draw_string(state: *mut ffi::lua_State) -> c_int {
     }
 
     // Align layout origin with the physical pixel grid to reduce blurriness
-    let pixels_per_point = ctx.window_state.scale_factor();
-    let position = position
-        .to_physical::<f32, _>(pixels_per_point)
-        .round()
-        .to_logical(pixels_per_point);
+    let scale_factor = ctx.window_state.scale_factor();
+    let position = (position * scale_factor).round() / scale_factor;
 
-    let layout = ctx.fonts.borrow_mut().layout(job, pixels_per_point);
+    let layout = ctx.fonts.borrow_mut().layout(job, scale_factor);
     for glyph in &layout.glyphs {
         ctx.recorder.draw_glyph(
             glyph.rect.translate(position.to_vector()),

@@ -56,8 +56,8 @@ impl DrawCommandRecorder {
         self.current_viewport = viewport;
     }
 
-    pub fn set_viewport_from_size(&mut self, size: LogicalSize<u32>) {
-        self.set_viewport(LogicalRect::from_size(size).cast());
+    pub fn set_viewport_from_size(&mut self, size: LogicalSize<f32>) {
+        self.set_viewport(LogicalRect::from_size(size));
     }
 
     pub fn set_draw_layer(&mut self, layer: i32, sublayer: i32) {

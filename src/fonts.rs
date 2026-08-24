@@ -1,6 +1,6 @@
 use crate::{
     color::Srgba,
-    dpi::LogicalVector,
+    dpi::{LogicalVector, ScaleFactor},
     fonts::{
         atlas::FontAtlas, glyph_key::SubpixelBin, layout::PositionedGlyph,
         layout_cache::LayoutCache, rasterizer::GlyphRasterizer,
@@ -176,7 +176,7 @@ impl Fonts {
                             &mut self.atlas,
                             &run,
                             LogicalVector::new(horizontal_offset, 0.0),
-                            1.0,
+                            ScaleFactor::identity(),
                         )
                         .for_each(|_| {});
                 }
@@ -184,21 +184,21 @@ impl Fonts {
         }
     }
 
-    pub fn layout(&mut self, job: LayoutJob, pixels_per_point: f32) -> Rc<Layout> {
-        let hash = calculate_hash(&(&job, OrderedFloat(pixels_per_point)));
+    pub fn layout(&mut self, job: LayoutJob, scale_factor: ScaleFactor<f32>) -> Rc<Layout> {
+        let hash = calculate_hash(&(&job, OrderedFloat(scale_factor.get())));
 
         if let Some(cached_layout) = self.layout_cache.get(hash) {
             return cached_layout;
         }
 
-        let layout = Rc::new(self.build_layout(job, pixels_per_point));
+        let layout = Rc::new(self.build_layout(job, scale_factor));
 
         self.layout_cache.insert(hash, Rc::clone(&layout));
 
         layout
     }
 
-    fn build_layout(&mut self, job: LayoutJob, pixels_per_point: f32) -> Layout {
+    fn build_layout(&mut self, job: LayoutJob, scale_factor: ScaleFactor<f32>) -> Layout {
         let default_style = TextStyle::default();
         let style = TextStyle {
             font_family: job.font_family,
@@ -255,7 +255,7 @@ impl Fonts {
                     &mut self.atlas,
                     &run,
                     glyph_offset,
-                    pixels_per_point,
+                    scale_factor,
                 ) {
                     let Some(glyph) = rasterized_glyph else {
                         continue;

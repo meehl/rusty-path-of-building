@@ -3,7 +3,7 @@ use std::sync::Arc;
 use winit::window::Window;
 
 use crate::{
-    dpi::{PhysicalPoint, PhysicalSize},
+    dpi::{PhysicalPoint, PhysicalSize, ScaleFactor},
     draw_commands::DrawCommand,
     installer::Installer,
     pob::PathOfBuilding,
@@ -55,7 +55,7 @@ pub struct StageFrameOutput {
     pub draw_commands: Vec<DrawCommand>,
     pub can_elide: bool,
     pub request_redraw: bool,
-    pub scale_factor: f32,
+    pub scale_factor: ScaleFactor<f32>,
 }
 
 pub enum ActiveStage {

@@ -1,8 +1,8 @@
 use crate::{
     color::Srgba,
     dpi::{
-        ConvertToLogical, LogicalRect, LogicalVector, NormalizedRect, PhysicalPoint, PhysicalRect,
-        PhysicalVector,
+        LogicalRect, LogicalVector, NormalizedRect, PhysicalPoint, PhysicalRect, PhysicalVector,
+        ScaleFactor,
     },
     fonts::{atlas::FontAtlas, glyph_key::GlyphKey},
     math::Size,
@@ -71,7 +71,7 @@ impl RasterizedGlyph {
         cached: CachedGlyph,
         position: PhysicalPoint<i32>,
         color: Srgba,
-        pixels_per_point: f32,
+        scale_factor: ScaleFactor<f32>,
     ) -> Self {
         let glyph_rect = PhysicalRect::from_origin_and_size(
             position + cached.baseline_offset,
@@ -79,7 +79,7 @@ impl RasterizedGlyph {
         );
 
         RasterizedGlyph {
-            rect: glyph_rect.to_logical(pixels_per_point),
+            rect: glyph_rect.cast() / scale_factor,
             uv: cached.uv,
             texture_layer_idx: cached.texture_layer_idx,
             color,
@@ -161,11 +161,11 @@ impl GlyphRasterizer {
         glyph_run: &'run GlyphRun<'_, Srgba>,
         // additional offset relative to layout origin
         glyph_offset: LogicalVector<f32>,
-        pixels_per_point: f32,
+        scale_factor: ScaleFactor<f32>,
     ) -> impl Iterator<Item = Option<RasterizedGlyph>> + use<'slf, 'run, 'atlas> {
         let run = glyph_run.run();
         let color = glyph_run.style().brush;
-        let font_size = run.font_size() * pixels_per_point;
+        let font_size = run.font_size() * scale_factor.get();
         let normalized_coords = run.normalized_coords();
         let skew = run.synthesis().skew(); // skew angle for faux italic
 
@@ -192,11 +192,11 @@ impl GlyphRasterizer {
             glyph.x += glyph_offset.x;
             glyph.y += glyph_offset.y;
 
-            let (glyph_key, glyph_pos) = GlyphKey::from_glyph(&glyph, style_id, pixels_per_point);
+            let (glyph_key, glyph_pos) = GlyphKey::from_glyph(&glyph, style_id, scale_factor.get());
 
             if let Some(cached_glyph) = cached_glyphs.get(&glyph_key) {
                 return cached_glyph.map(|cached| {
-                    RasterizedGlyph::from_cached(cached, glyph_pos, color, pixels_per_point)
+                    RasterizedGlyph::from_cached(cached, glyph_pos, color, scale_factor)
                 });
             }
 
@@ -234,7 +234,7 @@ impl GlyphRasterizer {
                 cached_glyph,
                 glyph_pos,
                 color,
-                pixels_per_point,
+                scale_factor,
             ))
         })
     }

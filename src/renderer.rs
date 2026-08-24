@@ -1,8 +1,8 @@
 use crate::{
     color::Srgba,
     dpi::{
-        ConvertToLogical, ConvertToPhysical, LogicalPoint, LogicalRect, LogicalSize,
-        NormalizedPoint, PhysicalRect, PhysicalSize,
+        LogicalPoint, LogicalRect, LogicalSize, NormalizedPoint, PhysicalRect, PhysicalSize,
+        ScaleFactor,
     },
     math::Point,
     renderer::{
@@ -52,7 +52,7 @@ pub struct RenderJob {
     pub indices: Vec<u32>,
     pub batches: Vec<Batch>,
     pub textures_delta: TexturesDelta,
-    pub scale_factor: f32,
+    pub scale_factor: ScaleFactor<f32>,
 }
 
 #[derive(Debug)]
@@ -255,7 +255,7 @@ impl Renderer {
         render_pass: &mut wgpu::RenderPass<'static>,
         render_job: &RenderJob,
         screen_size: PhysicalSize<u32>,
-        pixels_per_point: f32,
+        scale_factor: ScaleFactor<f32>,
     ) {
         profiling::scope!("render");
 
@@ -282,15 +282,10 @@ impl Renderer {
             render_pass.set_bind_group(1, bind_group, &[]);
 
             // scissor
-            let phys_clip_rect = batch
-                .clip_rect
-                .to_physical::<f32, _>(pixels_per_point)
-                .round();
+            let phys_clip_rect = batch.clip_rect * scale_factor;
             let scissor = phys_clip_rect
-                // NOTE: can't cast to u32 directly because negative values cause a panic
-                .cast::<i32>()
-                .intersection(&screen_rect.to_i32())
-                .map(|s| s.to_u32());
+                .intersection(&screen_rect.cast())
+                .map(|s| s.round().to_u32());
 
             // skip batch if scissor doesn't intersect screen
             let Some(scissor) = scissor else {
@@ -420,12 +415,12 @@ impl Renderer {
         queue: &wgpu::Queue,
         render_job: &RenderJob,
         screen_size: PhysicalSize<u32>,
-        pixels_per_point: f32,
+        scale_factor: ScaleFactor<f32>,
     ) {
         profiling::scope!("update_buffers");
 
         let uniform_buffer_content = Globals {
-            screen_size: screen_size.to_logical(pixels_per_point),
+            screen_size: screen_size.cast() / scale_factor,
         };
 
         // update globals uniform buffer
