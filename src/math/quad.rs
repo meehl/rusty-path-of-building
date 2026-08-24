@@ -1,5 +1,6 @@
 use crate::math::{Corners, Point, Rect, Size, Vector};
 use bytemuck::{Pod, Zeroable};
+use euclid::approxord::{max, min};
 use euclid::num::Zero;
 use std::fmt;
 use std::hash::Hash;
@@ -133,5 +134,27 @@ where
             value.bottom_right(),
             value.bottom_left(),
         )
+    }
+}
+
+impl<T, U> Quad<T, U>
+where
+    T: Copy + PartialOrd,
+{
+    /// Returns the axis-aligned bounding box containing this quad.
+    #[inline]
+    pub fn aabb(&self) -> Rect<T, U> {
+        let min_x = min(min(min(self.p0.x, self.p1.x), self.p2.x), self.p3.x);
+        let max_x = max(max(max(self.p0.x, self.p1.x), self.p2.x), self.p3.x);
+        let min_y = min(min(min(self.p0.y, self.p1.y), self.p2.y), self.p3.y);
+        let max_y = max(max(max(self.p0.y, self.p1.y), self.p2.y), self.p3.y);
+
+        Rect::new(Point::new(min_x, min_y), Point::new(max_x, max_y))
+    }
+
+    /// Tests intersection between this quad's AABB and a rectangle.
+    #[inline]
+    pub fn aabb_intersects_rect(&self, rect: &Rect<T, U>) -> bool {
+        self.aabb().intersects(rect)
     }
 }

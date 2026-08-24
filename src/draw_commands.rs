@@ -92,8 +92,15 @@ impl DrawCommandRecorder {
             None => (TextureId::default(), NormalizedQuad::white_uv(), 0),
         };
 
+        let positions = rect.translate(self.current_viewport.min.to_vector());
+
+        // cull if outside of viewport
+        if !positions.intersects(&self.current_viewport) {
+            return;
+        }
+
         self.push(DrawCommand {
-            positions: rect.translate(self.current_viewport.min.to_vector()).into(),
+            positions: positions.into(),
             uvs,
             color: self.current_draw_color,
             texture_id,
@@ -118,8 +125,15 @@ impl DrawCommandRecorder {
             None => (TextureId::default(), NormalizedQuad::white_uv(), 0),
         };
 
+        let positions = quad.translate(self.current_viewport.min.to_vector());
+
+        // cull if outside of viewport
+        if !positions.aabb_intersects_rect(&self.current_viewport) {
+            return;
+        }
+
         self.push(DrawCommand {
-            positions: quad.translate(self.current_viewport.min.to_vector()),
+            positions,
             uvs,
             color: self.current_draw_color,
             texture_id,
@@ -136,14 +150,19 @@ impl DrawCommandRecorder {
         layer_idx: u32,
         is_absolute_position: bool,
     ) {
-        let rect = if is_absolute_position {
+        let positions = if is_absolute_position {
             rect
         } else {
             rect.translate(self.current_viewport.min.to_vector())
         };
 
+        // cull if outside of viewport
+        if !positions.intersects(&self.current_viewport) {
+            return;
+        }
+
         self.push(DrawCommand {
-            positions: rect.into(),
+            positions: positions.into(),
             uvs: uv.into(),
             color,
             // font atlas always lives at default texture ID
