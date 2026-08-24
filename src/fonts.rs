@@ -272,7 +272,7 @@ impl Fonts {
         }
 
         Layout {
-            width: parley_layout.width(),
+            width: parley_layout.full_width(),
             glyphs,
             parley_layout,
         }
