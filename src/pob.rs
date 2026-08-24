@@ -86,7 +86,7 @@ impl Context {
 
 /// Represents the interface to Path of Building's Lua code.
 ///
-/// Exposes API, fowards events to Path of Building's event handlers, and manages subscripts.
+/// Exposes API, forwards events to Path of Building's event handlers, and manages subscripts.
 pub struct PathOfBuilding {
     lua: Lua,
     /// Hash of the previous frame's draw commands. Used to skip rerendering identical frames.
