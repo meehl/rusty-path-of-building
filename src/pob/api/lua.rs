@@ -14,7 +14,7 @@ pub fn protected_call(l: &Lua, (func, args): (Function, MultiValue)) -> LuaResul
 pub fn load_module(l: &Lua, (name, args): (String, MultiValue)) -> LuaResult<MultiValue> {
     let script_dir = {
         let ctx = l.app_data_ref::<Context>().unwrap();
-        ctx.script_dir.to_owned()
+        ctx.script_dir.clone()
     };
     let mut module_path = script_dir.join(name);
     if module_path.extension().is_none() {
@@ -31,7 +31,7 @@ pub fn load_module(l: &Lua, (name, args): (String, MultiValue)) -> LuaResult<Mul
 pub fn protected_load_module(l: &Lua, (name, args): (String, MultiValue)) -> LuaResult<MultiValue> {
     let script_dir = {
         let ctx = l.app_data_ref::<Context>().unwrap();
-        ctx.script_dir.to_owned()
+        ctx.script_dir.clone()
     };
     let mut module_path = script_dir.join(name);
     if module_path.extension().is_none() {

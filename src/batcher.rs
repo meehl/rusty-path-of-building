@@ -156,11 +156,11 @@ pub fn build_render_job(
         batches.push(batch);
     }
 
-    return RenderJob {
+    RenderJob {
         vertices,
         indices,
         batches,
         textures_delta,
         scale_factor,
-    };
+    }
 }

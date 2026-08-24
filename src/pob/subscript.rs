@@ -175,7 +175,7 @@ impl Subscript {
         }
     }
 
-    fn handle_calls(&mut self, lua: &Lua) {
+    fn handle_calls(&self, lua: &Lua) {
         match self.receiver.try_recv() {
             Ok(SubscriptCall::Blocking {
                 function_name,

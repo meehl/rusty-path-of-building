@@ -161,7 +161,7 @@ fn restart(l: &Lua, _: ()) -> LuaResult<()> {
 
 fn open_url(l: &Lua, url: String) -> LuaResult<MultiValue> {
     match open::that(url) {
-        Ok(_) => ().into_lua_multi(l),
+        Ok(()) => ().into_lua_multi(l),
         Err(_) => "Unable to open url!".into_lua_multi(l),
     }
 }

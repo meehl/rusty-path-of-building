@@ -168,7 +168,7 @@ unsafe extern "C-unwind" fn set_draw_layer(state: *mut ffi::lua_State) -> c_int 
                     let layer = i32_from_stack!(state, -nargs);
                     Some(layer)
                 }
-                t => panic!("Expected Nil or Number, got {:?}", t),
+                t => panic!("Expected Nil or Number, got {t:?}"),
             };
             let sublayer = i32_from_stack!(state, -nargs + 1);
             if let Some(layer) = layer {
@@ -189,9 +189,10 @@ unsafe extern "C-unwind" fn draw_image(state: *mut ffi::lua_State) -> c_int {
     let mut ctx = lua_instance.app_data_mut::<Context>().unwrap();
 
     let nargs = unsafe { ffi::lua_gettop(state) };
-    if !matches!(nargs, 5 | 6 | 7 | 9 | 10 | 11) {
-        panic!("Unexpected number of arguments");
-    }
+    assert!(
+        matches!(nargs, 5 | 6 | 7 | 9 | 10 | 11),
+        "Unexpected number of arguments"
+    );
 
     #[allow(clippy::manual_range_patterns)]
     let parse_uv = matches!(nargs, 9 | 10 | 11);
@@ -237,9 +238,10 @@ unsafe extern "C-unwind" fn draw_image_quad(state: *mut ffi::lua_State) -> c_int
     let mut ctx = lua_instance.app_data_mut::<Context>().unwrap();
 
     let nargs = unsafe { ffi::lua_gettop(state) };
-    if !matches!(nargs, 9 | 10 | 11 | 17 | 18 | 19) {
-        panic!("Unexpected number of arguments");
-    }
+    assert!(
+        matches!(nargs, 9 | 10 | 11 | 17 | 18 | 19),
+        "Unexpected number of arguments"
+    );
 
     #[allow(clippy::manual_range_patterns)]
     let parse_uv = matches!(nargs, 17 | 18 | 19);
@@ -560,17 +562,14 @@ impl<'a> Iterator for PoBStringSegmentIterator<'a> {
                 let color = Some(Srgba::from_escape_code(escape_str));
 
                 let _ = self.captures.next(); // pop current code to peek the next one
-                match self.captures.peek() {
-                    Some(next_code) => {
-                        // found another escape code. return text up the next code
-                        let next_code_start = next_code.get(0).unwrap().start();
-                        Some((color, &self.haystack[code_end..next_code_start]))
-                    }
-                    None => {
-                        // no additional escape codes found. return rest of string
-                        self.is_done = true;
-                        Some((color, &self.haystack[code_end..]))
-                    }
+                if let Some(next_code) = self.captures.peek() {
+                    // found another escape code. return text up the next code
+                    let next_code_start = next_code.get(0).unwrap().start();
+                    Some((color, &self.haystack[code_end..next_code_start]))
+                } else {
+                    // no additional escape codes found. return rest of string
+                    self.is_done = true;
+                    Some((color, &self.haystack[code_end..]))
                 }
             }
             None => {
@@ -647,12 +646,12 @@ impl std::str::FromStr for PoBFontType {
     }
 }
 
-#[inline(always)]
+#[inline]
 fn hex_byte(a: u8, b: u8) -> u8 {
     (hex_digit(a) << 4) | hex_digit(b)
 }
 
-#[inline(always)]
+#[inline]
 fn hex_digit(c: u8) -> u8 {
     match c {
         b'0'..=b'9' => c - b'0',

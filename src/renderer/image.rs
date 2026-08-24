@@ -61,7 +61,7 @@ impl ImageData {
             height,
             array_layers: 1,
             mipmap_count: NonZeroU32::new(1).expect("1 is non-zero"),
-            data_order: Default::default(),
+            data_order: DataOrder::default(),
             bytes: RgbaImage::from_pixel(width, height, color.0.into()).into_raw(),
         }
     }
@@ -75,7 +75,7 @@ impl From<DynamicImage> for ImageData {
             height: image.height(),
             array_layers: 1,
             mipmap_count: NonZeroU32::new(1).expect("1 is non-zero"),
-            data_order: Default::default(),
+            data_order: DataOrder::default(),
             bytes: image.to_rgba8().into_raw(),
         }
     }
@@ -89,7 +89,7 @@ impl From<RgbaImage> for ImageData {
             height: image.height(),
             array_layers: 1,
             mipmap_count: NonZeroU32::new(1).expect("1 is non-zero"),
-            data_order: Default::default(),
+            data_order: DataOrder::default(),
             bytes: image.into_raw(),
         }
     }
@@ -138,12 +138,10 @@ fn resolve_path<P: AsRef<Path>>(path: P) -> std::path::PathBuf {
 
 /// Checks if file is a compressed DDS file (.dds.zst)
 fn is_compressed_dds<P: AsRef<Path>>(path: P) -> bool {
-    let path = path.as_ref();
-    path.extension().and_then(|s| s.to_str()) == Some("zst")
-        && path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .is_some_and(|s| s.ends_with(".dds"))
+    path.as_ref()
+        .to_string_lossy()
+        .to_ascii_lowercase()
+        .ends_with(".dds.zst")
 }
 
 fn dds_format_to_wgpu(format: dds::Format) -> anyhow::Result<wgpu::TextureFormat> {

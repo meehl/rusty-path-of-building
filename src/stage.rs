@@ -66,29 +66,29 @@ pub enum ActiveStage {
 impl ActiveStage {
     pub fn update(&mut self) -> anyhow::Result<Option<StageTransition>> {
         match self {
-            ActiveStage::Startup(s) => s.update(),
-            ActiveStage::Main(s) => s.update(),
+            Self::Startup(s) => s.update(),
+            Self::Main(s) => s.update(),
         }
     }
 
     pub fn frame(&mut self) -> anyhow::Result<StageFrameOutput> {
         match self {
-            ActiveStage::Startup(s) => s.frame(),
-            ActiveStage::Main(s) => s.frame(),
+            Self::Startup(s) => s.frame(),
+            Self::Main(s) => s.frame(),
         }
     }
 
     pub fn handle_event(&mut self, event: StageEvent) -> anyhow::Result<Option<StageTransition>> {
         match self {
-            ActiveStage::Startup(s) => s.handle_event(event),
-            ActiveStage::Main(s) => s.handle_event(event),
+            Self::Startup(s) => s.handle_event(event),
+            Self::Main(s) => s.handle_event(event),
         }
     }
 
     pub fn set_window(&mut self, window: Arc<Window>) {
         match self {
-            ActiveStage::Startup(s) => s.set_window(window),
-            ActiveStage::Main(s) => s.set_window(window),
+            Self::Startup(s) => s.set_window(window),
+            Self::Main(s) => s.set_window(window),
         }
     }
 

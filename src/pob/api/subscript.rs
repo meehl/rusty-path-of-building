@@ -21,7 +21,7 @@ pub fn launch_subscript(
     let arguments = args.try_into()?;
 
     let ctx = l.app_data_ref::<Context>().unwrap();
-    let script_dir = ctx.script_dir.to_owned();
+    let script_dir = ctx.script_dir.clone();
     let subscript_id = ctx.subscript_manager.borrow_mut().push(
         script_dir,
         script_text,

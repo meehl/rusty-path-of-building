@@ -81,8 +81,6 @@ impl WindowState {
     }
 
     pub fn get_clipboard_text(&mut self) -> Option<String> {
-        self.clipboard
-            .as_mut()
-            .and_then(|clipboard| clipboard.get_text())
+        self.clipboard.as_mut().and_then(Clipboard::get_text)
     }
 }

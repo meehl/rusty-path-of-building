@@ -42,7 +42,7 @@ pub fn set_work_dir(l: &Lua, path: String) -> LuaResult<()> {
 pub fn make_dir(l: &Lua, path: String) -> LuaResult<MultiValue> {
     match fs::create_dir_all(path) {
         // callers expect first return value to be true on success
-        Ok(_) => (true).into_lua_multi(l),
+        Ok(()) => (true).into_lua_multi(l),
         // otherwise it is set to Nil and second return value is set to error msg
         Err(err) => (Value::Nil, err.to_string()).into_lua_multi(l),
     }
@@ -55,7 +55,7 @@ pub fn remove_dir(l: &Lua, (path, recursive): (String, Option<bool>)) -> LuaResu
         fs::remove_dir(&path)
     };
     match result {
-        Ok(_) => (true).into_lua_multi(l),
+        Ok(()) => (true).into_lua_multi(l),
         Err(err) => (Value::Nil, err.to_string()).into_lua_multi(l),
     }
 }

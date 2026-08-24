@@ -131,7 +131,7 @@ impl PathOfBuilding {
         Ok(lua)
     }
 
-    /// Adds "${script_dir}/lua" to package path
+    /// Adds `${script_dir}/lua` to package path
     pub fn register_package_paths(lua: &Lua, script_dir: &Path) -> LuaResult<()> {
         let package: Table = lua.globals().get("package")?;
         let mut package_path: String = package.get("path")?;
@@ -155,7 +155,7 @@ impl PathOfBuilding {
     fn restart(&mut self) -> LuaResult<()> {
         // move context out of current lua instance...
         let mut ctx = self.lua.remove_app_data::<Context>().unwrap();
-        let script_dir = ctx.script_dir.to_owned();
+        let script_dir = ctx.script_dir.clone();
         ctx.needs_restart = false;
 
         // and move it into new instance
@@ -166,7 +166,7 @@ impl PathOfBuilding {
     }
 
     /// Handles events by updating context and forwarding them to PoB's event handlers.
-    pub fn handle_event(&mut self, event: StageEvent) -> anyhow::Result<Option<StageTransition>> {
+    pub fn handle_event(&self, event: StageEvent) -> anyhow::Result<Option<StageTransition>> {
         match event {
             StageEvent::KeyDown { key } => {
                 self.ctx_mut().input_state.set_key_pressed(&key, true);
@@ -238,6 +238,7 @@ impl PathOfBuilding {
                 self.ctx_mut().window_state.size = size;
             }
             StageEvent::ScaleFactorChanged(scale_factor) => {
+                #[allow(clippy::cast_possible_truncation)]
                 self.ctx_mut()
                     .window_state
                     .set_scale_factor(scale_factor as f32);
@@ -358,7 +359,7 @@ impl PathOfBuilding {
         list_func.call::<Table>(())
     }
 
-    pub fn clear_pressed(&mut self) {
+    pub fn clear_pressed(&self) {
         self.ctx_mut().input_state.clear_pressed();
     }
 
@@ -368,7 +369,7 @@ impl PathOfBuilding {
     }
 
     /// Attaches the render-target window to the context
-    pub fn set_window(&mut self, window: Arc<Window>) {
+    pub fn set_window(&self, window: Arc<Window>) {
         self.ctx_mut().window_state.set_window(window);
     }
 
