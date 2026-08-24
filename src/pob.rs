@@ -290,9 +290,12 @@ impl PathOfBuilding {
 
         self.handle_subscripts()?;
 
-        call_callback::<(), ()>(&self.lua, "OnFrame", ())?;
+        {
+            profiling::scope!("lua_OnFrame");
+            call_callback::<(), ()>(&self.lua, "OnFrame", ())?;
+        }
 
-        let ctx = self.lua.app_data_mut::<Context>().unwrap();
+        let ctx = self.lua.app_data_ref::<Context>().unwrap();
 
         let (layers_hash, layers) = ctx.recorder.finish();
         let identical = layers_hash == self.previous_layers_hash;
