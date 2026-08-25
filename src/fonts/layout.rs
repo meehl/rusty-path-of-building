@@ -1,6 +1,7 @@
 use crate::{
     color::Srgba,
-    dpi::{LogicalPoint, LogicalRect, NormalizedRect},
+    dpi::{LogicalPoint, LogicalRect},
+    uv::UvRect,
 };
 use ordered_float::OrderedFloat;
 use parley::{FontFamily, FontFamilyName};
@@ -106,7 +107,7 @@ pub struct PositionedGlyph {
     // relative to layout origin
     // TODO: introduce new "layout space"?
     pub rect: LogicalRect<f32>,
-    pub uv: NormalizedRect,
+    pub uv: UvRect,
     pub layer_idx: u32,
     pub color: Srgba,
 }

@@ -19,6 +19,7 @@ mod pob;
 mod renderer;
 mod stage;
 mod util;
+mod uv;
 mod window;
 mod worker_pool;
 

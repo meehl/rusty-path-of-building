@@ -1,19 +1,20 @@
 use std::{collections::BTreeMap, hash::Hasher};
 
 use ahash::AHasher;
-use euclid::Size2D;
 
 use crate::{
     color::Srgba,
-    dpi::{LogicalQuad, LogicalRect, LogicalSize, NormalizedQuad, NormalizedRect, Uv},
+    dpi::{LogicalQuad, LogicalRect, LogicalSize},
+    math::Size,
     renderer::textures::TextureId,
+    uv::{UvConstructors, UvQuad, UvRect},
 };
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct DrawCommand {
     pub positions: LogicalQuad<f32>,
-    pub uvs: NormalizedQuad,
+    pub uvs: UvQuad,
     pub texture_id: TextureId,
     pub clip_rect: LogicalRect<f32>,
     pub texture_layer_idx: u32,
@@ -47,7 +48,7 @@ impl DrawCommandRecorder {
             layer.clear();
         }
         self.current_layer = (0, 0);
-        self.current_viewport = LogicalRect::from_size(Size2D::new(f32::INFINITY, f32::INFINITY));
+        self.current_viewport = LogicalRect::from_size(Size::new(f32::INFINITY, f32::INFINITY));
         self.current_draw_color = Srgba::WHITE;
         self.hasher = AHasher::default();
     }
@@ -80,16 +81,16 @@ impl DrawCommandRecorder {
         &mut self,
         rect: LogicalRect<f32>,
         texture_id: Option<TextureId>,
-        uv: Option<NormalizedRect>,
+        uv: Option<UvRect>,
         layer_idx: u32,
     ) {
         let (texture_id, uvs, texture_layer_idx) = match texture_id {
             Some(texture_id) => (
                 texture_id,
-                uv.map_or(NormalizedQuad::default_uv(), |uv_rect| uv_rect.into()),
+                uv.map_or(UvQuad::full_uv(), |uv_rect| uv_rect.into()),
                 layer_idx,
             ),
-            None => (TextureId::default(), NormalizedQuad::white_uv(), 0),
+            None => (TextureId::default(), UvQuad::white_uv(), 0),
         };
 
         let positions = rect.translate(self.current_viewport.min.to_vector());
@@ -113,16 +114,12 @@ impl DrawCommandRecorder {
         &mut self,
         quad: LogicalQuad<f32>,
         texture_id: Option<TextureId>,
-        uv: Option<NormalizedQuad>,
+        uv: Option<UvQuad>,
         layer_idx: u32,
     ) {
         let (texture_id, uvs, texture_layer_idx) = match texture_id {
-            Some(texture_id) => (
-                texture_id,
-                uv.unwrap_or(NormalizedQuad::default_uv()),
-                layer_idx,
-            ),
-            None => (TextureId::default(), NormalizedQuad::white_uv(), 0),
+            Some(texture_id) => (texture_id, uv.unwrap_or(UvQuad::full_uv()), layer_idx),
+            None => (TextureId::default(), UvQuad::white_uv(), 0),
         };
 
         let positions = quad.translate(self.current_viewport.min.to_vector());
@@ -145,7 +142,7 @@ impl DrawCommandRecorder {
     pub fn draw_glyph(
         &mut self,
         rect: LogicalRect<f32>,
-        uv: NormalizedRect,
+        uv: UvRect,
         color: Srgba,
         layer_idx: u32,
         is_absolute_position: bool,

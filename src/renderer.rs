@@ -1,15 +1,13 @@
 use crate::{
     color::Srgba,
-    dpi::{
-        LogicalPoint, LogicalRect, LogicalSize, NormalizedPoint, PhysicalRect, PhysicalSize,
-        ScaleFactor,
-    },
+    dpi::{LogicalPoint, LogicalRect, LogicalSize, PhysicalRect, PhysicalSize, ScaleFactor},
     math::Point,
     renderer::{
         image::ImageData,
         textures::{TextureId, TextureOptions, TexturesDelta},
     },
     util::calculate_hash,
+    uv::UvPoint,
 };
 use ahash::HashMap;
 use std::{
@@ -32,7 +30,7 @@ const DUMMY_TEXTURE_ID: TextureId = 0;
 #[derive(Clone, Copy, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {
     pub pos: LogicalPoint<f32>,
-    pub uv: NormalizedPoint,
+    pub uv: UvPoint,
     pub color: Srgba,
     /// Index into batch's texture array
     pub texture_slot: u32,

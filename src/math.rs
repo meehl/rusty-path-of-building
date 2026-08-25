@@ -1,5 +1,6 @@
 pub use euclid::Box2D as Rect;
 pub use euclid::Point2D as Point;
+pub use euclid::Scale;
 pub use euclid::Size2D as Size;
 pub use euclid::Vector2D as Vector;
 pub use quad::Quad;

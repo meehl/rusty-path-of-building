@@ -1,11 +1,9 @@
 use crate::{
     color::Srgba,
-    dpi::{
-        LogicalRect, LogicalVector, NormalizedRect, PhysicalPoint, PhysicalRect, PhysicalVector,
-        ScaleFactor,
-    },
+    dpi::{LogicalRect, LogicalVector, PhysicalPoint, PhysicalRect, PhysicalVector, ScaleFactor},
     fonts::{atlas::FontAtlas, glyph_key::GlyphKey},
     math::Size,
+    uv::UvRect,
 };
 use ahash::HashMap;
 use image::GenericImage;
@@ -52,7 +50,7 @@ impl<'a> StyleKey<'a> {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CachedGlyph {
     pub rect: PhysicalRect<u32>,
-    pub uv: NormalizedRect,
+    pub uv: UvRect,
     pub texture_layer_idx: u32,
     // offset from top/left to baseline
     pub baseline_offset: PhysicalVector<i32>,
@@ -61,7 +59,7 @@ pub struct CachedGlyph {
 pub struct RasterizedGlyph {
     // NOTE: this is relative to the layout origin
     pub rect: LogicalRect<f32>,
-    pub uv: NormalizedRect,
+    pub uv: UvRect,
     pub texture_layer_idx: u32,
     pub color: Srgba,
 }
@@ -244,7 +242,7 @@ impl GlyphRasterizer {
 fn write_to_atlas(
     image: &swash::scale::image::Image,
     atlas: &mut FontAtlas,
-) -> (PhysicalRect<u32>, NormalizedRect, u32) {
+) -> (PhysicalRect<u32>, UvRect, u32) {
     let mut allocated_glyph =
         atlas.allocate(Size::new(image.placement.width, image.placement.height));
 

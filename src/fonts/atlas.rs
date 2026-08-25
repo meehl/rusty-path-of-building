@@ -2,23 +2,24 @@ use std::num::NonZeroU32;
 
 use crate::{
     color::Srgba,
-    dpi::{Normalize, NormalizedRect},
-    math::{Point, Size},
+    math::{Point, Rect, Scale, Size},
     renderer::{
         image::{DataOrder, ImageData, ImageDelta},
         textures::TextureOptions,
     },
+    uv::{UvRect, UvSpace},
 };
 use image::{GenericImage, RgbaImage, SubImage};
 
 pub struct FontAtlasSpace;
 pub type FontAtlasPoint = Point<u32, FontAtlasSpace>;
 pub type FontAtlasSize = Size<u32, FontAtlasSpace>;
+pub type FontAtlasRect = Rect<u32, FontAtlasSpace>;
 
 pub struct AllocatedGlyph<'a> {
     pub sub_image: SubImage<&'a mut RgbaImage>,
     pub layer_idx: u32,
-    pub uv: NormalizedRect,
+    pub uv: UvRect,
 }
 
 struct Layer {
@@ -36,6 +37,8 @@ pub struct FontAtlas {
     // atlas has been altered and needs to be reuploaded to the GPU
     // TODO: only mark changed regions as dirty and perform partial texture update
     dirty: bool,
+    // used to convert to normalized UV coordinates
+    to_uv: Scale<f32, FontAtlasSpace, UvSpace>,
 }
 
 impl FontAtlas {
@@ -45,6 +48,7 @@ impl FontAtlas {
             max_layers,
             layers: Vec::new(),
             dirty: false,
+            to_uv: Scale::new(1.0 / layer_size as f32),
         };
 
         atlas.push_layer();
@@ -105,6 +109,9 @@ impl FontAtlas {
         layer.cursor.x += requested_size.width + PADDING;
         self.dirty = true;
 
+        let glyph_rect = FontAtlasRect::from_origin_and_size(pos, requested_size);
+        let uv = self.to_uv.transform_box2d(&glyph_rect.cast());
+
         AllocatedGlyph {
             sub_image: layer.image.sub_image(
                 pos.x,
@@ -113,10 +120,7 @@ impl FontAtlas {
                 requested_size.height,
             ),
             layer_idx: idx as u32,
-            uv: NormalizedRect::new(
-                pos.normalize(self.layer_size),
-                (pos + requested_size.to_vector()).normalize(self.layer_size),
-            ),
+            uv,
         }
     }
 
