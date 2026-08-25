@@ -1,10 +1,9 @@
 use crate::{
     color::Srgba,
     dpi::LogicalPoint,
-    fonts::{Alignment, FontStyle, LayoutJob},
+    fonts::{Alignment, FontStyle, LayoutJob, LayoutToLogical},
     math::{Point, Quad, Rect, Size},
-    pob::Context,
-    pob::api::image_handle::image_handle_texture_id,
+    pob::{Context, api::image_handle::image_handle_texture_id},
 };
 use core::ffi::c_int;
 use mlua::{
@@ -363,7 +362,7 @@ unsafe extern "C-unwind" fn draw_string(state: *mut ffi::lua_State) -> c_int {
     let layout = ctx.fonts.borrow_mut().layout(job, scale_factor);
     for glyph in &layout.glyphs {
         ctx.recorder.draw_glyph(
-            glyph.rect.translate(position.to_vector()),
+            LayoutToLogical::new(position.x, position.y).transform_box(&glyph.rect),
             glyph.uv,
             glyph.color,
             glyph.layer_idx,

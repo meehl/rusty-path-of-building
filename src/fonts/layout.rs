@@ -1,10 +1,18 @@
 use crate::{
     color::Srgba,
-    dpi::{LogicalPoint, LogicalRect},
+    dpi::{LogicalPoint, LogicalScreenSpace},
+    math::{Rect, Translation},
     uv::UvRect,
 };
 use ordered_float::OrderedFloat;
 use parley::{FontFamily, FontFamilyName};
+
+// All coordinates relative to layout origin
+pub struct LayoutSpace;
+
+pub type LayoutRect<T> = Rect<T, LayoutSpace>;
+
+pub type LayoutToLogical = Translation<f32, LayoutSpace, LogicalScreenSpace>;
 
 #[derive(Copy, Clone, Default, Debug, Hash, PartialEq)]
 pub enum Alignment {
@@ -104,9 +112,7 @@ impl std::hash::Hash for LayoutJob<'_> {
 }
 
 pub struct PositionedGlyph {
-    // relative to layout origin
-    // TODO: introduce new "layout space"?
-    pub rect: LogicalRect<f32>,
+    pub rect: LayoutRect<f32>,
     pub uv: UvRect,
     pub layer_idx: u32,
     pub color: Srgba,

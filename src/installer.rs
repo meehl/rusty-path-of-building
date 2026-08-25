@@ -3,7 +3,7 @@ use crate::{
     color::Srgba,
     dpi::{LogicalPoint, LogicalRect},
     draw_commands::DrawCommand,
-    fonts::{Alignment, FontStyle, Fonts, LayoutJob},
+    fonts::{Alignment, FontStyle, Fonts, LayoutJob, LayoutToLogical},
     installer::download::{
         DownloadEvent, ExtractionRule, build_client, download_and_extract_tarball,
         download_file_to_disk, fetch_file_contents,
@@ -144,7 +144,9 @@ impl Installer {
             .layout(job, self.window_state.scale_factor());
         for glyph in &layout.glyphs {
             draw_commands.push(DrawCommand {
-                positions: glyph.rect.translate(pos.to_vector()).into(),
+                positions: LayoutToLogical::new(pos.x, pos.y)
+                    .transform_box(&glyph.rect)
+                    .into(),
                 uvs: glyph.uv.into(),
                 color: glyph.color,
                 // font atlas always lives at default texture ID

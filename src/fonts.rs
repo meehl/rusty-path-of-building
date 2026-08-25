@@ -16,7 +16,7 @@ use parley::{
 };
 use std::{rc::Rc, sync::Arc};
 
-pub use layout::{Alignment, FontStyle, Layout, LayoutJob};
+pub use layout::{Alignment, FontStyle, Layout, LayoutJob, LayoutToLogical};
 
 mod atlas;
 mod glyph_key;

@@ -1,7 +1,7 @@
 use crate::{
     color::Srgba,
-    dpi::{LogicalRect, LogicalVector, PhysicalPoint, PhysicalRect, PhysicalVector, ScaleFactor},
-    fonts::{atlas::FontAtlas, glyph_key::GlyphKey},
+    dpi::{LogicalVector, PhysicalPoint, PhysicalRect, PhysicalVector, ScaleFactor},
+    fonts::{atlas::FontAtlas, glyph_key::GlyphKey, layout::LayoutRect},
     math::Size,
     uv::UvRect,
 };
@@ -57,8 +57,7 @@ pub struct CachedGlyph {
 }
 
 pub struct RasterizedGlyph {
-    // NOTE: this is relative to the layout origin
-    pub rect: LogicalRect<f32>,
+    pub rect: LayoutRect<f32>,
     pub uv: UvRect,
     pub texture_layer_idx: u32,
     pub color: Srgba,
@@ -77,7 +76,8 @@ impl RasterizedGlyph {
         );
 
         RasterizedGlyph {
-            rect: glyph_rect.cast() / scale_factor,
+            // TODO: store sizes instead of rects
+            rect: (glyph_rect.cast() / scale_factor).cast_unit(),
             uv: cached.uv,
             texture_layer_idx: cached.texture_layer_idx,
             color,
