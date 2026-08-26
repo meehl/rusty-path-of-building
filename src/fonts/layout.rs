@@ -1,7 +1,7 @@
 use crate::{
     color::Srgba,
     dpi::{LogicalPoint, LogicalScreenSpace},
-    math::{Rect, Translation},
+    math::{Point, Rect, Translation, Vector},
     uv::UvRect,
 };
 use ordered_float::OrderedFloat;
@@ -10,6 +10,8 @@ use parley::{FontFamily, FontFamilyName};
 // All coordinates relative to layout origin
 pub struct LayoutSpace;
 
+pub type LayoutPoint<T> = Point<T, LayoutSpace>;
+pub type LayoutVector<T> = Vector<T, LayoutSpace>;
 pub type LayoutRect<T> = Rect<T, LayoutSpace>;
 
 pub type LayoutToLogical = Translation<f32, LayoutSpace, LogicalScreenSpace>;

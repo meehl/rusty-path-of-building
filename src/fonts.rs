@@ -1,9 +1,12 @@
 use crate::{
     color::Srgba,
-    dpi::{LogicalVector, ScaleFactor},
+    dpi::ScaleFactor,
     fonts::{
-        atlas::FontAtlas, glyph_key::SubpixelBin, layout::PositionedGlyph,
-        layout_cache::LayoutCache, rasterizer::GlyphRasterizer,
+        atlas::FontAtlas,
+        glyph_key::SubpixelBin,
+        layout::{LayoutVector, PositionedGlyph},
+        layout_cache::LayoutCache,
+        rasterizer::GlyphRasterizer,
     },
     renderer::image::ImageDelta,
     util::calculate_hash,
@@ -176,7 +179,7 @@ impl Fonts {
                         .rasterize_glyph_run(
                             &mut self.atlas,
                             &run,
-                            LogicalVector::new(horizontal_offset, 0.0),
+                            LayoutVector::new(horizontal_offset, 0.0),
                             ScaleFactor::identity(),
                         )
                         .for_each(|_| {});
@@ -228,7 +231,7 @@ impl Fonts {
         parley_layout.break_all_lines(None);
 
         // extra offset applied to each glyph to get position relative to layout origin
-        let mut glyph_offset = LogicalVector::new(0.0, 0.0);
+        let mut glyph_offset = LayoutVector::new(0.0, 0.0);
         if let Some(alignment) = job.alignment {
             let alignment = match alignment {
                 Alignment::Min => parley::Alignment::Start,

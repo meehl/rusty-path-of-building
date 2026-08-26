@@ -4,7 +4,6 @@ pub struct LogicalScreenSpace;
 pub struct PhysicalScreenSpace;
 
 pub type LogicalPoint<T> = Point<T, LogicalScreenSpace>;
-pub type LogicalVector<T> = Vector<T, LogicalScreenSpace>;
 pub type LogicalSize<T> = Size<T, LogicalScreenSpace>;
 pub type LogicalRect<T> = Rect<T, LogicalScreenSpace>;
 pub type LogicalQuad<T> = Quad<T, LogicalScreenSpace>;

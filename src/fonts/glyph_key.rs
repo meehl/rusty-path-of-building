@@ -1,7 +1,9 @@
 use ordered_float::OrderedFloat;
-use parley::Glyph;
 
-use crate::{dpi::PhysicalPoint, fonts::style_cache::StyleId};
+use crate::{
+    dpi::PhysicalPoint,
+    fonts::{layout::LayoutPoint, style_cache::StyleId},
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct GlyphKey {
@@ -12,25 +14,25 @@ pub struct GlyphKey {
 }
 
 impl GlyphKey {
-    pub fn from_glyph(
-        glyph: &Glyph,
+    pub fn from_position(
+        position: LayoutPoint<f32>,
+        glyph_id: u32,
         style_id: StyleId,
         scale_factor: f32,
     ) -> (Self, PhysicalPoint<i32>) {
-        // Use subpixel binning for x coordinate
-        let (x, x_bin) = SubpixelBin::<4>::new(glyph.x * scale_factor);
-        // No binning for y coordinate, just rounding
-        let y = (glyph.y * scale_factor).round() as i32;
-        let glyph_pos = PhysicalPoint::new(x, y);
+        // x: use subpixel binning so bitmap encodes sub-pixel position
+        let (x, x_bin) = SubpixelBin::<4>::new(position.x * scale_factor);
+        // y: just rounded. not much benefit from sub-pixel vertical positioning
+        let y = (position.y * scale_factor).round() as i32;
 
         (
             Self {
-                glyph_id: glyph.id as u16,
+                glyph_id: glyph_id as u16,
                 style_id,
                 x_bin,
                 scale_factor: OrderedFloat(scale_factor),
             },
-            glyph_pos,
+            PhysicalPoint::new(x, y),
         )
     }
 

@@ -2,6 +2,7 @@ use std::num::NonZeroU32;
 
 use crate::{
     color::Srgba,
+    dpi::PhysicalSize,
     math::{Point, Rect, Scale, Size},
     renderer::{
         image::{DataOrder, ImageData, ImageDelta},
@@ -74,7 +75,7 @@ impl FontAtlas {
     }
 
     /// Allocates a new glyph
-    pub fn allocate(&mut self, requested_size: FontAtlasSize) -> AllocatedGlyph<'_> {
+    fn allocate(&mut self, requested_size: FontAtlasSize) -> AllocatedGlyph<'_> {
         const PADDING: u32 = 1;
 
         let mut idx = self.layers.len() - 1;
@@ -149,5 +150,31 @@ impl FontAtlas {
             },
             TextureOptions::LINEAR,
         ))
+    }
+
+    pub fn write_mask(
+        &mut self,
+        image: &swash::scale::image::Image,
+    ) -> (PhysicalSize<u32>, UvRect, u32) {
+        debug_assert!(matches!(image.content, swash::scale::image::Content::Mask));
+
+        let size = Size::new(image.placement.width, image.placement.height);
+        let mut allocation = self.allocate(size);
+
+        let mut i = 0;
+        for y in 0..size.height {
+            for x in 0..size.width {
+                let a = image.data[i];
+                // SAFETY: allocated atlas region and swash image have the same size
+                unsafe {
+                    allocation
+                        .sub_image
+                        .unsafe_put_pixel(x, y, Srgba::new(255, 255, 255, a).into())
+                };
+                i += 1;
+            }
+        }
+
+        (size.cast_unit(), allocation.uv, allocation.layer_idx)
     }
 }
