@@ -165,27 +165,21 @@ impl Fonts {
                 .tree_builder(&mut self.font_context, 1.0, false, &style);
         builder.push_text(text);
 
-        let (mut layout, _) = builder.build();
-        layout.break_all_lines(None);
+        let (mut parley_layout, _) = builder.build();
+        parley_layout.break_all_lines(None);
 
-        for line in layout.lines() {
-            for item in line.items() {
-                let parley::PositionedLayoutItem::GlyphRun(run) = item else {
-                    continue;
-                };
-
-                for horizontal_offset in SubpixelBin::<4>::BIN_OFFSETS {
-                    self.glyph_rasterizer
-                        .rasterize_glyph_run(
-                            &mut self.atlas,
-                            &run,
-                            LayoutVector::new(horizontal_offset, 0.0),
-                            ScaleFactor::identity(),
-                        )
-                        .for_each(|_| {});
-                }
+        for_each_glyph_run(&parley_layout, |run| {
+            for horizontal_offset in SubpixelBin::<4>::BIN_OFFSETS {
+                self.glyph_rasterizer
+                    .rasterize_glyph_run(
+                        &mut self.atlas,
+                        &run,
+                        LayoutVector::new(horizontal_offset, 0.0),
+                        ScaleFactor::identity(),
+                    )
+                    .for_each(|_| {});
             }
-        }
+        });
     }
 
     pub fn layout(&mut self, job: LayoutJob, scale_factor: ScaleFactor<f32>) -> Rc<Layout> {
@@ -231,7 +225,7 @@ impl Fonts {
         parley_layout.break_all_lines(None);
 
         // extra offset applied to each glyph to get position relative to layout origin
-        let mut glyph_offset = LayoutVector::new(0.0, 0.0);
+        let mut glyph_offset = LayoutVector::zero();
         if let Some(alignment) = job.alignment {
             let alignment = match alignment {
                 Alignment::Min => parley::Alignment::Start,
@@ -249,36 +243,41 @@ impl Fonts {
 
         let mut glyphs = Vec::new();
 
-        for line in parley_layout.lines() {
-            for item in line.items() {
-                let parley::PositionedLayoutItem::GlyphRun(run) = item else {
-                    continue;
-                };
-
-                for rasterized_glyph in self.glyph_rasterizer.rasterize_glyph_run(
-                    &mut self.atlas,
-                    &run,
-                    glyph_offset,
-                    scale_factor,
-                ) {
-                    let Some(glyph) = rasterized_glyph else {
-                        continue;
-                    };
-
-                    glyphs.push(PositionedGlyph {
-                        rect: glyph.rect,
-                        uv: glyph.uv,
-                        layer_idx: glyph.texture_layer_idx,
-                        color: glyph.color,
-                    });
-                }
+        for_each_glyph_run(&parley_layout, |run| {
+            for rasterized in self.glyph_rasterizer.rasterize_glyph_run(
+                &mut self.atlas,
+                &run,
+                glyph_offset,
+                scale_factor,
+            ) {
+                let Some(glyph) = rasterized else { continue };
+                glyphs.push(PositionedGlyph {
+                    rect: glyph.rect,
+                    uv: glyph.uv,
+                    layer_idx: glyph.texture_layer_idx,
+                    color: glyph.color,
+                });
             }
-        }
+        });
 
         Layout {
             width: parley_layout.full_width(),
             glyphs,
             parley_layout,
+        }
+    }
+}
+
+/// Applies a function to each glyph run in a `parley::Layout`
+fn for_each_glyph_run<'a>(
+    layout: &'a parley::Layout<Srgba>,
+    mut f: impl FnMut(&parley::GlyphRun<'a, Srgba>),
+) {
+    for line in layout.lines() {
+        for item in line.items() {
+            if let parley::PositionedLayoutItem::GlyphRun(run) = item {
+                f(&run);
+            }
         }
     }
 }
