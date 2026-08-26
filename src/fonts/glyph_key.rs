@@ -1,36 +1,28 @@
-use ordered_float::OrderedFloat;
-
-use crate::{
-    dpi::PhysicalPoint,
-    fonts::{layout::LayoutPoint, style_cache::StyleId},
-};
+use crate::{dpi::PhysicalPoint, fonts::style_cache::StyleId};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct GlyphKey {
     glyph_id: swash::GlyphId,
     style_id: StyleId,
     x_bin: SubpixelBin<4>,
-    scale_factor: OrderedFloat<f32>,
 }
 
 impl GlyphKey {
     pub fn from_position(
-        position: LayoutPoint<f32>,
+        position: PhysicalPoint<f32>,
         glyph_id: u32,
         style_id: StyleId,
-        scale_factor: f32,
     ) -> (Self, PhysicalPoint<i32>) {
         // x: use subpixel binning so bitmap encodes sub-pixel position
-        let (x, x_bin) = SubpixelBin::<4>::new(position.x * scale_factor);
+        let (x, x_bin) = SubpixelBin::<4>::new(position.x);
         // y: just rounded. not much benefit from sub-pixel vertical positioning
-        let y = (position.y * scale_factor).round() as i32;
+        let y = position.y.round() as i32;
 
         (
             Self {
                 glyph_id: glyph_id as u16,
                 style_id,
                 x_bin,
-                scale_factor: OrderedFloat(scale_factor),
             },
             PhysicalPoint::new(x, y),
         )

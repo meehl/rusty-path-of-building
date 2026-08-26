@@ -1,12 +1,9 @@
 use crate::{
     color::Srgba,
-    dpi::ScaleFactor,
+    dpi::{PhysicalVector, ScaleFactor},
     fonts::{
-        atlas::FontAtlas,
-        glyph_key::SubpixelBin,
-        layout::{LayoutVector, PositionedGlyph},
-        layout_cache::LayoutCache,
-        rasterizer::GlyphRasterizer,
+        atlas::FontAtlas, glyph_key::SubpixelBin, layout::PositionedGlyph,
+        layout_cache::LayoutCache, rasterizer::GlyphRasterizer,
     },
     renderer::image::ImageDelta,
     util::calculate_hash,
@@ -163,9 +160,12 @@ impl Fonts {
             font_size,
             ..Default::default()
         };
-        let mut builder =
-            self.layout_context
-                .tree_builder(&mut self.font_context, 1.0, false, &style);
+        let mut builder = self.layout_context.tree_builder(
+            &mut self.font_context,
+            scale_factor.get(),
+            false,
+            &style,
+        );
         builder.push_text(text);
 
         let (mut parley_layout, _) = builder.build();
@@ -177,7 +177,7 @@ impl Fonts {
                     .rasterize_glyph_run(
                         &mut self.atlas,
                         &run,
-                        LayoutVector::new(horizontal_offset, 0.0),
+                        PhysicalVector::new(horizontal_offset, 0.0),
                         scale_factor,
                     )
                     .for_each(|_| {});
@@ -213,9 +213,13 @@ impl Fonts {
             ..default_style
         };
 
-        let mut builder =
-            self.layout_context
-                .tree_builder(&mut self.font_context, 1.0, false, &style);
+        // scale factor is passed to builder so coordinates in resulting layout will be physical
+        let mut builder = self.layout_context.tree_builder(
+            &mut self.font_context,
+            scale_factor.get(),
+            false,
+            &style,
+        );
 
         for segment in job.segments {
             let brush_style = StyleProperty::Brush(segment.color);
@@ -228,7 +232,7 @@ impl Fonts {
         parley_layout.break_all_lines(None);
 
         // extra offset applied to each glyph to get position relative to layout origin
-        let mut glyph_offset = LayoutVector::zero();
+        let mut glyph_offset = PhysicalVector::zero();
         if let Some(alignment) = job.alignment {
             let alignment = match alignment {
                 Alignment::Min => parley::Alignment::Start,
@@ -264,7 +268,8 @@ impl Fonts {
         });
 
         Layout {
-            width: parley_layout.full_width(),
+            // full_width is physical so it needs to be converted back to logical
+            width: parley_layout.full_width() / scale_factor.get(),
             glyphs,
             parley_layout,
         }

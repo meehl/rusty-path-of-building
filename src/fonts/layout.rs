@@ -1,7 +1,7 @@
 use crate::{
     color::Srgba,
     dpi::{LogicalPoint, LogicalScreenSpace},
-    math::{Point, Rect, Translation, Vector},
+    math::{Rect, Translation},
     uv::UvRect,
 };
 use ordered_float::OrderedFloat;
@@ -10,8 +10,6 @@ use parley::{FontFamily, FontFamilyName};
 // All coordinates relative to layout origin
 pub struct LayoutSpace;
 
-pub type LayoutPoint<T> = Point<T, LayoutSpace>;
-pub type LayoutVector<T> = Vector<T, LayoutSpace>;
 pub type LayoutRect<T> = Rect<T, LayoutSpace>;
 
 pub type LayoutToLogical = Translation<f32, LayoutSpace, LogicalScreenSpace>;
@@ -123,7 +121,7 @@ pub struct PositionedGlyph {
 pub struct Layout {
     pub glyphs: Vec<PositionedGlyph>,
     pub width: f32,
-    // kept for parley's cursor helper
+    // kept for parley's cursor helper.
     pub parley_layout: parley::Layout<Srgba>,
 }
 
@@ -133,6 +131,9 @@ impl Layout {
     }
 
     pub fn cursor_index_at(&self, point: LogicalPoint<f32>) -> usize {
-        parley::Cursor::from_point(&self.parley_layout, point.x, point.y).index()
+        // `parley_layout` was built at the real display scale factor so its internal coordinates
+        // are physical. Scale the query point to match.
+        let scale = self.parley_layout.scale();
+        parley::Cursor::from_point(&self.parley_layout, point.x * scale, point.y * scale).index()
     }
 }

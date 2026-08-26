@@ -1,12 +1,7 @@
 use crate::{
     color::Srgba,
-    dpi::{PhysicalRect, PhysicalSize, PhysicalVector, ScaleFactor},
-    fonts::{
-        atlas::FontAtlas,
-        glyph_key::GlyphKey,
-        layout::{LayoutPoint, LayoutRect, LayoutVector},
-        style_cache::StyleCache,
-    },
+    dpi::{PhysicalPoint, PhysicalRect, PhysicalSize, PhysicalVector, ScaleFactor},
+    fonts::{atlas::FontAtlas, glyph_key::GlyphKey, layout::LayoutRect, style_cache::StyleCache},
     uv::UvRect,
 };
 use ahash::HashMap;
@@ -82,12 +77,12 @@ impl GlyphRasterizer {
         atlas: &'atlas mut FontAtlas,
         glyph_run: &'run GlyphRun<'_, Srgba>,
         // additional offset relative to layout origin
-        layout_offset: LayoutVector<f32>,
+        layout_offset: PhysicalVector<f32>,
         scale_factor: ScaleFactor<f32>,
     ) -> impl Iterator<Item = Option<RasterizedGlyph>> + use<'slf, 'run, 'atlas> {
         let run = glyph_run.run();
         let color = glyph_run.style().brush;
-        let font_size = run.font_size() * scale_factor.get();
+        let font_size = run.font_size();
         let normalized_coords = run.normalized_coords();
         let skew = run.synthesis().skew(); // skew angle for faux italic
 
@@ -112,10 +107,10 @@ impl GlyphRasterizer {
         let cached_glyphs = &mut self.cached_glyphs;
 
         glyph_run.positioned_glyphs().map(move |glyph| {
-            let layout_position = LayoutPoint::new(glyph.x, glyph.y) + layout_offset;
+            let layout_position = PhysicalPoint::new(glyph.x, glyph.y) + layout_offset;
 
-            let (glyph_key, pixel_position) =
-                GlyphKey::from_position(layout_position, glyph.id, style_id, scale_factor.get());
+            let (glyph_key, physical_position) =
+                GlyphKey::from_position(layout_position, glyph.id, style_id);
 
             let cached = *cached_glyphs.entry(glyph_key).or_insert_with(|| {
                 rasterize_glyph(&mut scaler, image, atlas, glyph.id, &glyph_key, skew)
@@ -123,7 +118,7 @@ impl GlyphRasterizer {
 
             cached.map(|cached| {
                 // apply the baseline offset to get the actual bitmap position
-                let bitmap_top_left = pixel_position + cached.baseline_offset;
+                let bitmap_top_left = physical_position + cached.baseline_offset;
                 let physical_rect =
                     PhysicalRect::from_origin_and_size(bitmap_top_left, cached.size.cast());
 
