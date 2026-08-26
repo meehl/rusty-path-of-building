@@ -1,6 +1,6 @@
 use crate::{
     color::Srgba,
-    dpi::{LogicalVector, PhysicalPoint, PhysicalRect, PhysicalVector, ScaleFactor},
+    dpi::{LogicalVector, PhysicalPoint, PhysicalRect, PhysicalSize, PhysicalVector, ScaleFactor},
     fonts::{atlas::FontAtlas, glyph_key::GlyphKey, layout::LayoutRect},
     math::Size,
     uv::UvRect,
@@ -49,7 +49,7 @@ impl<'a> StyleKey<'a> {
 }
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CachedGlyph {
-    pub rect: PhysicalRect<u32>,
+    pub size: PhysicalSize<u32>,
     pub uv: UvRect,
     pub texture_layer_idx: u32,
     // offset from top/left to baseline
@@ -72,11 +72,10 @@ impl RasterizedGlyph {
     ) -> Self {
         let glyph_rect = PhysicalRect::from_origin_and_size(
             position + cached.baseline_offset,
-            cached.rect.cast().size(),
+            cached.size.cast(),
         );
 
         RasterizedGlyph {
-            // TODO: store sizes instead of rects
             rect: (glyph_rect.cast() / scale_factor).cast_unit(),
             uv: cached.uv,
             texture_layer_idx: cached.texture_layer_idx,
@@ -218,10 +217,10 @@ impl GlyphRasterizer {
                 return None;
             };
 
-            let (glyph_rect, atlas_uv, atlas_layer_idx) = write_to_atlas(image, atlas);
+            let (glyph_size, atlas_uv, atlas_layer_idx) = write_to_atlas(image, atlas);
 
             let cached_glyph = CachedGlyph {
-                rect: glyph_rect,
+                size: glyph_size,
                 uv: atlas_uv,
                 texture_layer_idx: atlas_layer_idx,
                 baseline_offset: PhysicalVector::new(image.placement.left, -image.placement.top),
@@ -242,9 +241,9 @@ impl GlyphRasterizer {
 fn write_to_atlas(
     image: &swash::scale::image::Image,
     atlas: &mut FontAtlas,
-) -> (PhysicalRect<u32>, UvRect, u32) {
-    let mut allocated_glyph =
-        atlas.allocate(Size::new(image.placement.width, image.placement.height));
+) -> (PhysicalSize<u32>, UvRect, u32) {
+    let size = Size::new(image.placement.width, image.placement.height);
+    let mut allocated_glyph = atlas.allocate(size);
 
     match image.content {
         swash::scale::image::Content::Mask => {
@@ -268,7 +267,7 @@ fn write_to_atlas(
     };
 
     (
-        PhysicalRect::from_size(Size::new(image.placement.width, image.placement.height)),
+        size.cast_unit(),
         allocated_glyph.uv,
         allocated_glyph.layer_idx,
     )
