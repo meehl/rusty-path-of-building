@@ -1,52 +1,19 @@
 use crate::{
     color::Srgba,
     dpi::{LogicalVector, PhysicalPoint, PhysicalRect, PhysicalSize, PhysicalVector, ScaleFactor},
-    fonts::{atlas::FontAtlas, glyph_key::GlyphKey, layout::LayoutRect},
+    fonts::{atlas::FontAtlas, glyph_key::GlyphKey, layout::LayoutRect, style_cache::StyleCache},
     math::Size,
     uv::UvRect,
 };
 use ahash::HashMap;
 use image::GenericImage;
-use ordered_float::OrderedFloat;
 use parley::{FontData, GlyphRun};
-use std::borrow::Cow;
 use swash::zeno;
 
 type FontBlobId = u64;
 type FontIndex = u32;
 type SwashFontOffset = u32;
-pub type StyleId = u32;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-struct StyleKey<'a> {
-    font_blob_id: FontBlobId,
-    font_size: OrderedFloat<f32>,
-    normalized_coords: Cow<'a, [i16]>,
-    skew: i8,
-}
-
-impl<'a> StyleKey<'a> {
-    fn new(
-        font_blob_id: FontBlobId,
-        font_size: f32,
-        normalized_coords: &'a [i16],
-        skew: i8,
-    ) -> Self {
-        Self {
-            font_blob_id,
-            font_size: font_size.into(),
-            normalized_coords: Cow::Borrowed(normalized_coords),
-            skew,
-        }
-    }
-
-    fn to_static(&self) -> StyleKey<'static> {
-        StyleKey {
-            normalized_coords: self.normalized_coords.clone().into_owned().into(),
-            ..*self
-        }
-    }
-}
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CachedGlyph {
     pub size: PhysicalSize<u32>,
@@ -87,11 +54,7 @@ impl RasterizedGlyph {
 pub struct GlyphRasterizer {
     scale_context: swash::scale::ScaleContext,
     swash_keys: HashMap<(FontBlobId, FontIndex), (SwashFontOffset, swash::CacheKey)>,
-    // Style properties (font, size, etc.) are the same for each glyph run and don't
-    // need to be part of each glyph key. Instead, associate each style with its own
-    // ID and include that in the glyph key.
-    style_ids: HashMap<StyleKey<'static>, StyleId>,
-    next_style_id: StyleId,
+    style_cache: StyleCache,
     cached_glyphs: HashMap<GlyphKey, Option<CachedGlyph>>,
     // scratch image buffer used to write bitmap data into
     scratch: swash::scale::image::Image,
@@ -102,8 +65,7 @@ impl GlyphRasterizer {
         Self {
             scale_context: swash::scale::ScaleContext::new(),
             swash_keys: Default::default(),
-            style_ids: Default::default(),
-            next_style_id: 0,
+            style_cache: Default::default(),
             cached_glyphs: Default::default(),
             scratch: Default::default(),
         }
@@ -129,27 +91,6 @@ impl GlyphRasterizer {
         }
     }
 
-    fn get_style_id(
-        &mut self,
-        font_data: &FontData,
-        font_size: f32,
-        norm_coords: &[i16],
-        skew: i8,
-    ) -> StyleId {
-        let style_key = StyleKey::new(font_data.data.id(), font_size, norm_coords, skew);
-        match self.style_ids.get(&style_key) {
-            Some(key) => *key,
-            None => *self
-                .style_ids
-                .entry(style_key.to_static())
-                .or_insert_with(|| {
-                    let id = self.next_style_id;
-                    self.next_style_id += 1;
-                    id
-                }),
-        }
-    }
-
     /// Rasterizes glyph run and returns the placement and UV for each glyph.
     /// Can return `None` if glyph doesn't take up any space (e.g. whitespace).
     pub fn rasterize_glyph_run<'slf: 'run, 'run, 'atlas>(
@@ -167,8 +108,8 @@ impl GlyphRasterizer {
         let skew = run.synthesis().skew(); // skew angle for faux italic
 
         let font_ref = self.get_font_ref(run.font());
-        let style_id = self.get_style_id(
-            run.font(),
+        let style_id = self.style_cache.get_or_insert(
+            run.font().data.id(),
             font_size,
             normalized_coords,
             // parley stores skew as i8 internally so this conversion is ok

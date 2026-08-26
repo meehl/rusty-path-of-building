@@ -1,7 +1,7 @@
 use ordered_float::OrderedFloat;
 use parley::Glyph;
 
-use crate::{dpi::PhysicalPoint, fonts::rasterizer::StyleId};
+use crate::{dpi::PhysicalPoint, fonts::style_cache::StyleId};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct GlyphKey {

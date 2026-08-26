@@ -23,6 +23,7 @@ mod glyph_key;
 mod layout;
 mod layout_cache;
 mod rasterizer;
+mod style_cache;
 
 /// Data of a .ttf or .otf file
 #[derive(Clone, Debug)]
