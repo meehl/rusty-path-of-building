@@ -76,8 +76,8 @@ impl GlyphRasterizer {
         &'slf mut self,
         atlas: &'atlas mut FontAtlas,
         glyph_run: &'run GlyphRun<'_, Srgba>,
-        // additional offset relative to layout origin
-        layout_offset: PhysicalVector<f32>,
+        // additional offset applied to every glyph's raw parley position before quantization
+        offset: PhysicalVector<f32>,
         scale_factor: ScaleFactor<f32>,
     ) -> impl Iterator<Item = Option<RasterizedGlyph>> + use<'slf, 'run, 'atlas> {
         let run = glyph_run.run();
@@ -107,10 +107,10 @@ impl GlyphRasterizer {
         let cached_glyphs = &mut self.cached_glyphs;
 
         glyph_run.positioned_glyphs().map(move |glyph| {
-            let layout_position = PhysicalPoint::new(glyph.x, glyph.y) + layout_offset;
+            let glyph_position = PhysicalPoint::new(glyph.x, glyph.y) + offset;
 
             let (glyph_key, physical_position) =
-                GlyphKey::from_position(layout_position, glyph.id, style_id);
+                GlyphKey::from_position(glyph_position, glyph.id, style_id);
 
             let cached = *cached_glyphs.entry(glyph_key).or_insert_with(|| {
                 rasterize_glyph(&mut scaler, image, atlas, glyph.id, &glyph_key, skew)

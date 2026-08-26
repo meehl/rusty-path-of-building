@@ -355,11 +355,14 @@ unsafe extern "C-unwind" fn draw_string(state: *mut ffi::lua_State) -> c_int {
         ctx.recorder.set_draw_color(last_segment.color);
     }
 
-    // Align layout origin with the physical pixel grid to reduce blurriness
     let scale_factor = ctx.window_state.scale_factor();
+    let layout = ctx.fonts.borrow_mut().layout(job, scale_factor);
+
+    // apply offset to account for anchor position
+    let position = position + layout.anchor_offset(halign);
+    // align layout anchor with the physical pixel grid to reduce blurriness
     let position = (position * scale_factor).round() / scale_factor;
 
-    let layout = ctx.fonts.borrow_mut().layout(job, scale_factor);
     for glyph in &layout.glyphs {
         ctx.recorder.draw_glyph(
             LayoutToLogical::new(position.x, position.y).transform_box(&glyph.rect),

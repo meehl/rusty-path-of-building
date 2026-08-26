@@ -231,21 +231,13 @@ impl Fonts {
         let (mut parley_layout, _) = builder.build();
         parley_layout.break_all_lines(None);
 
-        // extra offset applied to each glyph to get position relative to layout origin
-        let mut glyph_offset = PhysicalVector::zero();
         if let Some(alignment) = job.alignment {
-            let alignment = match alignment {
+            let parley_alignment = match alignment {
                 Alignment::Min => parley::Alignment::Start,
-                Alignment::Center => {
-                    glyph_offset.x += -parley_layout.full_width() * 0.5;
-                    parley::Alignment::Center
-                }
-                Alignment::Max => {
-                    glyph_offset.x += -parley_layout.full_width();
-                    parley::Alignment::End
-                }
+                Alignment::Center => parley::Alignment::Center,
+                Alignment::Max => parley::Alignment::End,
             };
-            parley_layout.align(alignment, parley::AlignmentOptions::default());
+            parley_layout.align(parley_alignment, parley::AlignmentOptions::default());
         }
 
         let mut glyphs = Vec::new();
@@ -254,7 +246,7 @@ impl Fonts {
             for rasterized in self.glyph_rasterizer.rasterize_glyph_run(
                 &mut self.atlas,
                 &run,
-                glyph_offset,
+                PhysicalVector::zero(),
                 scale_factor,
             ) {
                 let Some(glyph) = rasterized else { continue };

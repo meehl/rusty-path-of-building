@@ -1,6 +1,6 @@
 use crate::{
     color::Srgba,
-    dpi::{LogicalPoint, LogicalScreenSpace},
+    dpi::{LogicalPoint, LogicalScreenSpace, LogicalVector},
     math::{Rect, Translation},
     uv::UvRect,
 };
@@ -128,6 +128,14 @@ pub struct Layout {
 impl Layout {
     pub fn width(&self) -> f32 {
         self.width
+    }
+
+    pub fn anchor_offset(&self, anchor: Alignment) -> LogicalVector<f32> {
+        match anchor {
+            Alignment::Min => LogicalVector::zero(),
+            Alignment::Center => LogicalVector::new(-self.width * 0.5, 0.0),
+            Alignment::Max => LogicalVector::new(-self.width, 0.0),
+        }
     }
 
     pub fn cursor_index_at(&self, point: LogicalPoint<f32>) -> usize {
