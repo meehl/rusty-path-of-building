@@ -6,7 +6,7 @@ use winit::window::Window;
 
 use crate::{
     args::Args,
-    dpi::PhysicalPoint,
+    dpi::{PhysicalPoint, ScaleFactor},
     draw_commands::DrawCommandRecorder,
     fonts::Fonts,
     input::{InputState, key_as_str, mousebutton_as_str},
@@ -239,9 +239,11 @@ impl PathOfBuilding {
             }
             StageEvent::ScaleFactorChanged(scale_factor) => {
                 #[allow(clippy::cast_possible_truncation)]
-                self.ctx_mut()
-                    .window_state
-                    .set_scale_factor(scale_factor as f32);
+                let mut ctx = self.ctx_mut();
+                ctx.window_state.set_scale_factor(scale_factor as f32);
+                ctx.fonts
+                    .borrow_mut()
+                    .preload_common_characters(16.0, ScaleFactor::new(scale_factor as f32));
             }
             StageEvent::FocusChanged(focused) => {
                 self.ctx_mut().window_state.is_focused = focused;

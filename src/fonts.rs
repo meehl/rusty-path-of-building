@@ -75,8 +75,6 @@ impl Fonts {
         };
 
         fonts.register_fonts();
-        fonts.preload_common_characters(14.0);
-        fonts.preload_common_characters(16.0);
 
         fonts
     }
@@ -109,7 +107,8 @@ impl Fonts {
         self.atlas.take_delta()
     }
 
-    pub fn preload_common_characters(&mut self, font_size: f32) {
+    /// Warms the glyph cache for common ACSII characters
+    pub fn preload_common_characters(&mut self, font_size: f32, scale_factor: ScaleFactor<f32>) {
         const ASCII_PRINTABLE_START: u8 = 32;
         const ASCII_PRINTABLE_END: u8 = 126;
 
@@ -126,6 +125,7 @@ impl Fonts {
             FontFamily::Single(FontFamilyName::Generic(GenericFamily::Monospace)),
             None,
             parley::FontStyle::Normal,
+            scale_factor,
         );
         self.preload_text(
             &common_chars,
@@ -133,6 +133,7 @@ impl Fonts {
             FontFamily::Single(FontFamilyName::Generic(GenericFamily::SansSerif)),
             None,
             parley::FontStyle::Normal,
+            scale_factor,
         );
         self.preload_text(
             &common_chars,
@@ -140,6 +141,7 @@ impl Fonts {
             FontFamily::Single(FontFamilyName::Generic(GenericFamily::SansSerif)),
             Some(FontWeight::BOLD),
             parley::FontStyle::Normal,
+            scale_factor,
         );
     }
 
@@ -150,6 +152,7 @@ impl Fonts {
         font_family: FontFamily,
         font_weight: Option<FontWeight>,
         font_style: parley::FontStyle,
+        scale_factor: ScaleFactor<f32>,
     ) {
         profiling::scope!("preload_text");
 
@@ -175,7 +178,7 @@ impl Fonts {
                         &mut self.atlas,
                         &run,
                         LayoutVector::new(horizontal_offset, 0.0),
-                        ScaleFactor::identity(),
+                        scale_factor,
                     )
                     .for_each(|_| {});
             }
