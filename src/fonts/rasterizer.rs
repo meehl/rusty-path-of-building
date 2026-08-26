@@ -16,10 +16,12 @@ type SwashFontOffset = u32;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CachedGlyph {
+    /// Size of the trimmed bitmap. Swash crops away transparant rows/columns so this is smaller
+    /// than the glyph's full advance box.
     pub size: PhysicalSize<u32>,
     pub uv: UvRect,
     pub texture_layer_idx: u32,
-    // offset from top/left to baseline
+    /// Offset from the glyph's origin (top-left) to the trimmed bitmap's top-left corner.
     pub baseline_offset: PhysicalVector<i32>,
 }
 
@@ -164,6 +166,7 @@ impl GlyphRasterizer {
                 size: glyph_size,
                 uv: atlas_uv,
                 texture_layer_idx: atlas_layer_idx,
+                // swash uses `Origin::BottomLeft` so we need to negate the vertical component
                 baseline_offset: PhysicalVector::new(image.placement.left, -image.placement.top),
             };
             cached_glyphs.insert(glyph_key, Some(cached_glyph));
