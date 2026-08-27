@@ -51,9 +51,8 @@ fn vs_main(
     return out;
 }
 
-// TODO: substitute array size based on device limits
-@group(1) @binding(0) var textures: binding_array<texture_2d_array<f32>, 32>;
-@group(1) @binding(1) var samplers: binding_array<sampler, 32>;
+@group(1) @binding(0) var textures: binding_array<texture_2d_array<f32>>;
+@group(1) @binding(1) var samplers: binding_array<sampler>;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
