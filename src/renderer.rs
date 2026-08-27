@@ -36,6 +36,29 @@ pub struct Vertex {
     pub layer_idx: u32,
 }
 
+impl Vertex {
+    const ATTRIBS: [wgpu::VertexAttribute; 5] = wgpu::vertex_attr_array![
+        // 0: vec2 position
+        0 => Float32x2,
+        // 1: vec2 uv
+        1 => Float32x2,
+        // 2: uint color
+        2 => Uint32,
+        // 3: uint texture_idx
+        3 => Uint32,
+        // 4: uint layer_idx
+        4 => Uint32
+    ];
+
+    fn desc() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &Self::ATTRIBS,
+        }
+    }
+}
+
 pub struct Batch {
     pub clip_rect: LogicalRect<f32>,
     pub textures: Vec<TextureId>,
@@ -173,18 +196,8 @@ impl Renderer {
             vertex: wgpu::VertexState {
                 entry_point: Some("vs_main"),
                 module: &shader_module,
-                buffers: &[Some(wgpu::VertexBufferLayout {
-                    // 4x f32, 3x u32 -> 7 * 4 bytes
-                    array_stride: 7 * 4,
-                    step_mode: wgpu::VertexStepMode::Vertex,
-                    // 0: vec2 position
-                    // 1: vec2 texture coordinates
-                    // 2: uint color
-                    // 3: uint texture_idx
-                    // 4: uint layer_idx
-                    attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Uint32, 3 => Uint32, 4 => Uint32],
-                })],
-                compilation_options: wgpu::PipelineCompilationOptions::default()
+                buffers: &[Some(Vertex::desc())],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
@@ -209,7 +222,7 @@ impl Renderer {
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
-                compilation_options: wgpu::PipelineCompilationOptions::default()
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
             }),
             multiview_mask: None,
             cache: None,
