@@ -147,7 +147,10 @@ impl PathOfBuilding {
     fn launch(lua: &Lua, script_dir: &Path) -> LuaResult<()> {
         change_working_directory(script_dir)?;
         lua.load(script_dir.join("Launch.lua")).exec()?;
-        call_callback::<(), ()>(lua, "OnInit", ())?;
+        {
+            profiling::scope!("OnInit");
+            call_callback::<(), ()>(lua, "OnInit", ())?;
+        }
         Ok(())
     }
 
