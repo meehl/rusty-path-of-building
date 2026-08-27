@@ -104,8 +104,6 @@ impl App {
                 &stage_output.draw_commands,
                 textures_delta,
                 stage_output.scale_factor,
-                // TODO: find better way to determine this value and how to pass it in
-                32,
             ))
         };
 

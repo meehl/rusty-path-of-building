@@ -4,7 +4,7 @@ use crate::{
     dpi::{LogicalRect, ScaleFactor},
     draw_commands::DrawCommand,
     renderer::{
-        Batch, RenderJob, Vertex,
+        BATCH_TEX_SLOTS, Batch, RenderJob, Vertex,
         textures::{TextureId, TexturesDelta},
     },
 };
@@ -69,9 +69,10 @@ pub fn build_render_job(
     commands: &[DrawCommand],
     textures_delta: TexturesDelta,
     scale_factor: ScaleFactor<f32>,
-    max_slots: u32,
 ) -> RenderJob {
     profiling::scope!("build_render_job");
+
+    let max_slots = BATCH_TEX_SLOTS;
 
     let mut vertices = Vec::with_capacity(commands.len() * 4);
     let mut indices = Vec::with_capacity(commands.len() * 6);

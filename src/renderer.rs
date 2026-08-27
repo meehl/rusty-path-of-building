@@ -21,9 +21,7 @@ pub mod image;
 mod mipmap;
 pub mod textures;
 
-// TODO:
-const MAX_SLOTS: u32 = 32;
-// TODO: use font atlas as dummy texture for now
+pub const BATCH_TEX_SLOTS: u32 = 32;
 const DUMMY_TEXTURE_ID: TextureId = 0;
 
 #[repr(C)]
@@ -141,13 +139,13 @@ impl Renderer {
                             sample_type: wgpu::TextureSampleType::Float { filterable: true },
                             view_dimension: wgpu::TextureViewDimension::D2Array,
                         },
-                        count: Some(NonZeroU32::new(MAX_SLOTS).unwrap()),
+                        count: Some(NonZeroU32::new(BATCH_TEX_SLOTS).unwrap()),
                     },
                     wgpu::BindGroupLayoutEntry {
                         binding: 1,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                        count: Some(NonZeroU32::new(MAX_SLOTS).unwrap()),
+                        count: Some(NonZeroU32::new(BATCH_TEX_SLOTS).unwrap()),
                     },
                 ],
             });
@@ -486,8 +484,8 @@ impl Renderer {
             // so we pad to up MAX_SLOTS with a dummy view/sampler
             let dummy = &self.textures[&DUMMY_TEXTURE_ID];
             let dummy_sampler = self.samplers.get(&dummy.options).unwrap();
-            views.resize(MAX_SLOTS as usize, &dummy.view);
-            samplers.resize(MAX_SLOTS as usize, dummy_sampler);
+            views.resize(BATCH_TEX_SLOTS as usize, &dummy.view);
+            samplers.resize(BATCH_TEX_SLOTS as usize, dummy_sampler);
 
             device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("batch_textures_bind_group"),
