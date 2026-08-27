@@ -21,7 +21,7 @@ pub mod image;
 mod mipmap;
 pub mod textures;
 
-pub const BATCH_TEX_SLOTS: u32 = 32;
+pub const BATCH_TEX_SLOTS: NonZeroU32 = NonZeroU32::new(32).expect("32 is non-zero");
 const DUMMY_TEXTURE_ID: TextureId = 0;
 
 #[repr(C)]
@@ -162,13 +162,13 @@ impl Renderer {
                             sample_type: wgpu::TextureSampleType::Float { filterable: true },
                             view_dimension: wgpu::TextureViewDimension::D2Array,
                         },
-                        count: Some(NonZeroU32::new(BATCH_TEX_SLOTS).unwrap()),
+                        count: Some(BATCH_TEX_SLOTS),
                     },
                     wgpu::BindGroupLayoutEntry {
                         binding: 1,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                        count: Some(NonZeroU32::new(BATCH_TEX_SLOTS).unwrap()),
+                        count: Some(BATCH_TEX_SLOTS),
                     },
                 ],
             });
@@ -497,8 +497,8 @@ impl Renderer {
             // so we pad to up MAX_SLOTS with a dummy view/sampler
             let dummy = &self.textures[&DUMMY_TEXTURE_ID];
             let dummy_sampler = self.samplers.get(&dummy.options).unwrap();
-            views.resize(BATCH_TEX_SLOTS as usize, &dummy.view);
-            samplers.resize(BATCH_TEX_SLOTS as usize, dummy_sampler);
+            views.resize(BATCH_TEX_SLOTS.get() as usize, &dummy.view);
+            samplers.resize(BATCH_TEX_SLOTS.get() as usize, dummy_sampler);
 
             device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("batch_textures_bind_group"),

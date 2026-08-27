@@ -1,3 +1,5 @@
+use std::num::NonZeroU32;
+
 use ahash::HashMap;
 
 use crate::{
@@ -37,12 +39,12 @@ impl BatchBuilder {
     ///
     /// Returns slot_index into textures array if texture can be assigned.
     /// Returns `None` if maximum amount of texture slots is reached.
-    fn try_assign(&mut self, id: TextureId, max_slots: u32) -> Option<u32> {
+    fn try_assign(&mut self, id: TextureId, max_slots: NonZeroU32) -> Option<u32> {
         if let Some(&slot) = self.texture_mapping.get(&id) {
             return Some(slot);
         }
 
-        if self.textures.len() as u32 >= max_slots {
+        if self.textures.len() as u32 >= max_slots.get() {
             return None;
         }
 
