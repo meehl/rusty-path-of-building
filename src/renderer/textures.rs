@@ -1,8 +1,4 @@
-use std::{
-    collections::hash_map::Entry,
-    path::Path,
-    sync::{Arc, RwLock},
-};
+use std::{cell::RefCell, collections::hash_map::Entry, path::Path, rc::Rc, sync::mpsc};
 
 use ahash::HashMap;
 use anyhow::bail;
@@ -16,12 +12,12 @@ use crate::{
 pub type TextureId = u64;
 
 pub struct TextureHandle {
-    tex_mngr: Arc<RwLock<TextureManager>>,
+    tex_mngr: Rc<RefCell<TextureRegistry>>,
     id: TextureId,
 }
 
 impl TextureHandle {
-    pub fn new(tex_mngr: Arc<RwLock<TextureManager>>, id: TextureId) -> Self {
+    fn new(tex_mngr: Rc<RefCell<TextureRegistry>>, id: TextureId) -> Self {
         Self { tex_mngr, id }
     }
 
@@ -31,8 +27,7 @@ impl TextureHandle {
 
     pub fn size(&self) -> [usize; 2] {
         self.tex_mngr
-            .read()
-            .unwrap()
+            .borrow()
             .get_meta_data(self.id)
             .map_or([0, 0], |tex| tex.size)
     }
@@ -40,15 +35,15 @@ impl TextureHandle {
 
 impl Drop for TextureHandle {
     fn drop(&mut self) {
-        self.tex_mngr.write().unwrap().free(self.id);
+        self.tex_mngr.borrow_mut().free(self.id);
     }
 }
 
 impl Clone for TextureHandle {
     fn clone(&self) -> Self {
-        self.tex_mngr.write().unwrap().retain(self.id);
+        self.tex_mngr.borrow_mut().retain(self.id);
         Self {
-            tex_mngr: Arc::clone(&self.tex_mngr),
+            tex_mngr: Rc::clone(&self.tex_mngr),
             id: self.id,
         }
     }
@@ -77,24 +72,27 @@ pub struct TextureMetaData {
 }
 
 #[derive(Default)]
-pub struct TextureManager {
+struct TextureRegistry {
     next_id: u64,
     meta_data: HashMap<TextureId, TextureMetaData>,
     delta: TexturesDelta,
 }
 
-impl TextureManager {
+impl TextureRegistry {
     /// Allocates a new Texture.
     pub fn alloc(&mut self, name: String, image: ImageData, options: TextureOptions) -> TextureId {
         let id = self.next_id;
         self.next_id += 1;
 
-        self.meta_data.entry(id).or_insert_with(|| TextureMetaData {
-            name,
-            size: [image.width as usize, image.height as usize],
-            retain_count: 1,
-            options,
-        });
+        self.meta_data.insert(
+            id,
+            TextureMetaData {
+                name,
+                size: [image.width as usize, image.height as usize],
+                retain_count: 1,
+                options,
+            },
+        );
 
         self.delta
             .update
@@ -108,12 +106,15 @@ impl TextureManager {
         let id = self.next_id;
         self.next_id += 1;
 
-        self.meta_data.entry(id).or_insert_with(|| TextureMetaData {
-            name,
-            size: [0, 0],
-            retain_count: 1,
-            options,
-        });
+        self.meta_data.insert(
+            id,
+            TextureMetaData {
+                name,
+                size: [0, 0],
+                retain_count: 1,
+                options,
+            },
+        );
 
         id
     }
@@ -126,7 +127,9 @@ impl TextureManager {
             self.delta.update.retain(|(x, _)| x != &id);
             self.delta.update.push((id, delta));
         } else {
-            debug_assert!(false, "Tried setting texture {id:?} which is not allocated");
+            // the handle may have been dropped while the async load was in flight.
+            // just discard the result.
+            log::debug!("Discarding load result for freed texture {id:?}");
         }
     }
 
@@ -134,7 +137,11 @@ impl TextureManager {
     pub fn free(&mut self, id: TextureId) {
         if let Entry::Occupied(mut entry) = self.meta_data.entry(id) {
             let meta = entry.get_mut();
-            meta.retain_count -= 1;
+            debug_assert!(
+                meta.retain_count > 0,
+                "Tried freeing texture {id:?} with retain_count == 0"
+            );
+            meta.retain_count = meta.retain_count.saturating_sub(1);
             if meta.retain_count == 0 {
                 entry.remove();
                 self.delta.free.push(id);
@@ -169,39 +176,52 @@ impl TextureManager {
     }
 }
 
-pub struct WrappedTextureManager {
-    manager: Arc<RwLock<TextureManager>>,
-    worker_pool: WorkerPool,
+enum LoadResult {
+    Loaded {
+        id: TextureId,
+        image: ImageData,
+        options: TextureOptions,
+    },
 }
 
-impl WrappedTextureManager {
+pub struct TextureManager {
+    manager: Rc<RefCell<TextureRegistry>>,
+    worker_pool: WorkerPool,
+    // channel for handling async image loads
+    results_tx: mpsc::Sender<LoadResult>,
+    results_rx: mpsc::Receiver<LoadResult>,
+}
+
+impl TextureManager {
     pub fn new() -> Self {
-        let manager = Arc::new(RwLock::new(TextureManager::default()));
+        let mut manager = TextureRegistry::default();
 
         // allocate default texture (id: 0) for font atlas
-        manager.write().unwrap().alloc(
+        manager.alloc(
             "font_atlas_texture".into(),
             ImageData::from_solid_color([0, 0], Srgba::TRANSPARENT),
             TextureOptions::default(),
         );
 
+        let (tx, rx) = mpsc::channel();
+
         Self {
-            manager,
+            manager: Rc::new(RefCell::new(manager)),
             worker_pool: WorkerPool::new(4),
+            results_tx: tx,
+            results_rx: rx,
         }
     }
 
     #[inline]
     pub fn update_font_texture(&self, delta: ImageDelta) {
-        self.manager
-            .write()
-            .unwrap()
-            .set(TextureId::default(), delta);
+        self.manager.borrow_mut().set(TextureId::default(), delta);
     }
 
     #[inline]
     pub fn take_delta(&self) -> TexturesDelta {
-        self.manager.write().unwrap().take_delta()
+        self.apply_pending_loads();
+        self.manager.borrow_mut().take_delta()
     }
 
     pub fn load_texture(
@@ -210,42 +230,36 @@ impl WrappedTextureManager {
         options: TextureOptions,
         is_async: bool,
     ) -> anyhow::Result<TextureHandle> {
-        let manager = Arc::clone(&self.manager);
+        profiling::scope!("load_texture");
 
-        let handle = if is_async {
-            let id = manager
-                .write()
-                .unwrap()
+        if is_async {
+            let id = self
+                .manager
+                .borrow_mut()
                 .reserve(image_path.clone(), options);
 
-            // load image in background worker
-            let mngr_clone = Arc::clone(&manager);
+            let tx = self.results_tx.clone();
             self.worker_pool
                 .execute(move || match load_image_file(Path::new(&image_path)) {
                     Ok(image) => {
-                        mngr_clone
-                            .write()
-                            .unwrap()
-                            .set(id, ImageDelta::new(image, options));
+                        let _ = tx.send(LoadResult::Loaded { id, image, options });
                     }
-                    Err(e) => log::warn!("Unable to load image fron {image_path}: {e}"),
+                    Err(e) => log::warn!("Unable to load image from {image_path}: {e}"),
                 });
 
-            TextureHandle::new(manager, id)
+            Ok(TextureHandle::new(Rc::clone(&self.manager), id))
         } else {
             match load_image_file(Path::new(&image_path)) {
                 Ok(image) => {
-                    let id = manager.write().unwrap().alloc(image_path, image, options);
-                    TextureHandle::new(manager, id)
+                    let id = self.manager.borrow_mut().alloc(image_path, image, options);
+                    Ok(TextureHandle::new(Rc::clone(&self.manager), id))
                 }
                 Err(e) => {
-                    log::warn!("Unable to load image fron {image_path}: {e}");
+                    log::warn!("Unable to load image from {image_path}: {e}");
                     bail!(e);
                 }
             }
-        };
-
-        Ok(handle)
+        }
     }
 
     pub fn update_texture(
@@ -256,14 +270,15 @@ impl WrappedTextureManager {
         is_async: bool,
     ) -> anyhow::Result<()> {
         if is_async {
-            let mngr_clone = Arc::clone(&self.manager);
+            let tx = self.results_tx.clone();
             self.worker_pool
                 .execute(move || match load_image_file(Path::new(&image_path)) {
                     Ok(image) => {
-                        mngr_clone
-                            .write()
-                            .unwrap()
-                            .set(texture_id, ImageDelta::new(image, options));
+                        let _ = tx.send(LoadResult::Loaded {
+                            id: texture_id,
+                            image,
+                            options,
+                        });
                     }
                     Err(e) => log::warn!("Unable to load image fron {image_path}: {e}"),
                 });
@@ -271,8 +286,7 @@ impl WrappedTextureManager {
             match load_image_file(Path::new(&image_path)) {
                 Ok(image) => {
                     self.manager
-                        .write()
-                        .unwrap()
+                        .borrow_mut()
                         .set(texture_id, ImageDelta::new(image, options));
                 }
                 Err(e) => {
@@ -283,6 +297,14 @@ impl WrappedTextureManager {
         }
 
         Ok(())
+    }
+
+    /// Drains completed async image loads and assigns them to textures
+    fn apply_pending_loads(&self) {
+        let mut manager = self.manager.borrow_mut();
+        while let Ok(LoadResult::Loaded { id, image, options }) = self.results_rx.try_recv() {
+            manager.set(id, ImageDelta::new(image, options));
+        }
     }
 }
 

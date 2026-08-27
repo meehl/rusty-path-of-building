@@ -6,7 +6,7 @@ use crate::{
     gfx::GraphicsContext,
     installer::Installer,
     pob::PathOfBuilding,
-    renderer::{RenderJob, textures::WrappedTextureManager},
+    renderer::{RenderJob, textures::TextureManager},
     stage::{ActiveStage, StageEvent, StageTransition},
 };
 use anyhow::Result;
@@ -25,7 +25,7 @@ struct FrameOutput {
 pub struct App {
     gfx_context: Option<GraphicsContext>,
     fonts: Rc<RefCell<Fonts>>,
-    texture_manager: Rc<RefCell<WrappedTextureManager>>,
+    texture_manager: Rc<RefCell<TextureManager>>,
     stage: ActiveStage,
     game: Game,
     script_dir: PathBuf,
@@ -38,7 +38,7 @@ impl App {
         let script_dir = custom_script_dir.unwrap_or_else(|| game.script_dir());
 
         let fonts = Rc::new(RefCell::new(Fonts::new(pob_font_definitions())));
-        let texture_manager = Rc::new(RefCell::new(WrappedTextureManager::new()));
+        let texture_manager = Rc::new(RefCell::new(TextureManager::new()));
 
         let stage = if uses_custom_script_dir {
             // skip installer if custom script dir is provided. used for local testing.

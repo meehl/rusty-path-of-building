@@ -14,7 +14,7 @@ use crate::{
         api::call_callback,
         subscript::{NativeMultiValue, SubscriptManager, SubscriptResult},
     },
-    renderer::textures::WrappedTextureManager,
+    renderer::textures::TextureManager,
     stage::{StageEvent, StageFrameOutput, StageTransition},
     util::change_working_directory,
     window::WindowState,
@@ -38,7 +38,7 @@ pub struct Context {
     /// Collects draw commands issued by API functions
     pub recorder: DrawCommandRecorder,
     pub fonts: Rc<RefCell<Fonts>>,
-    pub texture_manager: Rc<RefCell<WrappedTextureManager>>,
+    pub texture_manager: Rc<RefCell<TextureManager>>,
     pub subscript_manager: RefCell<SubscriptManager>,
     /// Directory containing the PoB Lua scripts
     pub script_dir: PathBuf,
@@ -54,7 +54,7 @@ impl Context {
     pub fn new(
         script_dir: &Path,
         fonts: Rc<RefCell<Fonts>>,
-        texture_manager: Rc<RefCell<WrappedTextureManager>>,
+        texture_manager: Rc<RefCell<TextureManager>>,
     ) -> Self {
         Self {
             input_state: InputState::default(),
@@ -97,7 +97,7 @@ impl PathOfBuilding {
     pub fn new(
         script_dir: &Path,
         fonts: Rc<RefCell<Fonts>>,
-        texture_manager: Rc<RefCell<WrappedTextureManager>>,
+        texture_manager: Rc<RefCell<TextureManager>>,
     ) -> anyhow::Result<Self> {
         let ctx = Context::new(script_dir, fonts, texture_manager);
         let lua = Self::create_lua(ctx)?;
