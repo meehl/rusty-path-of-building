@@ -255,45 +255,49 @@ pub enum NativeValue {
     Number(Number),
     Integer(Integer),
     Boolean(bool),
-    // Lua strings may not be valid UTF-8, so store Vec<u8> instead
+    // Lua strings may not be valid UTF-8, so use Vec<u8> instead of String
     String(Vec<u8>),
+}
+
+impl TryFrom<Value> for NativeValue {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Nil => Ok(Self::Nil),
+            Value::Boolean(b) => Ok(Self::Boolean(b)),
+            Value::Integer(i) => Ok(Self::Integer(i)),
+            Value::Number(n) => Ok(Self::Number(n)),
+            Value::String(s) => Ok(Self::String(s.as_bytes().to_vec())),
+            other => Err(anyhow!("Unsupported value type: {}", other.type_name())),
+        }
+    }
 }
 
 impl TryFrom<MultiValue> for NativeMultiValue {
     type Error = anyhow::Error;
 
     fn try_from(values: MultiValue) -> Result<Self, Self::Error> {
-        let native = values
-            .iter()
-            .map(|v| match v.type_name() {
-                "nil" => Ok(NativeValue::Nil),
-                "boolean" => Ok(NativeValue::Boolean(v.as_boolean().unwrap())),
-                "number" => Ok(NativeValue::Number(v.as_number().unwrap())),
-                "integer" => Ok(NativeValue::Integer(v.as_integer().unwrap())),
-                "string" => Ok(NativeValue::String(
-                    v.as_string().unwrap().as_bytes().to_vec(),
-                )),
-                _ => Err(anyhow!("Unsupported value type")),
-            })
-            .collect::<Result<VecDeque<_>, _>>()?;
-
-        Ok(Self(native))
+        values
+            .into_iter()
+            .map(NativeValue::try_from)
+            .collect::<Result<_, _>>()
+            .map(Self)
     }
 }
 
 impl IntoLuaMulti for NativeMultiValue {
     fn into_lua_multi(self, lua: &Lua) -> mlua::Result<MultiValue> {
-        let values = self
-            .0
-            .iter()
+        self.0
+            .into_iter()
             .map(|v| match v {
                 NativeValue::Nil => Ok(Value::Nil),
-                NativeValue::Boolean(b) => Ok(Value::Boolean(*b)),
-                NativeValue::Number(n) => Ok(Value::Number(*n)),
-                NativeValue::Integer(n) => Ok(Value::Integer(*n)),
+                NativeValue::Boolean(b) => Ok(Value::Boolean(b)),
+                NativeValue::Integer(i) => Ok(Value::Integer(i)),
+                NativeValue::Number(n) => Ok(Value::Number(n)),
                 NativeValue::String(s) => lua.create_string(s).map(Value::String),
             })
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(MultiValue::from_vec(values))
+            .collect::<mlua::Result<Vec<_>>>()
+            .map(MultiValue::from_vec)
     }
 }
