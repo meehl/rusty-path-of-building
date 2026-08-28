@@ -4,7 +4,7 @@ use mlua::{Function, Integer, IntoLuaMulti, Lua, MultiValue, Number, Value};
 use std::{
     collections::VecDeque,
     path::PathBuf,
-    sync::mpsc::{Receiver, Sender, TryRecvError, channel},
+    sync::mpsc::{Receiver, Sender, channel},
     thread::JoinHandle,
 };
 
@@ -176,46 +176,37 @@ impl Subscript {
     }
 
     fn handle_calls(&self, lua: &Lua) {
-        match self.receiver.try_recv() {
-            Ok(SubscriptCall::Blocking {
+        let call = match self.receiver.try_recv() {
+            Ok(call) => call,
+            // no pending call, or thread disconnected which is handled on join
+            Err(_) => return,
+        };
+
+        // the function that needs to be called in the main Lua instance
+        let func: Result<Function, _> = get_callback(lua, "OnSubCall");
+
+        match call {
+            SubscriptCall::Blocking {
                 function_name,
                 arguments,
                 return_values_sender,
-            }) => {
-                let func: Result<Function, _> = get_callback(lua, "OnSubCall");
-                match func {
-                    Ok(func) => {
-                        match func.call::<MultiValue>((function_name, arguments)) {
-                            Ok(return_values) => {
-                                // send return values back to thread
-                                let _ = return_values_sender.send(return_values.try_into());
-                            }
-                            // function returned error, forward it to thread
-                            Err(err) => {
-                                let _ = return_values_sender.send(Err(err.into()));
-                            }
-                        }
-                    }
-                    // function not found
-                    Err(err) => {
-                        let _ = return_values_sender.send(Err(err.into()));
-                    }
-                }
+            } => {
+                let result = func
+                    .map_err(anyhow::Error::from)
+                    .and_then(|f| Ok(f.call::<MultiValue>((function_name, arguments))?))
+                    .and_then(NativeMultiValue::try_from);
+                // send return values back to thread
+                let _ = return_values_sender.send(result);
             }
-            Ok(SubscriptCall::NonBlocking {
+            SubscriptCall::NonBlocking {
                 function_name,
                 arguments,
-            }) => {
-                let func: Result<Function, _> = get_callback(lua, "OnSubCall");
+            } => {
                 if let Ok(func) = func {
                     // we can ignore return values for non-blocking calls
                     let _ = func.call::<()>((function_name, arguments));
                 }
             }
-            // ignore disconnects. potential errors are handled during thread join
-            Err(TryRecvError::Disconnected) => {}
-            // no outstanding calls from thread
-            Err(TryRecvError::Empty) => {}
         }
     }
 
