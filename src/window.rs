@@ -22,7 +22,7 @@ impl Default for WindowState {
     fn default() -> Self {
         Self {
             window: None,
-            size: Default::default(),
+            size: PhysicalSize::default(),
             scale_factor: ScaleFactor::identity(),
             scale_factor_override: None,
             pending_window_title: std::cell::Cell::new(None),
@@ -69,7 +69,7 @@ impl WindowState {
     }
 
     pub fn scale_factor_override(&self) -> Option<f32> {
-        self.scale_factor_override.map(|s| s.get())
+        self.scale_factor_override.map(ScaleFactor::get)
     }
 
     pub fn set_scale_factor_override(&mut self, scale_factor: Option<f32>) {
