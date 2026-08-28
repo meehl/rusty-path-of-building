@@ -327,12 +327,12 @@ unsafe extern "C-unwind" fn draw_string(state: *mut ffi::lua_State) -> c_int {
     let halign = match alignment {
         PoBTextAlignment::Left => Alignment::Min,
         PoBTextAlignment::Center => {
-            position.x += screen_size.width as f32 / 2.0;
+            position.x += screen_size.width / 2.0;
             is_absolute_position = true;
             Alignment::Center
         }
         PoBTextAlignment::Right => {
-            position.x = screen_size.width as f32 - position.x;
+            position.x = screen_size.width - position.x;
             is_absolute_position = true;
             Alignment::Max
         }

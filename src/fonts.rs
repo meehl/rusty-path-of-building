@@ -176,7 +176,7 @@ impl Fonts {
                 self.glyph_rasterizer
                     .rasterize_glyph_run(
                         &mut self.atlas,
-                        &run,
+                        run,
                         PhysicalVector::new(horizontal_offset, 0.0),
                         scale_factor,
                     )
@@ -245,7 +245,7 @@ impl Fonts {
         for_each_glyph_run(&parley_layout, |run| {
             for rasterized in self.glyph_rasterizer.rasterize_glyph_run(
                 &mut self.atlas,
-                &run,
+                run,
                 PhysicalVector::zero(),
                 scale_factor,
             ) {
