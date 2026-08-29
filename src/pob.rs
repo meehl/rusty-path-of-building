@@ -10,10 +10,7 @@ use crate::{
     draw_commands::DrawCommandRecorder,
     fonts::Fonts,
     input::{InputState, key_as_str, mousebutton_as_str},
-    pob::{
-        api::call_callback,
-        subscript::{NativeMultiValue, SubscriptManager, SubscriptResult},
-    },
+    pob::subscript::{SubscriptManager, SubscriptResult},
     renderer::textures::TextureManager,
     stage::{StageEvent, StageFrameOutput, StageTransition},
     util::change_working_directory,
@@ -149,7 +146,7 @@ impl PathOfBuilding {
         lua.load(script_dir.join("Launch.lua")).exec()?;
         {
             profiling::scope!("OnInit");
-            call_callback::<(), ()>(lua, "OnInit", ())?;
+            api::on_init(lua)?;
         }
         Ok(())
     }
@@ -175,18 +172,14 @@ impl PathOfBuilding {
                 self.ctx_mut().input_state.set_key_pressed(&key, true);
 
                 if let Some(key) = key_as_str(key) {
-                    call_callback::<(&str, bool), ()>(
-                        &self.lua,
-                        "OnKeyDown",
-                        (key.as_str(), false),
-                    )?;
+                    api::on_key_down(&self.lua, key.as_str(), false)?;
                 }
             }
             StageEvent::KeyUp { key } => {
                 self.ctx_mut().input_state.set_key_pressed(&key, false);
 
                 if let Some(key) = key_as_str(key) {
-                    call_callback::<&str, ()>(&self.lua, "OnKeyUp", key.as_str())?;
+                    api::on_key_up(&self.lua, key.as_str())?;
                 }
             }
             StageEvent::ModifiersChanged { state } => {
@@ -194,46 +187,34 @@ impl PathOfBuilding {
             }
             StageEvent::CharacterInput { ch } => {
                 let ch = if ch.is_ascii() { ch } else { '?' };
-                call_callback::<char, ()>(&self.lua, "OnChar", ch)?;
+                api::on_char(&self.lua, ch)?;
             }
             StageEvent::MouseDown { button } => {
                 let is_double_click = self.ctx_mut().input_state.set_mouse_pressed(button, true);
 
                 if let Some(button) = mousebutton_as_str(button) {
-                    call_callback::<(&str, bool), ()>(
-                        &self.lua,
-                        // PoB treats mouse buttons as keys
-                        "OnKeyDown",
-                        (button.as_str(), is_double_click),
-                    )?;
+                    // PoB treats mouse buttons as keys
+                    api::on_key_down(&self.lua, button.as_str(), is_double_click)?;
                 }
             }
             StageEvent::MouseUp { button } => {
                 self.ctx_mut().input_state.set_mouse_pressed(button, false);
 
                 if let Some(button) = mousebutton_as_str(button) {
-                    call_callback::<&str, ()>(
-                        &self.lua,
-                        // PoB treats mouse buttons as keys
-                        "OnKeyUp",
-                        button.as_str(),
-                    )?;
+                    // PoB treats mouse buttons as keys
+                    api::on_key_up(&self.lua, button.as_str())?;
                 }
             }
             StageEvent::MouseWheel { delta } => {
                 if delta > 0.0 {
-                    call_callback::<(&str, bool), ()>(&self.lua, "OnKeyDown", ("WHEELUP", false))?;
-                    call_callback::<&str, ()>(&self.lua, "OnKeyUp", "WHEELUP")?;
+                    api::on_key_down(&self.lua, "WHEELUP", false)?;
+                    api::on_key_up(&self.lua, "WHEELUP")?;
                 } else if delta < 0.0 {
-                    call_callback::<(&str, bool), ()>(
-                        &self.lua,
-                        "OnKeyDown",
-                        ("WHEELDOWN", false),
-                    )?;
-                    call_callback::<&str, ()>(&self.lua, "OnKeyUp", "WHEELDOWN")?;
+                    api::on_key_down(&self.lua, "WHEELDOWN", false)?;
+                    api::on_key_up(&self.lua, "WHEELDOWN")?;
                 }
             }
-            StageEvent::Exit => call_callback(&self.lua, "OnExit", ())?,
+            StageEvent::Exit => api::on_exit(&self.lua)?,
             StageEvent::MouseMoved { pos } => {
                 self.ctx_mut().set_mouse_pos(pos);
             }
@@ -297,7 +278,7 @@ impl PathOfBuilding {
 
         {
             profiling::scope!("lua_OnFrame");
-            call_callback::<(), ()>(&self.lua, "OnFrame", ())?;
+            api::on_frame(&self.lua)?;
         }
 
         let ctx = self.lua.app_data_ref::<Context>().unwrap();
@@ -334,14 +315,10 @@ impl PathOfBuilding {
         for event in subscript_events {
             match event {
                 SubscriptResult::SubscriptFinished { id, return_values } => {
-                    call_callback::<(u64, NativeMultiValue), ()>(
-                        &self.lua,
-                        "OnSubFinished",
-                        (id, return_values),
-                    )?;
+                    api::on_sub_finished(&self.lua, id, return_values)?;
                 }
                 SubscriptResult::SubscriptError { id, error } => {
-                    call_callback::<(u64, String), ()>(&self.lua, "OnSubError", (id, error))?;
+                    api::on_sub_error(&self.lua, id, error)?;
                 }
             }
         }
@@ -373,7 +350,7 @@ impl PathOfBuilding {
 
     /// Calls PoB's `CanExit` handler. Used for unsaved changes prompt.
     pub fn can_exit(&self) -> bool {
-        call_callback::<(), bool>(&self.lua, "CanExit", ()).unwrap_or(false)
+        api::can_exit(&self.lua).unwrap_or(false)
     }
 
     /// Attaches the render-target window to the context

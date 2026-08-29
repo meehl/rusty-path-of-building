@@ -10,6 +10,14 @@ pub fn get_cursor_pos(l: &Lua, _: ()) -> LuaResult<(u32, u32)> {
     Ok((pos.x as u32, pos.y as u32))
 }
 
+pub fn set_cursor_pos(_l: &Lua, _: ()) -> LuaResult<()> {
+    unimplemented!()
+}
+
+pub fn show_cursor(_l: &Lua, _: ()) -> LuaResult<()> {
+    unimplemented!()
+}
+
 pub fn is_key_down(l: &Lua, key_name: String) -> LuaResult<bool> {
     let ctx = l.app_data_ref::<Context>().unwrap();
 

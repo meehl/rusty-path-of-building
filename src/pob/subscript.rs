@@ -1,6 +1,6 @@
-use crate::{pob::PathOfBuilding, pob::api::get_callback};
+use crate::{pob::PathOfBuilding, pob::api};
 use anyhow::{Result, anyhow};
-use mlua::{Function, Integer, IntoLuaMulti, Lua, MultiValue, Number, Value};
+use mlua::{Integer, IntoLuaMulti, Lua, MultiValue, Number, Value};
 use std::{
     path::PathBuf,
     sync::mpsc::{Receiver, Sender, channel},
@@ -200,18 +200,14 @@ impl Subscript {
             Err(_) => return,
         };
 
-        // the function that needs to be called in the main Lua instance
-        let func: Result<Function, _> = get_callback(lua, "OnSubCall");
-
         match call {
             SubscriptCall::Blocking {
                 function_name,
                 arguments,
                 reply_tx: return_values_sender,
             } => {
-                let result = func
+                let result = api::on_sub_call(lua, function_name, arguments)
                     .map_err(anyhow::Error::from)
-                    .and_then(|f| Ok(f.call::<MultiValue>((function_name, arguments))?))
                     .and_then(NativeMultiValue::try_from);
                 // if the subscript's thread has already gone away, there's nowhere to send the
                 // result, so ignore the error
@@ -221,10 +217,8 @@ impl Subscript {
                 function_name,
                 arguments,
             } => {
-                if let Ok(func) = func {
-                    // return values of non-blocking calls are discarded
-                    let _ = func.call::<()>((function_name, arguments));
-                }
+                // return values and errors of non-blocking calls are discarded
+                let _ = api::on_sub_call(lua, function_name, arguments);
             }
         }
     }
