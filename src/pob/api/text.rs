@@ -235,23 +235,27 @@ fn build_layout_job<'a>(
         font_style,
     );
 
-    for (color, segment) in PoBString(text) {
-        job.append(segment, color.unwrap_or(current_color));
+    for ColoredSegment {
+        color,
+        text,
+        original_start: _,
+    } in PoBString(text)
+    {
+        job.append(text, color.unwrap_or(current_color));
     }
 
     job
 }
 
-// PoB strings can contain escape codes that affect the color of subsequent text
+/// A string constructed by Lua which may contain color escapes.
 pub struct PoBString<'a>(pub &'a str);
 
 impl<'a> PoBString<'a> {
+    /// Returns a copy of the string with all color escapes removed.
     pub fn strip_escapes(&self) -> String {
         ESCAPE_STR_REGEX.replace_all(self.0, "").to_string()
     }
 }
-
-type ColoredSegment<'a> = (Option<Srgba>, &'a str);
 
 impl<'a> IntoIterator for PoBString<'a> {
     type Item = ColoredSegment<'a>;
@@ -262,22 +266,34 @@ impl<'a> IntoIterator for PoBString<'a> {
     }
 }
 
-// Iterates over colored segments
+/// A segment of text that shares the same color.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ColoredSegment<'a> {
+    pub color: Option<Srgba>,
+    pub text: &'a str,
+    /// The byte offset of `text` within the **original**, unstripped string.
+    pub original_start: usize,
+}
+
+/// Iterates over the [`ColoredSegment`]s of a [`PoBString`].
 pub struct PoBStringSegmentIterator<'a> {
     haystack: &'a str,
-    captures: std::iter::Peekable<regex::CaptureMatches<'static, 'a>>,
-    is_first: bool,
-    is_done: bool,
+    captures: regex::CaptureMatches<'static, 'a>,
+    /// Byte offset in `haystack` where the next segment's text begins.
+    cursor: usize,
+    /// Color of the next segment.
+    color: Option<Srgba>,
+    done: bool,
 }
 
 impl<'a> PoBStringSegmentIterator<'a> {
     fn new(haystack: &'a str) -> Self {
-        let captures = ESCAPE_STR_REGEX.captures_iter(haystack).peekable();
         Self {
             haystack,
-            captures,
-            is_first: true,
-            is_done: false,
+            captures: ESCAPE_STR_REGEX.captures_iter(haystack),
+            cursor: 0,
+            color: None,
+            done: false,
         }
     }
 }
@@ -286,41 +302,39 @@ impl<'a> Iterator for PoBStringSegmentIterator<'a> {
     type Item = ColoredSegment<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let is_first = core::mem::replace(&mut self.is_first, false);
+        if self.done {
+            return None;
+        }
 
-        match self.captures.peek() {
-            Some(capture) => {
-                let code_start = capture.get(0).unwrap().start();
-                let code_end = capture.get(0).unwrap().end();
+        loop {
+            match self.captures.next() {
+                Some(captures) => {
+                    let m = &captures.get(0).expect("group 0 always matches");
+                    let start = self.cursor;
+                    let text = &self.haystack[start..m.start()];
+                    let color = self.color;
 
-                // string didn't start with an escape code.
-                // return text up to first code without color.
-                if is_first && code_start > 0 {
-                    return Some((None, &self.haystack[..code_start]));
+                    self.cursor = m.end();
+                    self.color = Some(Srgba::from_escape_code(m.as_str()));
+
+                    // check for case where string starts with escape code
+                    if text.is_empty() && color.is_none() {
+                        continue;
+                    }
+
+                    return Some(ColoredSegment {
+                        color,
+                        text,
+                        original_start: start,
+                    });
                 }
-
-                let escape_str = capture.get(0).unwrap().as_str();
-                let color = Some(Srgba::from_escape_code(escape_str));
-
-                let _ = self.captures.next(); // pop current code to peek the next one
-                if let Some(next_code) = self.captures.peek() {
-                    // found another escape code. return text up the next code
-                    let next_code_start = next_code.get(0).unwrap().start();
-                    Some((color, &self.haystack[code_end..next_code_start]))
-                } else {
-                    // no additional escape codes found. return rest of string
-                    self.is_done = true;
-                    Some((color, &self.haystack[code_end..]))
-                }
-            }
-            None => {
-                if self.is_done {
-                    None
-                } else {
-                    // string doesn't contain any escape codes.
-                    // return entire string without color
-                    self.is_done = true;
-                    Some((None, self.haystack))
+                None => {
+                    self.done = true;
+                    return Some(ColoredSegment {
+                        color: self.color,
+                        text: &self.haystack[self.cursor..],
+                        original_start: self.cursor,
+                    });
                 }
             }
         }
@@ -356,7 +370,9 @@ impl std::str::FromStr for PoBTextAlignment {
             "RIGHT" => Ok(Self::Right),
             "CENTER_X" => Ok(Self::CenterX),
             "RIGHT_X" => Ok(Self::RightX),
-            _ => Err(anyhow::anyhow!("'{s}' is not a valid TextFontType variant")),
+            _ => Err(anyhow::anyhow!(
+                "'{s}' is not a valid PoBTextAlignment variant"
+            )),
         }
     }
 }
@@ -384,7 +400,83 @@ impl std::str::FromStr for PoBFontType {
             "FONTIN SC ITALIC" => Ok(Self::FontinSmallcapsItalic),
             "FONTIN" => Ok(Self::Fontin),
             "FONTIN ITALIC" => Ok(Self::FontinItalic),
-            _ => Err(anyhow::anyhow!("'{s}' is not a valid TextFontType variant")),
+            _ => Err(anyhow::anyhow!("'{s}' is not a valid PoBFontType variant")),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // helper for collecting segments
+    fn segs(text: &str) -> Vec<(Option<Srgba>, &str, usize)> {
+        PoBString(text)
+            .into_iter()
+            .map(|s| (s.color, s.text, s.original_start))
+            .collect()
+    }
+
+    #[test]
+    fn single_segment() {
+        assert_eq!(segs("Hello, world!"), vec![(None, "Hello, world!", 0)]);
+    }
+
+    #[test]
+    fn empty_string() {
+        assert_eq!(segs(""), vec![(None, "", 0)]);
+    }
+
+    #[test]
+    fn escape_at_start() {
+        assert_eq!(
+            segs("^3Hello, world!"),
+            vec![(Some(Srgba::from_rgb(0, 0, 255)), "Hello, world!", 2)]
+        );
+    }
+
+    #[test]
+    fn no_escape_at_start() {
+        assert_eq!(
+            segs("Hello, ^1world!"),
+            vec![
+                (None, "Hello, ", 0),
+                (Some(Srgba::from_rgb(255, 0, 0)), "world!", 9)
+            ]
+        );
+    }
+
+    #[test]
+    fn adjacent_escapes() {
+        assert_eq!(
+            segs("Hello, ^1^2world!"),
+            vec![
+                (None, "Hello, ", 0),
+                (Some(Srgba::from_rgb(255, 0, 0)), "", 9),
+                (Some(Srgba::from_rgb(0, 255, 0)), "world!", 11)
+            ]
+        );
+    }
+
+    #[test]
+    fn trailing_escape() {
+        assert_eq!(
+            segs("Hello, world!^3"),
+            vec![
+                (None, "Hello, world!", 0),
+                (Some(Srgba::from_rgb(0, 0, 255)), "", 15),
+            ]
+        );
+    }
+
+    #[test]
+    fn hex_escape() {
+        assert_eq!(
+            segs("^xFF0000Hello, ^X00ff00world!"),
+            vec![
+                (Some(Srgba::from_rgb(255, 0, 0)), "Hello, ", 8),
+                (Some(Srgba::from_rgb(0, 255, 0)), "world!", 23),
+            ]
+        );
     }
 }
