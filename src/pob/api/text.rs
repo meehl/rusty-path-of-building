@@ -153,38 +153,27 @@ pub fn get_index_at_cur(
 
     let font_type = font_type.parse::<PoBFontType>()?;
 
-    let job = build_layout_job(&text, Srgba::WHITE, font_type, line_height, None);
+    let (job, offset_map) =
+        build_layout_job_with_offsets(&text, Srgba::WHITE, font_type, line_height, None);
     let layout = ctx
         .fonts
         .borrow_mut()
         .layout(job, ctx.window_state.scale_factor());
-    let index_stripped = layout.cursor_index_at(Point::new(cur_x, cur_y));
 
-    // build_layout_job() strips all color escape strings from the original string. The
-    // resulting [`LayoutJob`] is then passed to get_text_index_at_cursor() which returns an
-    // index into the **stripped* string.
-    // But PoB expects an index into the **original, unstripped** text. Therefore we need to add
-    // the length of all color escapes up until the cursor position to return the right value.
-    //
-    // TODO: avoid matching and iterating over string twice
-    let mut color_escapes_total_length = 0;
-    for capture in ESCAPE_STR_REGEX.find_iter(&text) {
-        if capture.start() - color_escapes_total_length > index_stripped {
-            break;
-        }
-        color_escapes_total_length += capture.len();
-    }
+    // `cursor_index_at` returns an offset into the **stripped** text, but PoB expects on offset
+    // into the original, **unstripped** text. A `StrippedToOriginalOffsetMap` is used to do the
+    // conversion.
+    let stripped_index = layout.cursor_index_at(Point::new(cur_x, cur_y));
+    let original_index = offset_map.to_original(stripped_index);
 
-    // add length of color escapes and convert to lua's 1-based indexing
-    Ok(index_stripped + color_escapes_total_length + 1)
+    // convert to lua's 1-based indexing
+    Ok(original_index + 1)
 }
 
 pub static ESCAPE_STR_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\^(?<idx>[0-9])|\^[xX](?<hex>[0-9A-Fa-f]{6})").unwrap());
 
-fn build_layout_job<'a>(
-    text: &'a str,
-    current_color: Srgba,
+fn new_layout_job<'a>(
     font_type: PoBFontType,
     line_height: i32,
     alignment: Option<Alignment>,
@@ -226,14 +215,24 @@ fn build_layout_job<'a>(
     // 'Calcs' tab
     let font_size = (line_height - 2).max(1) as f32;
 
-    let mut job = LayoutJob::new(
+    LayoutJob::new(
         font_family,
         font_size,
         line_height as f32,
         alignment,
         font_weight,
         font_style,
-    );
+    )
+}
+
+fn build_layout_job<'a>(
+    text: &'a str,
+    current_color: Srgba,
+    font_type: PoBFontType,
+    line_height: i32,
+    alignment: Option<Alignment>,
+) -> LayoutJob<'a> {
+    let mut job = new_layout_job(font_type, line_height, alignment);
 
     for ColoredSegment {
         color,
@@ -245,6 +244,53 @@ fn build_layout_job<'a>(
     }
 
     job
+}
+
+/// Maps byte offset in stripped text back to offset in original text.
+#[derive(Debug, Default, Clone)]
+struct StrippedToOriginalOffsetMap {
+    segments: Vec<(usize, usize)>,
+}
+
+impl StrippedToOriginalOffsetMap {
+    fn push_segment(&mut self, stripped_start: usize, original_start: usize) {
+        self.segments.push((stripped_start, original_start));
+    }
+
+    fn to_original(&self, stripped_index: usize) -> usize {
+        assert!(!self.segments.is_empty());
+        let i = self
+            .segments
+            .partition_point(|&(stripped_start, _)| stripped_start <= stripped_index);
+        let (stripped_start, original_start) = self.segments[i - 1];
+        original_start + (stripped_index - stripped_start)
+    }
+}
+
+/// Returns a `StrippedToOriginalOffsetMap` alongside the `LayoutJob`.
+fn build_layout_job_with_offsets<'a>(
+    text: &'a str,
+    current_color: Srgba,
+    font_type: PoBFontType,
+    line_height: i32,
+    alignment: Option<Alignment>,
+) -> (LayoutJob<'a>, StrippedToOriginalOffsetMap) {
+    let mut job = new_layout_job(font_type, line_height, alignment);
+    let mut offset_map = StrippedToOriginalOffsetMap::default();
+    let mut stripped_offset = 0;
+
+    for ColoredSegment {
+        color,
+        text,
+        original_start,
+    } in PoBString(text)
+    {
+        offset_map.push_segment(stripped_offset, original_start);
+        job.append(text, color.unwrap_or(current_color));
+        stripped_offset += text.len();
+    }
+
+    (job, offset_map)
 }
 
 /// A string constructed by Lua which may contain color escapes.
@@ -478,5 +524,41 @@ mod tests {
                 (Some(Srgba::from_rgb(0, 255, 0)), "world!", 23),
             ]
         );
+    }
+
+    #[test]
+    fn cursor_offset_empty() {
+        let mut offset_map = StrippedToOriginalOffsetMap::default();
+        for seg in PoBString("") {
+            offset_map.push_segment(0, seg.original_start);
+        }
+        assert_eq!(offset_map.to_original(0), 0);
+    }
+
+    #[test]
+    fn cursor_offset_no_escape() {
+        let mut offset_map = StrippedToOriginalOffsetMap::default();
+        let mut stripped_offset = 0;
+        for seg in PoBString("Hello, World!") {
+            offset_map.push_segment(stripped_offset, seg.original_start);
+            stripped_offset += seg.text.len();
+        }
+        assert_eq!(offset_map.to_original(0), 0);
+        assert_eq!(offset_map.to_original(3), 3);
+        assert_eq!(offset_map.to_original(6), 6);
+    }
+
+    #[test]
+    fn cursor_offset() {
+        let mut offset_map = StrippedToOriginalOffsetMap::default();
+        let mut stripped_offset = 0;
+        for seg in PoBString("^1Hello^xFF0000World^3!") {
+            offset_map.push_segment(stripped_offset, seg.original_start);
+            stripped_offset += seg.text.len();
+        }
+        assert_eq!(offset_map.to_original(0), 2);
+        assert_eq!(offset_map.to_original(3), 5);
+        assert_eq!(offset_map.to_original(6), 16);
+        assert_eq!(offset_map.to_original(11), 23);
     }
 }
