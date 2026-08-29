@@ -1,27 +1,36 @@
-use crate::pob::{
-    api::{
-        callback::{call_callback, get_custom_callback, set_custom_callback, set_main_object},
-        clipboard::{copy, paste},
-        compression::{deflate, inflate},
-        console::{console_clear, console_execute, console_print_table, console_printf},
-        general::{exit, get_time, open_url, render_init, restart, strip_escapes, take_screenshot},
-        image_handle::register_image_handle_api,
-        input::{get_cursor_pos, is_key_down, set_cursor_pos, show_cursor},
-        lua::{load_module, protected_call, protected_load_module},
-        paths::{
-            get_runtime_path, get_script_path, get_user_path, get_work_dir, make_dir, remove_dir,
-            set_work_dir,
+use crate::{
+    input::{Key, MouseButton},
+    pob::{
+        api::{
+            callback::{call_callback, get_custom_callback, set_custom_callback, set_main_object},
+            clipboard::{copy, paste},
+            compression::{deflate, inflate},
+            console::{console_clear, console_execute, console_print_table, console_printf},
+            general::{
+                exit, get_time, open_url, render_init, restart, strip_escapes, take_screenshot,
+            },
+            image_handle::register_image_handle_api,
+            input::{
+                get_cursor_pos, is_key_down, key_as_str, mousebutton_as_str, set_cursor_pos,
+                show_cursor,
+            },
+            lua::{load_module, protected_call, protected_load_module},
+            paths::{
+                get_runtime_path, get_script_path, get_user_path, get_work_dir, make_dir,
+                remove_dir, set_work_dir,
+            },
+            search_handle::new_search_handle,
+            subscript::{abort_subscript, is_subscript_running, launch_subscript},
+            window::{
+                get_dpi_scale_override, get_screen_scale, get_screen_size, set_dpi_scale_override,
+                set_foreground, set_window_title,
+            },
         },
-        search_handle::new_search_handle,
-        subscript::{abort_subscript, is_subscript_running, launch_subscript},
-        window::{
-            get_dpi_scale_override, get_screen_scale, get_screen_size, set_dpi_scale_override,
-            set_foreground, set_window_title,
-        },
+        subscript::NativeMultiValue,
     },
-    subscript::NativeMultiValue,
 };
 use mlua::{Lua, MultiValue, Result as LuaResult};
+use winit::keyboard::SmolStr;
 
 mod callback;
 mod clipboard;
@@ -37,7 +46,7 @@ mod search_handle;
 mod subscript;
 mod window;
 
-/// Register functions that can be called from lua
+/// Register functions that can be called from Lua
 pub fn register_globals(lua: &Lua) -> LuaResult<()> {
     let globals = lua.globals();
 
@@ -142,10 +151,42 @@ define_callbacks! {
     on_exit         => "OnExit"() -> ();
     on_frame        => "OnFrame"() -> ();
     can_exit        => "CanExit"() -> bool;
-    on_key_down     => "OnKeyDown"(key: &str, double_click: bool) -> ();
-    on_key_up       => "OnKeyUp"(key: &str) -> ();
     on_char         => "OnChar"(ch: char) -> ();
     on_sub_call     => "OnSubCall"(name: String, args: NativeMultiValue) -> MultiValue;
     on_sub_finished => "OnSubFinished"(id: u64, return_values: NativeMultiValue) -> ();
     on_sub_error    => "OnSubError"(id: u64, error_msg: String) -> ();
+}
+
+// `on_key_up` and `on_key_down` are manually defined because they require additional conversions
+// between key representations.
+pub enum Input {
+    Keyboard(Key),
+    Mouse(MouseButton),
+    WheelUp,
+    WheelDown,
+}
+
+impl Input {
+    fn as_pob_key_str(&self) -> Option<SmolStr> {
+        match self {
+            Input::Keyboard(key) => key_as_str(key.clone()),
+            Input::Mouse(button) => mousebutton_as_str(*button),
+            Input::WheelUp => Some("WHEELUP".into()),
+            Input::WheelDown => Some("WHEELDOWN".into()),
+        }
+    }
+}
+
+pub fn on_key_down(lua: &Lua, key: &Input, double_click: bool) -> LuaResult<()> {
+    let Some(key_str) = key.as_pob_key_str() else {
+        return Ok(());
+    };
+    call_callback(lua, "OnKeyDown", (key_str.as_str(), double_click))
+}
+
+pub fn on_key_up(lua: &Lua, key: &Input) -> LuaResult<()> {
+    let Some(key_str) = key.as_pob_key_str() else {
+        return Ok(());
+    };
+    call_callback(lua, "OnKeyUp", (key_str.as_str(),))
 }

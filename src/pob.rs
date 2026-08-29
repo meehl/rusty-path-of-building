@@ -9,7 +9,7 @@ use crate::{
     dpi::{PhysicalPoint, ScaleFactor},
     draw_commands::DrawCommandRecorder,
     fonts::Fonts,
-    input::{InputState, key_as_str, mousebutton_as_str},
+    input::InputState,
     pob::subscript::{SubscriptManager, SubscriptResult},
     renderer::textures::TextureManager,
     stage::{StageEvent, StageFrameOutput, StageTransition},
@@ -170,17 +170,11 @@ impl PathOfBuilding {
         match event {
             StageEvent::KeyDown { key } => {
                 self.ctx_mut().input_state.set_key_pressed(&key, true);
-
-                if let Some(key) = key_as_str(key) {
-                    api::on_key_down(&self.lua, key.as_str(), false)?;
-                }
+                api::on_key_down(&self.lua, &api::Input::Keyboard(key), false)?;
             }
             StageEvent::KeyUp { key } => {
                 self.ctx_mut().input_state.set_key_pressed(&key, false);
-
-                if let Some(key) = key_as_str(key) {
-                    api::on_key_up(&self.lua, key.as_str())?;
-                }
+                api::on_key_up(&self.lua, &api::Input::Keyboard(key))?;
             }
             StageEvent::ModifiersChanged { state } => {
                 self.ctx_mut().input_state.key_modifiers = state;
@@ -191,27 +185,19 @@ impl PathOfBuilding {
             }
             StageEvent::MouseDown { button } => {
                 let is_double_click = self.ctx_mut().input_state.set_mouse_pressed(button, true);
-
-                if let Some(button) = mousebutton_as_str(button) {
-                    // PoB treats mouse buttons as keys
-                    api::on_key_down(&self.lua, button.as_str(), is_double_click)?;
-                }
+                api::on_key_down(&self.lua, &api::Input::Mouse(button), is_double_click)?;
             }
             StageEvent::MouseUp { button } => {
                 self.ctx_mut().input_state.set_mouse_pressed(button, false);
-
-                if let Some(button) = mousebutton_as_str(button) {
-                    // PoB treats mouse buttons as keys
-                    api::on_key_up(&self.lua, button.as_str())?;
-                }
+                api::on_key_up(&self.lua, &api::Input::Mouse(button))?;
             }
             StageEvent::MouseWheel { delta } => {
                 if delta > 0.0 {
-                    api::on_key_down(&self.lua, "WHEELUP", false)?;
-                    api::on_key_up(&self.lua, "WHEELUP")?;
+                    api::on_key_down(&self.lua, &api::Input::WheelUp, false)?;
+                    api::on_key_up(&self.lua, &api::Input::WheelUp)?;
                 } else if delta < 0.0 {
-                    api::on_key_down(&self.lua, "WHEELDOWN", false)?;
-                    api::on_key_up(&self.lua, "WHEELDOWN")?;
+                    api::on_key_down(&self.lua, &api::Input::WheelDown, false)?;
+                    api::on_key_up(&self.lua, &api::Input::WheelDown)?;
                 }
             }
             StageEvent::Exit => api::on_exit(&self.lua)?,

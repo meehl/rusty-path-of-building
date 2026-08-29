@@ -5,40 +5,20 @@ use winit::window::Window;
 use crate::{
     dpi::{PhysicalPoint, PhysicalSize, ScaleFactor},
     draw_commands::DrawCommand,
+    input::{Key, ModifiersState, MouseButton},
     installer::Installer,
     pob::PathOfBuilding,
 };
 
-pub type Key = winit::keyboard::Key;
-pub type MouseButton = winit::event::MouseButton;
-pub type ModifiersState = winit::keyboard::ModifiersState;
-
 pub enum StageEvent {
-    KeyDown {
-        key: Key,
-    },
-    KeyUp {
-        key: Key,
-    },
-    CharacterInput {
-        ch: char,
-    },
-    ModifiersChanged {
-        state: ModifiersState,
-    },
-    MouseDown {
-        button: MouseButton,
-        //is_double_click: bool,
-    },
-    MouseUp {
-        button: MouseButton,
-    },
-    MouseWheel {
-        delta: f32,
-    },
-    MouseMoved {
-        pos: PhysicalPoint<f32>,
-    },
+    KeyDown { key: Key },
+    KeyUp { key: Key },
+    CharacterInput { ch: char },
+    ModifiersChanged { state: ModifiersState },
+    MouseDown { button: MouseButton },
+    MouseUp { button: MouseButton },
+    MouseWheel { delta: f32 },
+    MouseMoved { pos: PhysicalPoint<f32> },
     Exit,
     Resized(PhysicalSize<u32>),
     ScaleFactorChanged(f64),
