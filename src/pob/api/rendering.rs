@@ -255,8 +255,10 @@ pub unsafe extern "C-unwind" fn draw_image_quad(state: *mut ffi::lua_State) -> c
     0
 }
 
-pub fn get_draw_layer(_: &Lua, _: ()) -> LuaResult<()> {
-    unimplemented!()
+pub fn get_draw_layer(l: &Lua, _: ()) -> LuaResult<i32> {
+    let ctx = l.app_data_ref::<Context>().unwrap();
+    // matching PoB's behavior where only the sublayer is returned
+    Ok(ctx.recorder.get_draw_layer().1)
 }
 
 pub fn set_blend_mode(_: &Lua, _: ()) -> LuaResult<()> {

@@ -69,6 +69,10 @@ impl DrawCommandRecorder {
         self.set_draw_layer(self.current_layer.0, sublayer);
     }
 
+    pub fn get_draw_layer(&self) -> (i32, i32) {
+        self.current_layer
+    }
+
     pub fn set_draw_color(&mut self, color: Srgba) {
         self.current_draw_color = color;
     }
