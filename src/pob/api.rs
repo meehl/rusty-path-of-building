@@ -6,9 +6,7 @@ use crate::{
             clipboard::{copy, paste},
             compression::{deflate, inflate},
             console::{console_clear, console_execute, console_print_table, console_printf},
-            general::{
-                exit, get_time, open_url, render_init, restart, strip_escapes, take_screenshot,
-            },
+            general::{exit, get_time, open_url, render_init, restart, take_screenshot},
             image_handle::register_image_handle_api,
             input::{
                 get_cursor_pos, is_key_down, key_as_str, mousebutton_as_str, set_cursor_pos,
@@ -19,8 +17,13 @@ use crate::{
                 get_runtime_path, get_script_path, get_user_path, get_work_dir, make_dir,
                 remove_dir, set_work_dir,
             },
+            rendering::{
+                draw_image, draw_image_quad, get_async_count, get_draw_color, get_draw_layer,
+                set_blend_mode, set_clear_color, set_draw_color, set_draw_layer, set_viewport,
+            },
             search_handle::new_search_handle,
             subscript::{abort_subscript, is_subscript_running, launch_subscript},
+            text::{draw_string, get_index_at_cur, get_string_width, strip_escapes},
             window::{
                 get_dpi_scale_override, get_screen_scale, get_screen_size, set_dpi_scale_override,
                 set_foreground, set_window_title,
@@ -34,6 +37,7 @@ use winit::keyboard::SmolStr;
 
 mod callback;
 mod clipboard;
+mod color;
 mod compression;
 mod console;
 mod general;
@@ -44,6 +48,7 @@ mod paths;
 mod rendering;
 mod search_handle;
 mod subscript;
+mod text;
 mod window;
 
 /// Register functions that can be called from Lua
@@ -72,7 +77,6 @@ pub fn register_globals(lua: &Lua) -> LuaResult<()> {
 
     // general
     globals.set("GetTime", lua.create_function(get_time)?)?;
-    globals.set("StripEscapes", lua.create_function(strip_escapes)?)?;
     globals.set("Exit", lua.create_function(exit)?)?;
     globals.set("Restart", lua.create_function(restart)?)?;
     globals.set("OpenURL", lua.create_function(open_url)?)?;
@@ -130,7 +134,36 @@ pub fn register_globals(lua: &Lua) -> LuaResult<()> {
     globals.set("AbortSubScript", lua.create_function(abort_subscript)?)?;
 
     // rendering
-    rendering::register_globals(lua)?;
+    // NOTE: unfortunately, mlua's conversion of function arguments adds a lot of
+    // overhead. this is very noticeable for the draw functions which can be called
+    // thousands of times per frame. C functions are used to get raw access to
+    // the lua stack without the overhead.
+    unsafe { globals.set("SetDrawColor", lua.create_c_function(set_draw_color)?)? };
+    unsafe { globals.set("GetDrawColor", lua.create_c_function(get_draw_color)?)? };
+    unsafe { globals.set("SetViewport", lua.create_c_function(set_viewport)?)? };
+    unsafe {
+        globals.set("SetDrawLayer", lua.create_c_function(set_draw_layer)?)?;
+    }
+    unsafe { globals.set("DrawImage", lua.create_c_function(draw_image)?)? };
+    unsafe { globals.set("DrawImageQuad", lua.create_c_function(draw_image_quad)?)? };
+    globals.set("GetDrawLayer", lua.create_function(get_draw_layer)?)?;
+    globals.set("SetBlendMode", lua.create_function(set_blend_mode)?)?;
+    globals.set("GetAsyncCount", lua.create_function(get_async_count)?)?;
+    globals.set("SetClearColor", lua.create_function(set_clear_color)?)?;
+
+    // text
+    // see comment above about why C functions are used for these
+    unsafe {
+        globals.set("DrawString", lua.create_c_function(draw_string)?)?;
+    }
+    unsafe {
+        globals.set("DrawStringWidth", lua.create_c_function(get_string_width)?)?;
+    }
+    globals.set(
+        "DrawStringCursorIndex",
+        lua.create_function_mut(get_index_at_cur)?,
+    )?;
+    globals.set("StripEscapes", lua.create_function(strip_escapes)?)?;
 
     Ok(())
 }

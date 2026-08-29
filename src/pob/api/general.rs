@@ -1,4 +1,4 @@
-use crate::pob::{Context, api::rendering::PoBString};
+use crate::pob::Context;
 use mlua::{IntoLuaMulti, Lua, MultiValue, Result as LuaResult, Variadic};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -7,10 +7,6 @@ pub fn get_time(_l: &Lua, _: ()) -> LuaResult<u128> {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_millis())
-}
-
-pub fn strip_escapes(_: &Lua, text: String) -> LuaResult<String> {
-    Ok(PoBString(&text).strip_escapes())
 }
 
 pub fn exit(l: &Lua, exit_msg: Option<String>) -> LuaResult<()> {
