@@ -585,20 +585,22 @@ impl<'a> Iterator for PoBStringSegmentIterator<'a> {
     }
 }
 
-// PoB's text alignment is weird
+// PoB's alignment argument is weird!
+// It controls:
+// - the alignment within the text box
+// - the anchor point of the box
+// - the relative/absolute positioning of the box
 #[derive(Clone, Copy, Debug)]
 enum PoBTextAlignment {
-    // left-aligned, x coordinate describes top-left corner
+    // alignment: left | anchor: top-left corner | position: relative to viewport
     Left,
-    // centered in screen space, x coordinate describes offset of text center
-    // from screen center. positive values of x move text to right, negative to left.
+    // alignment: center | anchor: top-center | position: relative to center of screen
     Center,
-    // right-aligned in screen space, x coordinate describes distance from right edge
-    // of text to right edge of screen. positive values move text further to left.
+    // alignment: right | anchor: top-right | position: relative to right edge of screen
     Right,
-    // makes text centered around position, i.e. position.x = horizontal center of text
+    // alignment: center | anchor: top-center | position: relative to viewport
     CenterX,
-    // makes text right-aligned to position, i.e. position.x = right edge of text
+    // alignment: right | anchor: top-right corner | position: relative to viewport
     RightX,
 }
 
