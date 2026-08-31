@@ -5,7 +5,7 @@ use crate::{
     dpi::PhysicalSize,
     math::{Point, Rect, Scale, Size},
     renderer::{
-        image::{DataOrder, ImageData, ImageDelta},
+        image::{DataOrder, ImageData, ImageDelta, MipStrategy, PartialDeltaOrigin},
         textures::TextureOptions,
     },
     uv::{UvRect, UvSpace},
@@ -25,9 +25,11 @@ pub struct AllocatedGlyph<'a> {
 
 struct Layer {
     image: RgbaImage,
-    // position of next allocation
+    /// Position of next allocation
     cursor: FontAtlasPoint,
     current_row_height: u32,
+    /// Dirty region
+    dirty: FontAtlasRect,
 }
 
 pub struct FontAtlas {
@@ -35,11 +37,10 @@ pub struct FontAtlas {
     // maximum amount of layers
     max_layers: u32,
     layers: Vec<Layer>,
-    // atlas has been altered and needs to be reuploaded to the GPU
-    // TODO: only mark changed regions as dirty and perform partial texture update
-    dirty: bool,
     // used to convert to normalized UV coordinates
     to_uv: Scale<f32, FontAtlasSpace, UvSpace>,
+    /// Set when a full texture upload is required
+    needs_full_update: bool,
 }
 
 impl FontAtlas {
@@ -48,8 +49,8 @@ impl FontAtlas {
             layer_size: Size::new(layer_size, layer_size),
             max_layers,
             layers: Vec::new(),
-            dirty: false,
             to_uv: Scale::new(1.0 / layer_size as f32),
+            needs_full_update: false,
         };
 
         atlas.push_layer();
@@ -63,7 +64,11 @@ impl FontAtlas {
             image: RgbaImage::new(self.layer_size.width, self.layer_size.height),
             cursor: FontAtlasPoint::zero(),
             current_row_height: 0,
+            dirty: FontAtlasRect::zero(),
         });
+
+        // adding a new layer requires a full texture re-allocation
+        self.needs_full_update = true;
     }
 
     /// Initializes the atlas.
@@ -108,10 +113,12 @@ impl FontAtlas {
         layer.current_row_height = layer.current_row_height.max(requested_size.height);
         let pos = layer.cursor;
         layer.cursor.x += requested_size.width + PADDING;
-        self.dirty = true;
 
         let glyph_rect = FontAtlasRect::from_origin_and_size(pos, requested_size);
         let uv = self.to_uv.transform_box2d(&glyph_rect.cast());
+
+        // extend dirty region to include new glyph allocation
+        layer.dirty = layer.dirty.union(&glyph_rect);
 
         AllocatedGlyph {
             sub_image: layer.image.sub_image(
@@ -125,31 +132,67 @@ impl FontAtlas {
         }
     }
 
-    pub fn take_delta(&mut self) -> Option<ImageDelta> {
-        if !std::mem::replace(&mut self.dirty, false) {
-            return None;
+    pub fn take_delta(&mut self) -> Vec<ImageDelta> {
+        // first check if full update is required
+        if std::mem::replace(&mut self.needs_full_update, false) {
+            let mut bytes = Vec::with_capacity(
+                self.layers.len() * (self.layer_size.width * self.layer_size.height * 4) as usize,
+            );
+
+            for layer in &mut self.layers {
+                bytes.extend_from_slice(layer.image.as_raw());
+                // reset layer's dirty region since we're doing a full update anyway
+                layer.dirty = FontAtlasRect::zero();
+            }
+
+            return vec![ImageDelta::full(
+                ImageData {
+                    format: wgpu::TextureFormat::Rgba8Unorm,
+                    width: self.layer_size.width,
+                    height: self.layer_size.height,
+                    array_layers: self.layers.len() as u32,
+                    mipmap_count: NonZeroU32::new(1).expect("1 is non-zero"),
+                    data_order: DataOrder::default(),
+                    bytes,
+                },
+                TextureOptions::LINEAR,
+                MipStrategy::None,
+            )];
         }
 
-        let mut bytes = Vec::with_capacity(
-            self.layers.len() * (self.layer_size.width * self.layer_size.height * 4) as usize,
-        );
+        // add partial update for each dirty layer
+        let mut partial_updates = Vec::new();
+        for (i, layer) in self.layers.iter_mut().enumerate() {
+            let dirty = std::mem::replace(&mut layer.dirty, FontAtlasRect::zero());
+            if dirty.is_empty() {
+                continue;
+            }
 
-        for layer in &self.layers {
-            bytes.extend_from_slice(layer.image.as_raw());
+            let bytes = layer
+                .image
+                .sub_image(dirty.min.x, dirty.min.y, dirty.width(), dirty.height())
+                .to_image()
+                .into_vec();
+
+            partial_updates.push(ImageDelta::partial(
+                ImageData {
+                    format: wgpu::TextureFormat::Rgba8Unorm,
+                    width: dirty.width(),
+                    height: dirty.height(),
+                    array_layers: 1,
+                    mipmap_count: NonZeroU32::new(1).expect("1 is non-zero"),
+                    data_order: DataOrder::default(),
+                    bytes,
+                },
+                PartialDeltaOrigin {
+                    x: dirty.min.x,
+                    y: dirty.min.y,
+                    layer: i as u32,
+                },
+            ));
         }
 
-        Some(ImageDelta::new(
-            ImageData {
-                format: wgpu::TextureFormat::Rgba8Unorm,
-                width: self.layer_size.width,
-                height: self.layer_size.height,
-                array_layers: self.layers.len() as u32,
-                mipmap_count: NonZeroU32::new(1).expect("1 is non-zero"),
-                data_order: DataOrder::default(),
-                bytes,
-            },
-            TextureOptions::LINEAR,
-        ))
+        partial_updates
     }
 
     pub fn write_mask(

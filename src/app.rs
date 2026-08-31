@@ -88,11 +88,10 @@ impl App {
 
         let stage_output = self.stage.frame()?;
 
-        if let Some(font_image_delta) = self.fonts.borrow_mut().font_atlas_delta() {
-            self.texture_manager
-                .borrow()
-                .update_font_texture(font_image_delta);
-        }
+        let font_image_delta = self.fonts.borrow_mut().font_atlas_delta();
+        self.texture_manager
+            .borrow()
+            .update_font_texture(font_image_delta);
 
         let textures_delta = self.texture_manager.borrow().take_delta();
 

@@ -5,7 +5,7 @@ use anyhow::bail;
 
 use crate::{
     color::Srgba,
-    renderer::image::{ImageData, ImageDelta, load_image_file},
+    renderer::image::{ImageData, ImageDelta, MipStrategy, load_image_file},
     worker_pool::WorkerPool,
 };
 
@@ -80,9 +80,17 @@ struct TextureRegistry {
 
 impl TextureRegistry {
     /// Allocates a new Texture.
-    pub fn alloc(&mut self, name: String, image: ImageData, options: TextureOptions) -> TextureId {
+    pub fn alloc(
+        &mut self,
+        name: String,
+        image: ImageData,
+        options: TextureOptions,
+        generate_mipmaps: bool,
+    ) -> TextureId {
         let id = self.next_id;
         self.next_id += 1;
+
+        let mip_strategy = MipStrategy::resolve(&image, generate_mipmaps);
 
         self.meta_data.insert(
             id,
@@ -96,7 +104,7 @@ impl TextureRegistry {
 
         self.delta
             .update
-            .push((id, ImageDelta::new(image, options)));
+            .push((id, ImageDelta::full(image, options, mip_strategy)));
 
         id
     }
@@ -122,9 +130,11 @@ impl TextureRegistry {
     /// Assigns a new image to an existing texture.
     pub fn set(&mut self, id: TextureId, delta: ImageDelta) {
         if let Some(meta_data) = self.meta_data.get_mut(&id) {
-            meta_data.size = [delta.image.width as usize, delta.image.height as usize];
-            // discard all old enqueued deltas
-            self.delta.update.retain(|(x, _)| x != &id);
+            if let ImageDelta::Full { image, .. } = &delta {
+                meta_data.size = [image.width as usize, image.height as usize];
+                // discard all old enqueued deltas since we're doing a full update
+                self.delta.update.retain(|(x, _)| x != &id);
+            }
             self.delta.update.push((id, delta));
         } else {
             // the handle may have been dropped while the async load was in flight.
@@ -181,6 +191,7 @@ enum LoadResult {
         id: TextureId,
         image: ImageData,
         options: TextureOptions,
+        generate_mipmaps: bool,
     },
 }
 
@@ -199,8 +210,9 @@ impl TextureManager {
         // allocate default texture (id: 0) for font atlas
         manager.alloc(
             "font_atlas_texture".into(),
-            ImageData::from_solid_color([0, 0], Srgba::TRANSPARENT),
+            ImageData::from_solid_color([1, 1], Srgba::WHITE),
             TextureOptions::default(),
+            false,
         );
 
         let (tx, rx) = mpsc::channel();
@@ -214,8 +226,10 @@ impl TextureManager {
     }
 
     #[inline]
-    pub fn update_font_texture(&self, delta: ImageDelta) {
-        self.manager.borrow_mut().set(TextureId::default(), delta);
+    pub fn update_font_texture(&self, delta: Vec<ImageDelta>) {
+        delta.into_iter().for_each(|d| {
+            self.manager.borrow_mut().set(TextureId::default(), d);
+        });
     }
 
     #[inline]
@@ -229,6 +243,7 @@ impl TextureManager {
         image_path: String,
         options: TextureOptions,
         is_async: bool,
+        generate_mipmaps: bool,
     ) -> anyhow::Result<TextureHandle> {
         profiling::scope!("load_texture");
 
@@ -242,7 +257,12 @@ impl TextureManager {
             self.worker_pool
                 .execute(move || match load_image_file(Path::new(&image_path)) {
                     Ok(image) => {
-                        let _ = tx.send(LoadResult::Loaded { id, image, options });
+                        let _ = tx.send(LoadResult::Loaded {
+                            id,
+                            image,
+                            options,
+                            generate_mipmaps,
+                        });
                     }
                     Err(e) => log::warn!("Unable to load image from {image_path}: {e}"),
                 });
@@ -251,7 +271,12 @@ impl TextureManager {
         } else {
             match load_image_file(Path::new(&image_path)) {
                 Ok(image) => {
-                    let id = self.manager.borrow_mut().alloc(image_path, image, options);
+                    let id = self.manager.borrow_mut().alloc(
+                        image_path,
+                        image,
+                        options,
+                        generate_mipmaps,
+                    );
                     Ok(TextureHandle::new(Rc::clone(&self.manager), id))
                 }
                 Err(e) => {
@@ -268,6 +293,7 @@ impl TextureManager {
         image_path: String,
         options: TextureOptions,
         is_async: bool,
+        generate_mipmaps: bool,
     ) -> anyhow::Result<()> {
         if is_async {
             let tx = self.results_tx.clone();
@@ -278,19 +304,21 @@ impl TextureManager {
                             id: texture_id,
                             image,
                             options,
+                            generate_mipmaps,
                         });
                     }
-                    Err(e) => log::warn!("Unable to load image fron {image_path}: {e}"),
+                    Err(e) => log::warn!("Unable to load image from {image_path}: {e}"),
                 });
         } else {
             match load_image_file(Path::new(&image_path)) {
                 Ok(image) => {
+                    let mip_strategy = MipStrategy::resolve(&image, generate_mipmaps);
                     self.manager
                         .borrow_mut()
-                        .set(texture_id, ImageDelta::new(image, options));
+                        .set(texture_id, ImageDelta::full(image, options, mip_strategy));
                 }
                 Err(e) => {
-                    log::warn!("Unable to load image fron {image_path}: {e}");
+                    log::warn!("Unable to load image from {image_path}: {e}");
                     bail!(e);
                 }
             }
@@ -302,19 +330,25 @@ impl TextureManager {
     /// Drains completed async image loads and assigns them to textures
     fn apply_pending_loads(&self) {
         let mut manager = self.manager.borrow_mut();
-        while let Ok(LoadResult::Loaded { id, image, options }) = self.results_rx.try_recv() {
-            manager.set(id, ImageDelta::new(image, options));
+        while let Ok(LoadResult::Loaded {
+            id,
+            image,
+            options,
+            generate_mipmaps,
+        }) = self.results_rx.try_recv()
+        {
+            let mip_strategy = MipStrategy::resolve(&image, generate_mipmaps);
+            manager.set(id, ImageDelta::full(image, options, mip_strategy));
         }
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TextureOptions {
     pub magnification: wgpu::FilterMode,
     pub minification: wgpu::FilterMode,
     pub wrap_mode: wgpu::AddressMode,
     pub mipmap_mode: wgpu::MipmapFilterMode,
-    pub generate_mipmaps: bool,
 }
 
 impl TextureOptions {
@@ -323,7 +357,6 @@ impl TextureOptions {
         minification: wgpu::FilterMode::Linear,
         wrap_mode: wgpu::AddressMode::Repeat,
         mipmap_mode: wgpu::MipmapFilterMode::Linear,
-        generate_mipmaps: false,
     };
 
     pub const LINEAR: Self = Self {
@@ -331,21 +364,11 @@ impl TextureOptions {
         minification: wgpu::FilterMode::Linear,
         wrap_mode: wgpu::AddressMode::ClampToEdge,
         mipmap_mode: wgpu::MipmapFilterMode::Linear,
-        generate_mipmaps: false,
     };
 }
 
 impl Default for TextureOptions {
     fn default() -> Self {
         Self::LINEAR
-    }
-}
-
-impl std::hash::Hash for TextureOptions {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.magnification.hash(state);
-        self.minification.hash(state);
-        self.wrap_mode.hash(state);
-        self.mipmap_mode.hash(state);
     }
 }

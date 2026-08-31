@@ -100,7 +100,7 @@ impl Fonts {
     }
 
     /// Gets changes to the font atlas texture since last call.
-    pub fn font_atlas_delta(&mut self) -> Option<ImageDelta> {
+    pub fn font_atlas_delta(&mut self) -> Vec<ImageDelta> {
         self.atlas.take_delta()
     }
 

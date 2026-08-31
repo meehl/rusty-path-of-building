@@ -3,7 +3,7 @@ use crate::{
     dpi::{LogicalPoint, LogicalRect, LogicalSize, PhysicalRect, PhysicalSize, ScaleFactor},
     math::Point,
     renderer::{
-        image::ImageData,
+        image::{ImageData, MipStrategy},
         textures::{TextureId, TextureOptions, TexturesDelta},
     },
     util::calculate_hash,
@@ -15,7 +15,7 @@ use std::{
     num::{NonZeroU32, NonZeroU64},
     ops::Range,
 };
-use wgpu::util::DeviceExt;
+use wgpu::{Origin3d, util::DeviceExt};
 
 pub mod image;
 mod mipmap;
@@ -325,80 +325,119 @@ impl Renderer {
     ) {
         profiling::scope!("update_textures");
 
-        if !textures_delta.update.is_empty() {
-            self.batch_bind_group_cache.clear();
-        }
-
         for (id, image_delta) in &textures_delta.update {
-            let ImageData {
-                format,
-                width,
-                height,
-                array_layers,
-                mipmap_count,
-                data_order,
-                ref bytes,
-            } = image_delta.image;
+            match image_delta {
+                image::ImageDelta::Full {
+                    image,
+                    options,
+                    mip_strategy,
+                } => {
+                    let ImageData {
+                        format,
+                        width,
+                        height,
+                        array_layers,
+                        mipmap_count,
+                        data_order,
+                        bytes,
+                    } = image;
 
-            let size = wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: array_layers,
-            };
+                    let size = wgpu::Extent3d {
+                        width: *width,
+                        height: *height,
+                        depth_or_array_layers: *array_layers,
+                    };
 
-            // only generate mipmaps for uncompressed images that don't already have mipmaps
-            let gen_mipmaps = image_delta.options.generate_mipmaps
-                && mipmap_count.get() == 1
-                && !format.is_compressed();
+                    let gen_mipmaps = matches!(mip_strategy, MipStrategy::GenerateOnUpload);
 
-            let mip_level_count = if gen_mipmaps {
-                size.max_mips(wgpu::TextureDimension::D2)
-            } else {
-                mipmap_count.get()
-            };
+                    let mip_level_count = if gen_mipmaps {
+                        size.max_mips(wgpu::TextureDimension::D2)
+                    } else {
+                        mipmap_count.get()
+                    };
 
-            let label_str = format!("texture_{id:?}");
-            let label = Some(label_str.as_str());
+                    let label_str = format!("texture_{id:?}");
+                    let label = Some(label_str.as_str());
 
-            let texture = create_texture_with_data(
-                device,
-                queue,
-                &wgpu::TextureDescriptor {
-                    label,
-                    size,
-                    mip_level_count,
-                    sample_count: 1,
-                    dimension: wgpu::TextureDimension::D2,
-                    format,
-                    usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                    view_formats: &[format.add_srgb_suffix()],
-                },
-                data_order.into(),
-                bytes,
-                gen_mipmaps,
-            );
+                    let texture = create_texture_with_data(
+                        device,
+                        queue,
+                        &wgpu::TextureDescriptor {
+                            label,
+                            size,
+                            mip_level_count,
+                            sample_count: 1,
+                            dimension: wgpu::TextureDimension::D2,
+                            format: *format,
+                            usage: wgpu::TextureUsages::TEXTURE_BINDING
+                                | wgpu::TextureUsages::COPY_DST,
+                            view_formats: &[format.add_srgb_suffix()],
+                        },
+                        (*data_order).into(),
+                        bytes,
+                        gen_mipmaps,
+                    );
 
-            if gen_mipmaps {
-                mipmap::generate_mipmap_chain(queue, &texture, bytes);
+                    if gen_mipmaps {
+                        mipmap::generate_mipmap_chain(queue, &texture, bytes);
+                    }
+
+                    let view = texture.create_view(&wgpu::TextureViewDescriptor {
+                        dimension: Some(wgpu::TextureViewDimension::D2Array),
+                        ..Default::default()
+                    });
+
+                    self.samplers
+                        .entry(*options)
+                        .or_insert_with(|| create_sampler(*options, device));
+
+                    self.textures.insert(
+                        *id,
+                        TextureEntry {
+                            texture,
+                            view,
+                            options: *options,
+                        },
+                    );
+
+                    self.batch_bind_group_cache.clear();
+                }
+                image::ImageDelta::Partial {
+                    image: source,
+                    origin,
+                } => {
+                    let destination = self.textures.get(id).expect("Texture is allocated");
+
+                    let size = wgpu::Extent3d {
+                        width: source.width,
+                        height: source.height,
+                        depth_or_array_layers: 1,
+                    };
+
+                    let origin = Origin3d {
+                        x: origin.x,
+                        y: origin.y,
+                        z: origin.layer,
+                    };
+
+                    // NOTE: this doesn't handle mipmaps or formats other than RBGA
+                    queue.write_texture(
+                        wgpu::TexelCopyTextureInfo {
+                            texture: &destination.texture,
+                            mip_level: 0,
+                            origin,
+                            aspect: wgpu::wgt::TextureAspect::All,
+                        },
+                        &source.bytes,
+                        wgpu::TexelCopyBufferLayout {
+                            offset: 0,
+                            bytes_per_row: Some(4 * source.width),
+                            rows_per_image: Some(source.height),
+                        },
+                        size,
+                    );
+                }
             }
-
-            let view = texture.create_view(&wgpu::TextureViewDescriptor {
-                dimension: Some(wgpu::TextureViewDimension::D2Array),
-                ..Default::default()
-            });
-
-            self.samplers
-                .entry(image_delta.options)
-                .or_insert_with(|| create_sampler(image_delta.options, device));
-
-            self.textures.insert(
-                *id,
-                TextureEntry {
-                    texture,
-                    view,
-                    options: image_delta.options,
-                },
-            );
         }
     }
 
@@ -607,30 +646,22 @@ fn create_texture_with_data(
     data: &[u8],
     skip_mipmaps: bool,
 ) -> wgpu::Texture {
-    // Implicitly add the COPY_DST usage
+    // implicitly add the COPY_DST usage
     let mut desc = desc.to_owned();
     desc.usage |= wgpu::TextureUsages::COPY_DST;
     let texture = device.create_texture(&desc);
 
-    // Will return None only if it's a combined depth-stencil format
-    // If so, default to 4, validation will fail later anyway since the depth or stencil
-    // aspect needs to be written to individually
+    // will return None only if it's a combined depth-stencil format. if so, default to 4,
+    // validation will fail later anyway since the depth or stencil aspect needs to be written to
+    // individually
     let block_size = desc.format.block_copy_size(None).unwrap_or(4);
     let (block_width, block_height) = desc.format.block_dimensions();
     let layer_iterations = desc.array_layer_count();
 
-    let outer_iteration;
-    let inner_iteration;
-    match order {
-        wgpu::wgt::TextureDataOrder::LayerMajor => {
-            outer_iteration = layer_iterations;
-            inner_iteration = desc.mip_level_count;
-        }
-        wgpu::wgt::TextureDataOrder::MipMajor => {
-            outer_iteration = desc.mip_level_count;
-            inner_iteration = layer_iterations;
-        }
-    }
+    let (outer_iteration, inner_iteration) = match order {
+        wgpu::wgt::TextureDataOrder::LayerMajor => (layer_iterations, desc.mip_level_count),
+        wgpu::wgt::TextureDataOrder::MipMajor => (desc.mip_level_count, layer_iterations),
+    };
 
     let mut binary_offset = 0;
     for outer in 0..outer_iteration {
@@ -646,13 +677,13 @@ fn create_texture_with_data(
                 mip_size.depth_or_array_layers = 1;
             }
 
-            // When uploading mips of compressed textures and the mip is supposed to be
-            // a size that isn't a multiple of the block size, the mip needs to be uploaded
-            // as its "physical size" which is the size rounded up to the nearest block size.
+            // when uploading mips of compressed textures and the mip is supposed to be a size that
+            // isn't a multiple of the block size, the mip needs to be uploaded as its "physical
+            // size" which is the size rounded up to the nearest block size.
             let mip_physical = mip_size.physical_size(desc.format);
 
-            // All these calculations are performed on the physical size as that's the
-            // data that exists in the buffer.
+            // all these calculations are performed on the physical size as that's the data that
+            // exists in the buffer.
             let width_blocks = mip_physical.width / block_width;
             let height_blocks = mip_physical.height / block_height;
 

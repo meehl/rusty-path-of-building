@@ -2,17 +2,83 @@ use crate::{color::Srgba, renderer::textures::TextureOptions};
 use image::{DynamicImage, RgbaImage};
 use std::{io::Read, num::NonZeroU32, path::Path};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MipStrategy {
+    /// Single mip level.
+    None,
+    /// Generate mip chain from mip 0 on upload.
+    GenerateOnUpload,
+    /// Upload as is. Used when `ImageData` already contains a full mip chain (e.g. when loaded from DDS).
+    Provided,
+}
+
+impl MipStrategy {
+    /// Resolves to a `MipStrategy` based on the actual `ImageData` and the callers request to
+    /// generate a mip chain if possible.
+    pub fn resolve(image: &ImageData, generate_if_possible: bool) -> Self {
+        if image.mipmap_count.get() > 1 {
+            Self::Provided
+        } else if generate_if_possible && !image.format.is_compressed() {
+            Self::GenerateOnUpload
+        } else {
+            Self::None
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct PartialDeltaOrigin {
+    pub x: u32,
+    pub y: u32,
+    pub layer: u32,
+}
+
+/// Represents the change to a GPU texture.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ImageDelta {
-    pub image: ImageData,
-    pub options: TextureOptions,
+pub enum ImageDelta {
+    /// Creates a whole new texture.
+    Full {
+        image: ImageData,
+        options: TextureOptions,
+        mip_strategy: MipStrategy,
+    },
+    /// Updates a sub-region starting at `origin` of an existing texture.
+    Partial {
+        image: ImageData,
+        origin: PartialDeltaOrigin,
+    },
 }
 
 impl ImageDelta {
-    pub fn new<I: Into<ImageData>>(image: I, options: TextureOptions) -> Self {
-        Self {
-            image: image.into(),
+    pub fn full<I: Into<ImageData>>(
+        image: I,
+        options: TextureOptions,
+        mip_strategy: MipStrategy,
+    ) -> Self {
+        let image = image.into();
+
+        debug_assert!(
+            match mip_strategy {
+                MipStrategy::None => true,
+                MipStrategy::GenerateOnUpload => {
+                    image.mipmap_count.get() == 1 && !image.format.is_compressed()
+                }
+                MipStrategy::Provided => image.mipmap_count.get() > 1,
+            },
+            "MipStrategy inconsistent with image data"
+        );
+
+        Self::Full {
+            image,
             options,
+            mip_strategy,
+        }
+    }
+
+    pub fn partial<I: Into<ImageData>>(image: I, origin: PartialDeltaOrigin) -> Self {
+        Self::Partial {
+            image: image.into(),
+            origin,
         }
     }
 }

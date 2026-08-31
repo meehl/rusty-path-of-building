@@ -201,6 +201,7 @@ unsafe extern "C-unwind" fn image_handle_load(state: *mut ffi::lua_State) -> c_i
 
     // Flags
     let mut is_async = false;
+    let mut generate_mipmaps = false;
     let mut options = TextureOptions::LINEAR_REPEAT;
 
     let nargs = unsafe { ffi::lua_gettop(state) };
@@ -230,7 +231,7 @@ unsafe extern "C-unwind" fn image_handle_load(state: *mut ffi::lua_State) -> c_i
                 is_async = true;
             }
             b"MIPMAP" => {
-                options.generate_mipmaps = true;
+                generate_mipmaps = true;
             }
             _ => {}
         }
@@ -250,13 +251,14 @@ unsafe extern "C-unwind" fn image_handle_load(state: *mut ffi::lua_State) -> c_i
                 path,
                 options,
                 is_async,
+                generate_mipmaps,
             );
         }
         None => {
-            if let Ok(texture_handle) = ctx
-                .texture_manager
-                .borrow()
-                .load_texture(path, options, is_async)
+            if let Ok(texture_handle) =
+                ctx.texture_manager
+                    .borrow()
+                    .load_texture(path, options, is_async, generate_mipmaps)
             {
                 handle.texture = Some(texture_handle);
             }
