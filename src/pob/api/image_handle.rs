@@ -6,6 +6,7 @@ use std::{
 use mlua::{Lua, Result as LuaResult, ffi};
 
 use crate::{
+    dpi::PhysicalSize,
     pob::Context,
     renderer::textures::{TextureHandle, TextureId, TextureOptions},
 };
@@ -33,19 +34,16 @@ impl ImageHandle {
     #[inline]
     pub fn is_loading(&self) -> bool {
         match &self.texture {
-            Some(texture) => {
-                let size = texture.size();
-                size[0] == 0
-            }
+            Some(texture) => texture.is_loading(),
             None => true,
         }
     }
 
     #[inline]
-    pub fn image_size(&self) -> [usize; 2] {
+    pub fn image_size(&self) -> PhysicalSize<u32> {
         match &self.texture {
-            Some(texture) => texture.size(),
-            None => [0, 0],
+            Some(texture) => texture.size().unwrap_or(PhysicalSize::zero()),
+            None => PhysicalSize::zero(),
         }
     }
 }
@@ -154,11 +152,11 @@ unsafe extern "C-unwind" fn image_handle_is_loading(state: *mut ffi::lua_State) 
 unsafe extern "C-unwind" fn image_handle_image_size(state: *mut ffi::lua_State) -> c_int {
     let handle = unsafe { get_image_handle(state, 1) };
 
-    let [width, height] = unsafe { (*handle).image_size() };
+    let size = unsafe { (*handle).image_size() };
 
     unsafe {
-        ffi::lua_pushinteger(state, width as ffi::lua_Integer);
-        ffi::lua_pushinteger(state, height as ffi::lua_Integer);
+        ffi::lua_pushinteger(state, size.width as ffi::lua_Integer);
+        ffi::lua_pushinteger(state, size.height as ffi::lua_Integer);
     }
 
     2

@@ -24,6 +24,22 @@ impl MipStrategy {
             Self::None
         }
     }
+
+    /// Determine mip level count of given `ImageData` after mip strategy has been applied
+    pub fn resolve_mip_level_count(&self, image: &ImageData) -> u32 {
+        match self {
+            Self::None => 1,
+            Self::Provided => image.mipmap_count.get(),
+            Self::GenerateOnUpload => {
+                let size = wgpu::Extent3d {
+                    width: image.width,
+                    height: image.height,
+                    depth_or_array_layers: image.array_layers,
+                };
+                size.max_mips(wgpu::TextureDimension::D2)
+            }
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

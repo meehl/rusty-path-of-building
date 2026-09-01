@@ -5,6 +5,7 @@ use anyhow::bail;
 
 use crate::{
     color::Srgba,
+    dpi::PhysicalSize,
     renderer::image::{ImageData, ImageDelta, MipStrategy, load_image_file},
     worker_pool::WorkerPool,
 };
@@ -25,11 +26,30 @@ impl TextureHandle {
         self.id
     }
 
-    pub fn size(&self) -> [usize; 2] {
-        self.tex_mngr
+    pub fn size(&self) -> Option<PhysicalSize<u32>> {
+        match self
+            .tex_mngr
             .borrow()
             .get_meta_data(self.id)
-            .map_or([0, 0], |tex| tex.size)
+            .expect("Texture exists because we hold a handle")
+            .state
+        {
+            TextureState::AsyncLoading => None,
+            TextureState::Loaded(shape) => Some(shape.size),
+        }
+    }
+
+    pub fn is_loading(&self) -> bool {
+        match self
+            .tex_mngr
+            .borrow()
+            .get_meta_data(self.id)
+            .expect("Texture exists because we hold a handle")
+            .state
+        {
+            TextureState::AsyncLoading => true,
+            TextureState::Loaded(_) => false,
+        }
     }
 }
 
@@ -61,14 +81,29 @@ impl TexturesDelta {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct TextureShape {
+    size: PhysicalSize<u32>,
+    format: wgpu::TextureFormat,
+    array_layers: u32,
+    mip_level_count: u32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TextureState {
+    /// Texture is being loaded asynchronously
+    AsyncLoading,
+    Loaded(TextureShape),
+}
+
 /// Metadata about an allocated texture.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TextureMetaData {
-    pub name: String,
-    pub size: [usize; 2],
+    name: String,
+    options: TextureOptions,
+    state: TextureState,
     /// Texture is freed when this reaches zero
     retain_count: usize,
-    pub options: TextureOptions,
 }
 
 #[derive(Default)]
@@ -96,9 +131,14 @@ impl TextureRegistry {
             id,
             TextureMetaData {
                 name,
-                size: [image.width as usize, image.height as usize],
                 retain_count: 1,
                 options,
+                state: TextureState::Loaded(TextureShape {
+                    size: PhysicalSize::new(image.width, image.height),
+                    format: image.format,
+                    array_layers: image.array_layers,
+                    mip_level_count: mip_strategy.resolve_mip_level_count(&image),
+                }),
             },
         );
 
@@ -118,9 +158,9 @@ impl TextureRegistry {
             id,
             TextureMetaData {
                 name,
-                size: [0, 0],
                 retain_count: 1,
                 options,
+                state: TextureState::AsyncLoading,
             },
         );
 
@@ -129,18 +169,45 @@ impl TextureRegistry {
 
     /// Assigns a new image to an existing texture.
     pub fn set(&mut self, id: TextureId, delta: ImageDelta) {
-        if let Some(meta_data) = self.meta_data.get_mut(&id) {
-            if let ImageDelta::Full { image, .. } = &delta {
-                meta_data.size = [image.width as usize, image.height as usize];
-                // discard all old enqueued deltas since we're doing a full update
-                self.delta.update.retain(|(x, _)| x != &id);
-            }
-            self.delta.update.push((id, delta));
-        } else {
+        let Some(meta_data) = self.meta_data.get_mut(&id) else {
             // the handle may have been dropped while the async load was in flight.
             // just discard the result.
             log::debug!("Discarding load result for freed texture {id:?}");
+            return;
+        };
+
+        match &delta {
+            ImageDelta::Full {
+                image,
+                mip_strategy,
+                ..
+            } => {
+                meta_data.state = TextureState::Loaded(TextureShape {
+                    size: PhysicalSize::new(image.width, image.height),
+                    format: image.format,
+                    array_layers: image.array_layers,
+                    mip_level_count: mip_strategy.resolve_mip_level_count(image),
+                });
+                // discard all old enqueued deltas since we're doing a full update
+                self.delta.update.retain(|(x, _)| x != &id);
+            }
+            ImageDelta::Partial { image, .. } => {
+                let TextureState::Loaded(shape) = &meta_data.state else {
+                    panic!("partial update for texture {id:?} which hasn't finished loading!");
+                };
+
+                assert_eq!(
+                    shape.format, image.format,
+                    "format of partial update must match format of existing texture {id:?}"
+                );
+
+                assert_eq!(
+                    shape.mip_level_count, 1,
+                    "partial updates are not supported for textures with mipmaps (texture {id:?})"
+                );
+            }
         }
+        self.delta.update.push((id, delta));
     }
 
     /// Frees an existing texture.
