@@ -33,6 +33,6 @@ pub fn deflate(l: &Lua, uncompressed: LuaString) -> LuaResult<MultiValue> {
     let mut compressed = Vec::new();
     match encoder.read_to_end(&mut compressed) {
         Ok(_) => l.create_string(&compressed).unwrap().into_lua_multi(l),
-        Err(e) => Ok((Value::Nil, e.to_string()).into_lua_multi(l).unwrap()),
+        Err(e) => (Value::Nil, e.to_string()).into_lua_multi(l),
     }
 }
