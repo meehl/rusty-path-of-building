@@ -3,7 +3,7 @@ use crate::{
     dpi::{LogicalPoint, LogicalRect, LogicalSize, PhysicalRect, PhysicalSize, ScaleFactor},
     math::Point,
     renderer::{
-        image::{ImageData, MipStrategy},
+        image::MipStrategy,
         textures::{TextureId, TextureOptions, TexturesDelta},
     },
     util::calculate_hash,
@@ -254,7 +254,7 @@ impl Renderer {
             textures_bind_group_layout,
             textures: HashMap::default(),
             samplers: HashMap::default(),
-            batch_bind_group_cache: Default::default(),
+            batch_bind_group_cache: HashMap::default(),
         }
     }
 
@@ -332,28 +332,13 @@ impl Renderer {
                     options,
                     mip_strategy,
                 } => {
-                    let ImageData {
-                        format,
-                        width,
-                        height,
-                        array_layers,
-                        mipmap_count,
-                        data_order,
-                        bytes,
-                    } = image;
+                    let generate_mipmaps = matches!(mip_strategy, MipStrategy::GenerateOnUpload);
+                    let mip_level_count = mip_strategy.resolve_mip_level_count(image);
 
                     let size = wgpu::Extent3d {
-                        width: *width,
-                        height: *height,
-                        depth_or_array_layers: *array_layers,
-                    };
-
-                    let gen_mipmaps = matches!(mip_strategy, MipStrategy::GenerateOnUpload);
-
-                    let mip_level_count = if gen_mipmaps {
-                        size.max_mips(wgpu::TextureDimension::D2)
-                    } else {
-                        mipmap_count.get()
+                        width: image.width,
+                        height: image.height,
+                        depth_or_array_layers: image.array_layers,
                     };
 
                     let label_str = format!("texture_{id:?}");
@@ -368,18 +353,18 @@ impl Renderer {
                             mip_level_count,
                             sample_count: 1,
                             dimension: wgpu::TextureDimension::D2,
-                            format: *format,
+                            format: image.format,
                             usage: wgpu::TextureUsages::TEXTURE_BINDING
                                 | wgpu::TextureUsages::COPY_DST,
-                            view_formats: &[format.add_srgb_suffix()],
+                            view_formats: &[image.format.add_srgb_suffix()],
                         },
-                        (*data_order).into(),
-                        bytes,
-                        gen_mipmaps,
+                        image.data_order.into(),
+                        &image.bytes,
+                        generate_mipmaps,
                     );
 
-                    if gen_mipmaps {
-                        mipmap::generate_mipmap_chain(queue, &texture, bytes);
+                    if generate_mipmaps {
+                        mipmap::generate_mipmap_chain(queue, &texture, &image.bytes);
                     }
 
                     let view = texture.create_view(&wgpu::TextureViewDescriptor {

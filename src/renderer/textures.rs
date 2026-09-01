@@ -294,9 +294,9 @@ impl TextureManager {
 
     #[inline]
     pub fn update_font_texture(&self, delta: Vec<ImageDelta>) {
-        delta.into_iter().for_each(|d| {
+        for d in delta.into_iter() {
             self.manager.borrow_mut().set(TextureId::default(), d);
-        });
+        }
     }
 
     #[inline]
