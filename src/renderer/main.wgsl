@@ -3,7 +3,7 @@ enable wgpu_binding_array;
 // Vertex shader bindings
 struct VertexOutput {
     @location(0) tex_coord: vec2<f32>,
-    @location(1) color: vec4<f32>, // linear
+    @location(1) color: vec4<f32>,
     @location(2) @interpolate(flat) texture_idx: u32,
     @location(3) @interpolate(flat) layer_idx: u32,
     @builtin(position) position: vec4<f32>,
