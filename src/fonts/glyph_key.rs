@@ -66,7 +66,7 @@ impl<const NUM_OF_BINS: usize> SubpixelBin<NUM_OF_BINS> {
 
 #[test]
 fn test_subpixel_bins() {
-    assert_eq!(SubpixelBin::<4>::new(3.14), (3, SubpixelBin(1)));
+    assert_eq!(SubpixelBin::<4>::new(3.13), (3, SubpixelBin(1)));
     assert_eq!(SubpixelBin::<4>::new(0.11), (0, SubpixelBin(0)));
     assert_eq!(SubpixelBin::<4>::new(-0.8), (-1, SubpixelBin(1)));
     assert_eq!(SubpixelBin::<2>::new(0.24), (0, SubpixelBin(0)));
