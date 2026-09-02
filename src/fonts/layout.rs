@@ -14,7 +14,7 @@ pub type LayoutRect<T> = Rect<T, LayoutSpace>;
 
 pub type LayoutToLogical = Translation<f32, LayoutSpace, LogicalScreenSpace>;
 
-#[derive(Copy, Clone, Default, Debug, Hash, PartialEq)]
+#[derive(Copy, Clone, Default, Debug, Hash, Eq, PartialEq)]
 pub enum Alignment {
     #[default]
     Min,
@@ -22,7 +22,7 @@ pub enum Alignment {
     Max,
 }
 
-#[derive(Copy, Clone, Default, Debug, Hash, PartialEq)]
+#[derive(Copy, Clone, Default, Debug, Hash, Eq, PartialEq)]
 pub enum FontStyle {
     #[default]
     Normal,
@@ -32,8 +32,8 @@ pub enum FontStyle {
 impl From<FontStyle> for parley::FontStyle {
     fn from(value: FontStyle) -> Self {
         match value {
-            FontStyle::Normal => parley::FontStyle::Normal,
-            FontStyle::Italic => parley::FontStyle::Italic,
+            FontStyle::Normal => Self::Normal,
+            FontStyle::Italic => Self::Italic,
         }
     }
 }

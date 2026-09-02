@@ -202,10 +202,10 @@ pub enum Input {
 impl Input {
     fn as_pob_key_str(&self) -> Option<SmolStr> {
         match self {
-            Input::Keyboard(key) => key_as_str(key.clone()),
-            Input::Mouse(button) => mousebutton_as_str(*button),
-            Input::WheelUp => Some("WHEELUP".into()),
-            Input::WheelDown => Some("WHEELDOWN".into()),
+            Self::Keyboard(key) => key_as_str(key.clone()),
+            Self::Mouse(button) => mousebutton_as_str(*button),
+            Self::WheelUp => Some("WHEELUP".into()),
+            Self::WheelDown => Some("WHEELDOWN".into()),
         }
     }
 }

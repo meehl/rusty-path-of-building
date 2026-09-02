@@ -122,6 +122,9 @@ pub enum ExtractionRule {
     RewritePrefix { prefix: String, dest_dir: PathBuf },
 }
 
+const CHUNK_SIZE: usize = 512 * 1024;
+const PROGRESS_INTERVAL: Duration = Duration::from_millis(50);
+
 /// Download a GitHub release tarball and extract entries to specified destinations.
 pub fn download_and_extract_tarball(
     client: &Client,
@@ -146,13 +149,11 @@ pub fn download_and_extract_tarball(
         let content_length = response.content_length();
 
         let mut tmp_file = File::create(&tmp_path)?;
-        const CHUNK_SIZE: usize = 512 * 1024;
         let mut chunk = vec![0u8; CHUNK_SIZE];
         let mut downloaded: u64 = 0;
         let mut body = response;
 
         let mut last_progress = Instant::now();
-        const PROGRESS_INTERVAL: Duration = Duration::from_millis(50);
 
         loop {
             let n = body.read(&mut chunk)?;

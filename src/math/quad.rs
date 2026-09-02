@@ -52,10 +52,10 @@ impl<T: fmt::Debug, U> fmt::Debug for Quad<T, U> {
 impl<T: Default, U> Default for Quad<T, U> {
     fn default() -> Self {
         Self::new(
-            Default::default(),
-            Default::default(),
-            Default::default(),
-            Default::default(),
+            Point::default(),
+            Point::default(),
+            Point::default(),
+            Point::default(),
         )
     }
 }

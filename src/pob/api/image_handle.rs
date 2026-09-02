@@ -21,7 +21,7 @@ impl ImageHandle {
         Self { texture: None }
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn texture_id(&self) -> Option<TextureId> {
         self.texture.as_ref().map(TextureHandle::id)
     }
@@ -33,18 +33,15 @@ impl ImageHandle {
 
     #[inline]
     pub fn is_loading(&self) -> bool {
-        match &self.texture {
-            Some(texture) => texture.is_loading(),
-            None => true,
-        }
+        self.texture.as_ref().is_none_or(TextureHandle::is_loading)
     }
 
     #[inline]
     pub fn image_size(&self) -> PhysicalSize<u32> {
-        match &self.texture {
-            Some(texture) => texture.size().unwrap_or(PhysicalSize::zero()),
-            None => PhysicalSize::zero(),
-        }
+        self.texture
+            .as_ref()
+            .and_then(TextureHandle::size)
+            .unwrap_or_else(PhysicalSize::zero)
     }
 }
 
@@ -62,7 +59,7 @@ const IMAGE_HANDLE_METATABLE: &[u8] = b"runtime.ImageHandle\0";
 #[inline]
 unsafe fn push_image_handle(state: *mut ffi::lua_State) -> *mut ImageHandle {
     let ptr = unsafe { ffi::lua_newuserdata(state, std::mem::size_of::<ImageHandle>()) }
-        as *mut ImageHandle;
+        .cast::<ImageHandle>();
 
     // Construct the Rust object directly in Lua-owned memory
     unsafe {
@@ -78,7 +75,7 @@ unsafe extern "C-unwind" fn new_image_handle(state: *mut ffi::lua_State) -> c_in
         push_image_handle(state);
 
         // The metatable must already have been registered.
-        ffi::luaL_getmetatable(state, IMAGE_HANDLE_METATABLE.as_ptr() as *const _);
+        ffi::luaL_getmetatable(state, IMAGE_HANDLE_METATABLE.as_ptr().cast());
         ffi::lua_setmetatable(state, -2);
     }
 
@@ -89,12 +86,12 @@ unsafe extern "C-unwind" fn new_image_handle(state: *mut ffi::lua_State) -> c_in
 #[inline]
 unsafe fn get_image_handle(state: *mut ffi::lua_State, index: c_int) -> *mut ImageHandle {
     unsafe {
-        ffi::luaL_checkudata(state, index, IMAGE_HANDLE_METATABLE.as_ptr() as *const _)
-            as *mut ImageHandle
+        ffi::luaL_checkudata(state, index, IMAGE_HANDLE_METATABLE.as_ptr().cast())
+            .cast::<ImageHandle>()
     }
 }
 
-#[inline(always)]
+#[inline]
 pub unsafe fn image_handle_texture_id(
     state: *mut ffi::lua_State,
     index: c_int,
@@ -103,7 +100,7 @@ pub unsafe fn image_handle_texture_id(
         return None;
     }
 
-    let ptr = unsafe { ffi::lua_touserdata(state, index) } as *const ImageHandle;
+    let ptr = unsafe { ffi::lua_touserdata(state, index) }.cast::<ImageHandle>();
 
     if ptr.is_null() {
         return None;
@@ -114,7 +111,7 @@ pub unsafe fn image_handle_texture_id(
 
 // Drops the `ImageHandle`
 unsafe extern "C-unwind" fn image_handle_gc(state: *mut ffi::lua_State) -> c_int {
-    let ptr = unsafe { ffi::lua_touserdata(state, 1) } as *mut ImageHandle;
+    let ptr = unsafe { ffi::lua_touserdata(state, 1) }.cast::<ImageHandle>();
 
     if !ptr.is_null() {
         unsafe {
@@ -131,7 +128,7 @@ unsafe extern "C-unwind" fn image_handle_is_valid(state: *mut ffi::lua_State) ->
     let valid = unsafe { (*handle).is_valid() };
 
     unsafe {
-        ffi::lua_pushboolean(state, valid as c_int);
+        ffi::lua_pushboolean(state, c_int::from(valid));
     }
 
     1
@@ -143,7 +140,7 @@ unsafe extern "C-unwind" fn image_handle_is_loading(state: *mut ffi::lua_State) 
     let loading = unsafe { (*handle).is_loading() };
 
     unsafe {
-        ffi::lua_pushboolean(state, loading as c_int);
+        ffi::lua_pushboolean(state, c_int::from(loading));
     }
 
     1
@@ -211,12 +208,12 @@ unsafe extern "C-unwind" fn image_handle_load(state: *mut ffi::lua_State) -> c_i
 
         let mut len = 0;
 
-        let ptr = unsafe { ffi::lua_tolstring(state, index, &mut len) };
+        let ptr = unsafe { ffi::lua_tolstring(state, index, &raw mut len) };
         if ptr.is_null() {
             continue;
         }
 
-        let bytes = unsafe { std::slice::from_raw_parts(ptr as *const u8, len) };
+        let bytes = unsafe { std::slice::from_raw_parts(ptr.cast::<u8>(), len) };
 
         match bytes {
             b"CLAMP" => {
@@ -268,7 +265,7 @@ unsafe extern "C-unwind" fn image_handle_load(state: *mut ffi::lua_State) -> c_i
 
 unsafe fn register_image_handle_metatable(state: *mut ffi::lua_State) {
     unsafe {
-        let created = ffi::luaL_newmetatable(state, IMAGE_HANDLE_METATABLE.as_ptr() as *const _);
+        let created = ffi::luaL_newmetatable(state, IMAGE_HANDLE_METATABLE.as_ptr().cast());
 
         // Create metatable if it doesn't exist already
         if created != 0 {

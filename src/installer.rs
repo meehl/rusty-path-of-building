@@ -107,10 +107,9 @@ impl Installer {
     pub fn handle_event(&mut self, event: StageEvent) -> anyhow::Result<Option<StageTransition>> {
         match event {
             StageEvent::Resized(size) => self.window_state.size = size,
-            StageEvent::ScaleFactorChanged(factor) =>
-            {
+            StageEvent::ScaleFactorChanged(factor) => {
                 #[allow(clippy::cast_possible_truncation)]
-                self.window_state.set_scale_factor(factor as f32)
+                self.window_state.set_scale_factor(factor as f32);
             }
             _ => {}
         }

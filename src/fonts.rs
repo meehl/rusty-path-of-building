@@ -68,7 +68,7 @@ impl Fonts {
             layout_context: LayoutContext::new(),
             atlas: FontAtlas::new(1024, 1024),
             glyph_rasterizer: GlyphRasterizer::new(),
-            layout_cache: Default::default(),
+            layout_cache: LayoutCache::default(),
         };
 
         fonts.register_fonts();
@@ -205,10 +205,9 @@ impl Fonts {
             font_family: job.font_family,
             font_size: job.font_size.into(),
             line_height: parley::LineHeight::Absolute(job.line_height.into()),
-            font_weight: job
-                .font_weight
-                .map(|w| parley::FontWeight::new(w.into()))
-                .unwrap_or(default_style.font_weight),
+            font_weight: job.font_weight.map_or(default_style.font_weight, |w| {
+                parley::FontWeight::new(w.into())
+            }),
             font_style: job.font_style.into(),
             ..default_style
         };

@@ -13,8 +13,11 @@ use anyhow::Result;
 use std::sync::Arc;
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
 use winit::{
-    application::ApplicationHandler, event::*, event_loop::ActiveEventLoop,
-    platform::modifier_supplement::KeyEventExtModifierSupplement, window::Window,
+    application::ApplicationHandler,
+    event::{ElementState, MouseScrollDelta, WindowEvent},
+    event_loop::ActiveEventLoop,
+    platform::modifier_supplement::KeyEventExtModifierSupplement,
+    window::Window,
 };
 
 struct FrameOutput {
@@ -78,7 +81,7 @@ impl App {
                     self.handle_event(StageEvent::Exit);
                     event_loop.exit();
                 }
-            };
+            }
         }
         Ok(())
     }
@@ -214,7 +217,7 @@ impl ApplicationHandler<GraphicsContext> for App {
 
                 if let Some(ref mut gfx) = self.gfx_context {
                     match gfx.render(render_job) {
-                        Ok(_) => {}
+                        Ok(()) => {}
                         Err(err) => {
                             log::error!("Unable to render: {err}");
                         }

@@ -14,7 +14,7 @@ macro_rules! str_from_stack {
         unsafe {
             let mut size = 0;
             let data = ffi::luaL_checklstring($s, $i, &mut size);
-            let bytes = std::slice::from_raw_parts(data as *const u8, size);
+            let bytes = std::slice::from_raw_parts(data.cast::<u8>(), size);
             std::str::from_utf8_unchecked(bytes)
         }
     };
@@ -74,10 +74,10 @@ pub unsafe extern "C-unwind" fn get_draw_color(state: *mut ffi::lua_State) -> c_
     let ctx = lua_instance.app_data_ref::<Context>().unwrap();
 
     let color: [f32; 4] = ctx.recorder.get_draw_color().into();
-    unsafe { ffi::lua_pushnumber(state, color[0] as f64) };
-    unsafe { ffi::lua_pushnumber(state, color[1] as f64) };
-    unsafe { ffi::lua_pushnumber(state, color[2] as f64) };
-    unsafe { ffi::lua_pushnumber(state, color[3] as f64) };
+    unsafe { ffi::lua_pushnumber(state, f64::from(color[0])) };
+    unsafe { ffi::lua_pushnumber(state, f64::from(color[1])) };
+    unsafe { ffi::lua_pushnumber(state, f64::from(color[2])) };
+    unsafe { ffi::lua_pushnumber(state, f64::from(color[3])) };
 
     4
 }

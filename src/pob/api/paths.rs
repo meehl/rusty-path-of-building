@@ -14,20 +14,17 @@ pub fn get_user_path(l: &Lua, _: ()) -> LuaResult<PathBuf> {
 // parent directory of Launch.lua script
 pub fn get_script_path(l: &Lua, _: ()) -> LuaResult<PathBuf> {
     let ctx = l.app_data_ref::<Context>().unwrap();
-    Ok(ctx.script_dir.to_owned())
+    Ok(ctx.script_dir.clone())
 }
 
 // parent directory of executable
 pub fn get_runtime_path(_: &Lua, _: ()) -> LuaResult<PathBuf> {
-    match get_executable_dir() {
-        Ok(exe_path) => Ok(exe_path),
-        Err(_) => Ok(PathBuf::new()),
-    }
+    Ok(get_executable_dir().unwrap_or_default())
 }
 
 pub fn get_work_dir(l: &Lua, _: ()) -> LuaResult<PathBuf> {
     let ctx = l.app_data_ref::<Context>().unwrap();
-    Ok(ctx.current_working_dir.to_owned())
+    Ok(ctx.current_working_dir.clone())
 }
 
 // NOTE: unused

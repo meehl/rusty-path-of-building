@@ -19,7 +19,7 @@ macro_rules! str_from_stack {
         unsafe {
             let mut size = 0;
             let data = ffi::luaL_checklstring($s, $i, &mut size);
-            let bytes = std::slice::from_raw_parts(data as *const u8, size);
+            let bytes = std::slice::from_raw_parts(data.cast::<u8>(), size);
             std::str::from_utf8_unchecked(bytes)
         }
     };
@@ -140,7 +140,7 @@ pub unsafe extern "C-unwind" fn get_string_width(state: *mut ffi::lua_State) -> 
         .layout(job, ctx.window_state.scale_factor());
     let width = layout.width();
 
-    unsafe { ffi::lua_pushnumber(state, width as f64) };
+    unsafe { ffi::lua_pushnumber(state, f64::from(width)) };
     1
 }
 
@@ -313,7 +313,7 @@ impl<'a> IntoIterator for PoBString<'a> {
 }
 
 /// A segment of text that shares the same color.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct ColoredSegment<'a> {
     pub color: Option<Srgba>,
     pub text: &'a str,
@@ -353,36 +353,33 @@ impl<'a> Iterator for PoBStringSegmentIterator<'a> {
         }
 
         loop {
-            match self.captures.next() {
-                Some(captures) => {
-                    let m = &captures.get(0).expect("group 0 always matches");
-                    let start = self.cursor;
-                    let text = &self.haystack[start..m.start()];
-                    let color = self.color;
+            if let Some(captures) = self.captures.next() {
+                let m = &captures.get(0).expect("group 0 always matches");
+                let start = self.cursor;
+                let text = &self.haystack[start..m.start()];
+                let color = self.color;
 
-                    self.cursor = m.end();
-                    self.color = Some(Srgba::from_escape_code(m.as_str()));
+                self.cursor = m.end();
+                self.color = Some(Srgba::from_escape_code(m.as_str()));
 
-                    // check for case where string starts with escape code
-                    if text.is_empty() && color.is_none() {
-                        continue;
-                    }
-
-                    return Some(ColoredSegment {
-                        color,
-                        text,
-                        original_start: start,
-                    });
+                // check for case where string starts with escape code
+                if text.is_empty() && color.is_none() {
+                    continue;
                 }
-                None => {
-                    self.done = true;
-                    return Some(ColoredSegment {
-                        color: self.color,
-                        text: &self.haystack[self.cursor..],
-                        original_start: self.cursor,
-                    });
-                }
+
+                return Some(ColoredSegment {
+                    color,
+                    text,
+                    original_start: start,
+                });
             }
+
+            self.done = true;
+            return Some(ColoredSegment {
+                color: self.color,
+                text: &self.haystack[self.cursor..],
+                original_start: self.cursor,
+            });
         }
     }
 }

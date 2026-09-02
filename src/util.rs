@@ -15,8 +15,8 @@ pub fn get_executable_dir() -> anyhow::Result<PathBuf> {
 pub fn change_working_directory<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
     env::set_current_dir(path.as_ref()).map_err(|e| {
         anyhow::anyhow!(
-            "Failed to change working directory {:?}: {}",
-            path.as_ref(),
+            "Failed to change working directory {}: {}",
+            path.as_ref().display(),
             e
         )
     })

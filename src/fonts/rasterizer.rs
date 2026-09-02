@@ -43,10 +43,10 @@ impl GlyphRasterizer {
     pub fn new() -> Self {
         Self {
             scale_context: swash::scale::ScaleContext::new(),
-            swash_keys: Default::default(),
-            style_cache: Default::default(),
-            cached_glyphs: Default::default(),
-            scratch: Default::default(),
+            swash_keys: HashMap::default(),
+            style_cache: StyleCache::default(),
+            cached_glyphs: HashMap::default(),
+            scratch: swash::scale::image::Image::default(),
         }
     }
 
@@ -158,7 +158,7 @@ fn rasterize_glyph(
 
     if !did_render || image.placement.width == 0 || image.placement.height == 0 {
         return None;
-    };
+    }
 
     let (size, uv, layer_idx) = atlas.write_mask(image);
 

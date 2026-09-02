@@ -191,10 +191,9 @@ impl Subscript {
     ///
     /// Does nothing if there is no pending call.
     fn handle_calls(&self, lua: &Lua) {
-        let call = match self.call_rx.try_recv() {
-            Ok(call) => call,
+        let Ok(call) = self.call_rx.try_recv() else {
             // no pending call, or thread disconnected which is handled on join
-            Err(_) => return,
+            return;
         };
 
         match call {

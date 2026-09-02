@@ -64,16 +64,19 @@ impl UserData for SearchHandle {
         methods.add_method_mut("GetFileName", |l, this, ()| {
             Ok(this.current.as_ref().unwrap().file_name().into_lua(l))
         });
-        methods.add_method("GetFileSize", |_, this, ()| match &this.current {
-            Some(path) => match fs::metadata(path) {
-                Ok(metadata) => Ok(metadata.len()),
-                Err(_) => Ok(0),
-            },
-            None => Ok(0),
+        methods.add_method("GetFileSize", |_, this, ()| {
+            Ok(this
+                .current
+                .as_ref()
+                .and_then(|path| fs::metadata(path).ok())
+                .map_or(0, |metadata| metadata.len()))
         });
-        methods.add_method("GetFileModifiedTime", |_, this, ()| match &this.current {
-            Some(path) => get_time_modified(path).map_or(Ok(0), Ok),
-            None => Ok(0),
+        methods.add_method("GetFileModifiedTime", |_, this, ()| {
+            Ok(this
+                .current
+                .as_ref()
+                .and_then(|path| get_time_modified(path).ok())
+                .unwrap_or(0))
         });
     }
 }

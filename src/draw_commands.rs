@@ -91,7 +91,7 @@ impl DrawCommandRecorder {
         let (texture_id, uvs, texture_layer_idx) = match texture_id {
             Some(texture_id) => (
                 texture_id,
-                uv.map_or(UvQuad::full_uv(), |uv_rect| uv_rect.into()),
+                uv.map_or_else(UvQuad::full_uv, |uv_rect| uv_rect.into()),
                 layer_idx,
             ),
             None => (TextureId::default(), UvQuad::white_uv(), 0),
@@ -122,7 +122,7 @@ impl DrawCommandRecorder {
         layer_idx: u32,
     ) {
         let (texture_id, uvs, texture_layer_idx) = match texture_id {
-            Some(texture_id) => (texture_id, uv.unwrap_or(UvQuad::full_uv()), layer_idx),
+            Some(texture_id) => (texture_id, uv.unwrap_or_else(UvQuad::full_uv), layer_idx),
             None => (TextureId::default(), UvQuad::white_uv(), 0),
         };
 

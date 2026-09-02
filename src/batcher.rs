@@ -37,7 +37,7 @@ impl BatchBuilder {
 
     /// Tries to assign a texture to the batch.
     ///
-    /// Returns slot_index into textures array if texture can be assigned.
+    /// Returns `slot_index` into textures array if texture can be assigned.
     /// Returns `None` if maximum amount of texture slots is reached.
     fn try_assign(&mut self, id: TextureId, max_slots: NonZeroU32) -> Option<u32> {
         if let Some(&slot) = self.texture_mapping.get(&id) {

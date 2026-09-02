@@ -210,10 +210,12 @@ impl FontAtlas {
                 let a = image.data[i];
                 // SAFETY: allocated atlas region and swash image have the same size
                 unsafe {
-                    allocation
-                        .sub_image
-                        .unsafe_put_pixel(x, y, Srgba::new(255, 255, 255, a).into())
-                };
+                    allocation.sub_image.unsafe_put_pixel(
+                        x,
+                        y,
+                        Srgba::new(255, 255, 255, a).into(),
+                    );
+                }
                 i += 1;
             }
         }
