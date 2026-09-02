@@ -5,7 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub fn get_time(_l: &Lua, _: ()) -> LuaResult<u128> {
     Ok(SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap()
+        .expect("UNIX_EPOCH is before now")
         .as_millis())
 }
 
