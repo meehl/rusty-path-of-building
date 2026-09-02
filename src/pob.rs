@@ -13,7 +13,7 @@ use crate::{
     pob::subscript::{SubscriptManager, SubscriptResult},
     renderer::textures::TextureManager,
     stage::{StageEvent, StageFrameOutput, StageTransition},
-    util::change_working_directory,
+    util::{append_lua_package_dir, change_working_directory},
     window::WindowState,
 };
 use std::{
@@ -111,13 +111,12 @@ impl PathOfBuilding {
     fn create_lua(ctx: Context) -> LuaResult<Lua> {
         // `unsafe_new` needed to allow loading of C modules
         let lua = unsafe { Lua::unsafe_new() };
+        append_lua_package_dir(&lua, &ctx.script_dir.join("lua"))?;
 
         // expose import url to lua
         let args = Args::parse();
         let args_table = lua.create_sequence_from(std::iter::once(args.import_url))?;
         lua.globals().set("arg", args_table)?;
-
-        Self::register_package_paths(&lua, &ctx.script_dir)?;
 
         // make context accessible to API functions
         lua.set_app_data(ctx);
@@ -126,18 +125,6 @@ impl PathOfBuilding {
         api::register_globals(&lua)?;
 
         Ok(lua)
-    }
-
-    /// Adds `${script_dir}/lua` to package path
-    pub fn register_package_paths(lua: &Lua, script_dir: &Path) -> LuaResult<()> {
-        let package: Table = lua.globals().get("package")?;
-        let mut package_path: String = package.get("path")?;
-        package_path.push(';');
-        package_path.push_str(script_dir.join("lua/?.lua").to_str().unwrap());
-        package_path.push(';');
-        package_path.push_str(script_dir.join("lua/?/init.lua").to_str().unwrap());
-        package.set("path", package_path)?;
-        Ok(())
     }
 
     /// Loads and runs `Launch.lua`, then calls PoB's `OnInit` handler.

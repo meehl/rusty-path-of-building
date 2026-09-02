@@ -1,4 +1,4 @@
-use crate::{pob::PathOfBuilding, pob::api};
+use crate::{pob::api, util::append_lua_package_dir};
 use anyhow::{Result, anyhow};
 use mlua::{Integer, IntoLuaMulti, Lua, MultiValue, Number, Value};
 use std::{
@@ -134,10 +134,7 @@ impl Subscript {
 
             // unsafe required to load C modules (curl)
             let lua = unsafe { Lua::unsafe_new() };
-
-            // add ./lua to package.path and package.cpath
-            // TODO: this is awkward, move package path registration out of PoB?
-            PathOfBuilding::register_package_paths(&lua, &script_dir)?;
+            append_lua_package_dir(&lua, &script_dir.join("lua"))?;
 
             // register a proxy for each allowed blocking call.
             // forwards the call to the main thread and blocks on `reply_rx` until the main thread
