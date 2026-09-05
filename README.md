@@ -18,6 +18,10 @@ rusty-path-of-building [poe1|poe2]
 
 [![Stable version badge](https://img.shields.io/flathub/v/community.pathofbuilding.PathOfBuilding)](https://flathub.org/en/apps/community.pathofbuilding.PathOfBuilding)
 
+### Homebrew
+
+See the [tap available here](https://github.com/meehl/homebrew-rusty-path-of-building). NOTE: This has been tested on macOS only.
+
 ### Building from source
 
 `LuaJIT` needs to be installed for the `mlua` crate to compile.
