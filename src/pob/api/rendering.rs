@@ -145,13 +145,13 @@ pub unsafe extern "C-unwind" fn draw_image(state: *mut ffi::lua_State) -> c_int 
 
     let nargs = unsafe { ffi::lua_gettop(state) };
     assert!(
-        matches!(nargs, 5 | 6 | 7 | 9 | 10 | 11),
+        matches!(nargs, 5 | 6 | 9 | 10),
         "Unexpected number of arguments"
     );
 
     #[allow(clippy::manual_range_patterns)]
-    let parse_uv = matches!(nargs, 9 | 10 | 11);
-    let parse_layer_idx = matches!(nargs, 6 | 7 | 10 | 11);
+    let parse_uv = matches!(nargs, 9 | 10);
+    let parse_layer_idx = matches!(nargs, 6 | 10);
 
     let texture_id = unsafe { image_handle_texture_id(state, -nargs) };
 
@@ -194,13 +194,13 @@ pub unsafe extern "C-unwind" fn draw_image_quad(state: *mut ffi::lua_State) -> c
 
     let nargs = unsafe { ffi::lua_gettop(state) };
     assert!(
-        matches!(nargs, 9 | 10 | 11 | 17 | 18 | 19),
+        matches!(nargs, 9 | 10 | 17 | 18),
         "Unexpected number of arguments"
     );
 
     #[allow(clippy::manual_range_patterns)]
-    let parse_uv = matches!(nargs, 17 | 18 | 19);
-    let parse_layer_idx = matches!(nargs, 10 | 11 | 18 | 19);
+    let parse_uv = matches!(nargs, 17 | 18);
+    let parse_layer_idx = matches!(nargs, 10 | 18);
 
     let texture_id = unsafe { image_handle_texture_id(state, -nargs) };
 
@@ -259,10 +259,6 @@ pub fn get_draw_layer(l: &Lua, _: ()) -> LuaResult<i32> {
     let ctx = l.app_data_ref::<Context>().unwrap();
     // matching PoB's behavior where only the sublayer is returned
     Ok(ctx.recorder.get_draw_layer().1)
-}
-
-pub fn set_blend_mode(_: &Lua, _: ()) -> LuaResult<()> {
-    unimplemented!()
 }
 
 pub fn get_async_count(_: &Lua, _: ()) -> LuaResult<()> {
