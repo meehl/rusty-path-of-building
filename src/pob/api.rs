@@ -19,7 +19,7 @@ use crate::{
             },
             rendering::{
                 draw_image, draw_image_quad, get_async_count, get_draw_color, get_draw_layer,
-                set_blend_mode, set_clear_color, set_draw_color, set_draw_layer, set_viewport,
+                set_clear_color, set_draw_color, set_draw_layer, set_viewport,
             },
             search_handle::new_search_handle,
             subscript::{abort_subscript, is_subscript_running, launch_subscript},
@@ -147,7 +147,6 @@ pub fn register_globals(lua: &Lua) -> LuaResult<()> {
     unsafe { globals.set("DrawImage", lua.create_c_function(draw_image)?)? };
     unsafe { globals.set("DrawImageQuad", lua.create_c_function(draw_image_quad)?)? };
     globals.set("GetDrawLayer", lua.create_function(get_draw_layer)?)?;
-    globals.set("SetBlendMode", lua.create_function(set_blend_mode)?)?;
     globals.set("GetAsyncCount", lua.create_function(get_async_count)?)?;
     globals.set("SetClearColor", lua.create_function(set_clear_color)?)?;
 
