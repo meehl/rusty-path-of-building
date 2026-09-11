@@ -2,6 +2,8 @@
 pub mod luacurl;
 #[cfg(feature = "bundled-lua-modules")]
 pub mod luasocket;
+#[cfg(feature = "bundled-lua-modules")]
+pub mod luazip;
 
 use mlua::{Lua, Result as LuaResult};
 
@@ -10,6 +12,7 @@ pub fn register(lua: &Lua) -> LuaResult<()> {
     lua.register_module("lua-utf8", luautf8::create_module(lua)?)?;
     lua.register_module("socket", luasocket::create_module(lua)?)?;
     lua.register_module("lcurl.safe", luacurl::create_module(lua)?)?;
+    lua.register_module("lzip", luazip::create_module(lua)?)?;
     Ok(())
 }
 
