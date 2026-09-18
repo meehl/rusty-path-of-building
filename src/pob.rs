@@ -124,6 +124,9 @@ impl PathOfBuilding {
         // register API functions
         api::register_globals(&lua)?;
 
+        // register Rust port of `luautf8` as module
+        lua.register_module("lua-utf8", luautf8::create_module(&lua)?)?;
+
         Ok(lua)
     }
 
