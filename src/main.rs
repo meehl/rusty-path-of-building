@@ -59,10 +59,18 @@ fn find_nearby_launch_script() -> Option<PathBuf> {
 
     for candidate in candidates {
         if candidate.try_exists().is_ok_and(|exists| exists)
-            && let Some(Ok(candidate)) = candidate.parent().map(Path::canonicalize)
+            && let Ok(candidate) = candidate.canonicalize()
+            && let Some(dir) = candidate.parent()
         {
-            return Some(candidate);
-        }
+            // remove the windows extended length path syntax as it contains a
+            // question mark which will interfere with lua's require()
+            const WINDOWS_PREFIX: &str = r#"\\?\"#;
+            let path_str = dir.display().to_string();
+            return match path_str.strip_prefix(WINDOWS_PREFIX) {
+                Some(stripped) => Some(PathBuf::from(stripped)),
+                None => Some(dir.to_path_buf()),
+            };
+        };
     }
 
     None
