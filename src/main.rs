@@ -1,6 +1,9 @@
 use crate::{app::App, args::Args};
 use clap::Parser;
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 use winit::event_loop::EventLoop;
 
 mod app;
@@ -59,9 +62,18 @@ fn find_nearby_launch_script() -> Option<PathBuf> {
 
     for candidate in candidates {
         if candidate.try_exists().is_ok_and(|exists| exists)
-            && let Some(Ok(candidate)) = candidate.parent().map(Path::canonicalize)
+            && let Ok(candidate) = candidate.canonicalize()
+            && let Some(dir) = candidate.parent()
         {
-            return Some(candidate);
+            // remove the windows extended length path syntax as it contains a
+            // question mark which will interfere with lua's require()
+            const WINDOWS_PREFIX: &str = r#"\\?\"#;
+            let path_str = dir.display().to_string();
+            if path_str.starts_with(WINDOWS_PREFIX) {
+                return Some(PathBuf::from_str(&path_str[WINDOWS_PREFIX.len()..]).unwrap());
+            } else {
+                return Some(dir.to_path_buf());
+            };
         }
     }
 
