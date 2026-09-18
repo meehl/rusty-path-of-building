@@ -1,9 +1,6 @@
 use crate::{app::App, args::Args};
 use clap::Parser;
-use std::{
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use std::path::{Path, PathBuf};
 use winit::event_loop::EventLoop;
 
 mod app;
@@ -69,12 +66,11 @@ fn find_nearby_launch_script() -> Option<PathBuf> {
             // question mark which will interfere with lua's require()
             const WINDOWS_PREFIX: &str = r#"\\?\"#;
             let path_str = dir.display().to_string();
-            if path_str.starts_with(WINDOWS_PREFIX) {
-                return Some(PathBuf::from_str(&path_str[WINDOWS_PREFIX.len()..]).unwrap());
-            } else {
-                return Some(dir.to_path_buf());
+            return match path_str.strip_prefix(WINDOWS_PREFIX) {
+                Some(stripped) => Some(PathBuf::from(stripped)),
+                None => Some(dir.to_path_buf()),
             };
-        }
+        };
     }
 
     None
