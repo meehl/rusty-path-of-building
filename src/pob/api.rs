@@ -12,6 +12,7 @@ use crate::{
                 get_cursor_pos, is_key_down, key_as_str, mousebutton_as_str, set_cursor_pos,
                 show_cursor,
             },
+            llm::{llm_cancel, llm_chat, llm_get_config},
             lua::{load_module, protected_call, protected_load_module},
             paths::{
                 get_runtime_path, get_script_path, get_user_path, get_work_dir, make_dir,
@@ -43,6 +44,7 @@ mod console;
 mod general;
 mod image_handle;
 mod input;
+mod llm;
 mod lua;
 mod paths;
 mod rendering;
@@ -133,6 +135,11 @@ pub fn register_globals(lua: &Lua) -> LuaResult<()> {
     )?;
     globals.set("AbortSubScript", lua.create_function(abort_subscript)?)?;
 
+    // llm
+    globals.set("LlmChat", lua.create_function(llm_chat)?)?;
+    globals.set("LlmCancel", lua.create_function(llm_cancel)?)?;
+    globals.set("LlmGetConfig", lua.create_function(llm_get_config)?)?;
+
     // rendering
     // NOTE: unfortunately, mlua's conversion of function arguments adds a lot of
     // overhead. this is very noticeable for the draw functions which can be called
@@ -187,6 +194,7 @@ define_callbacks! {
     on_sub_call     => "OnSubCall"(name: String, args: NativeMultiValue) -> MultiValue;
     on_sub_finished => "OnSubFinished"(id: u64, return_values: NativeMultiValue) -> ();
     on_sub_error    => "OnSubError"(id: u64, error_msg: String) -> ();
+    on_llm_result   => "OnLlmResult"(id: u64, body: Option<String>, error_msg: Option<String>) -> ();
 }
 
 // `on_key_up` and `on_key_down` are manually defined because they require additional conversions

@@ -2,6 +2,15 @@
 
 ## [Unreleased] - ReleaseDate
 
+### Added
+
+- Add an AI assistant tab to the build screen (Maritaca Sabiá 4 / Sabiazinho 4)
+- Colour the assistant's answers with PoB's palette: gems, unique items, passive nodes, damage types, attributes and numbers
+
+### Changed
+
+- Pass non-ASCII characters (e.g. accents) to PoB's text input instead of replacing them with `?`
+
 ## [0.2.18] - 2026-05-29
 
 ### Changed

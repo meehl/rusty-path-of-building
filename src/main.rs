@@ -3,6 +3,7 @@ use clap::Parser;
 use std::path::{Path, PathBuf};
 use winit::event_loop::EventLoop;
 
+mod ai_config;
 mod app;
 mod args;
 mod batcher;

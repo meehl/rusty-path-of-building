@@ -5,12 +5,16 @@ use mlua::{
 use winit::window::Window;
 
 use crate::{
+    ai_config::AiConfig,
     args::Args,
     dpi::{PhysicalPoint, ScaleFactor},
     draw_commands::DrawCommandRecorder,
     fonts::Fonts,
     input::InputState,
-    pob::subscript::{SubscriptManager, SubscriptResult},
+    pob::{
+        llm::LlmManager,
+        subscript::{SubscriptManager, SubscriptResult},
+    },
     renderer::textures::TextureManager,
     stage::{StageEvent, StageFrameOutput, StageTransition},
     util::{append_lua_package_dir, change_working_directory},
@@ -24,7 +28,12 @@ use std::{
 };
 
 mod api;
+mod llm;
 mod subscript;
+
+/// Lua code that adds the AI assistant tab to PoB's build screen. It is embedded in the binary
+/// instead of patched into PoB's files so it survives PoB updates.
+const AI_TAB_LUA: &str = include_str!("pob/lua/ai_tab.lua");
 
 /// Holds all state shared between Rust and the API functions exposed to Lua.
 ///
@@ -37,6 +46,7 @@ pub struct Context {
     pub fonts: Rc<RefCell<Fonts>>,
     pub texture_manager: Rc<RefCell<TextureManager>>,
     pub subscript_manager: RefCell<SubscriptManager>,
+    pub llm_manager: RefCell<LlmManager>,
     /// Directory containing the PoB Lua scripts
     pub script_dir: PathBuf,
     pub current_working_dir: PathBuf,
@@ -60,6 +70,7 @@ impl Context {
             fonts,
             texture_manager,
             subscript_manager: RefCell::new(SubscriptManager::default()),
+            llm_manager: RefCell::new(LlmManager::new(AiConfig::load(script_dir))),
             script_dir: script_dir.to_owned(),
             current_working_dir: PathBuf::default(),
             needs_restart: false,
@@ -127,13 +138,17 @@ impl PathOfBuilding {
         Ok(lua)
     }
 
-    /// Loads and runs `Launch.lua`, then calls PoB's `OnInit` handler.
+    /// Loads and runs `Launch.lua`, then calls PoB's `OnInit` handler and installs the AI tab.
     fn launch(lua: &Lua, script_dir: &Path) -> LuaResult<()> {
         change_working_directory(script_dir)?;
         lua.load(script_dir.join("Launch.lua")).exec()?;
         {
             profiling::scope!("OnInit");
             api::on_init(lua)?;
+        }
+        // The AI tab is optional. PoB must keep working if it fails to load.
+        if let Err(e) = lua.load(AI_TAB_LUA).set_name("=ai_tab.lua").exec() {
+            log::warn!("Failed to load AI tab: {e}");
         }
         Ok(())
     }
@@ -167,7 +182,11 @@ impl PathOfBuilding {
                 self.ctx_mut().input_state.key_modifiers = state;
             }
             StageEvent::CharacterInput { ch } => {
-                let ch = if ch.is_ascii() { ch } else { '?' };
+                let ch = if ch.is_ascii() || is_printable_unicode(ch) {
+                    ch
+                } else {
+                    '?'
+                };
                 api::on_char(&self.lua, ch)?;
             }
             StageEvent::MouseDown { button } => {
@@ -248,6 +267,7 @@ impl PathOfBuilding {
         }
 
         self.handle_subscripts()?;
+        self.handle_llm_results()?;
 
         {
             profiling::scope!("lua_OnFrame");
@@ -265,9 +285,13 @@ impl PathOfBuilding {
         let is_focused = ctx.window_state.is_focused;
         let is_hovered = ctx.window_state.is_hovered;
         let has_active_subscript = ctx.subscript_manager.borrow().has_running_subscripts();
+        let has_pending_llm_request = ctx.llm_manager.borrow().has_pending();
         let has_active_coroutine = self.has_active_coroutine();
-        let request_redraw =
-            is_focused || is_hovered || has_active_subscript || has_active_coroutine;
+        let request_redraw = is_focused
+            || is_hovered
+            || has_active_subscript
+            || has_pending_llm_request
+            || has_active_coroutine;
 
         Ok(StageFrameOutput {
             draw_commands: layers.values().flatten().copied().collect(),
@@ -294,6 +318,22 @@ impl PathOfBuilding {
                     api::on_sub_error(&self.lua, id, error)?;
                 }
             }
+        }
+        Ok(())
+    }
+
+    /// Forwards finished LLM requests to Lua's `OnLlmResult` handler. Call once per frame.
+    fn handle_llm_results(&self) -> LuaResult<()> {
+        profiling::scope!("handle_llm_results");
+
+        let results = self.ctx().llm_manager.borrow_mut().poll();
+
+        for result in results {
+            let (body, error) = match result.outcome {
+                Ok(body) => (Some(body), None),
+                Err(error) => (None, Some(error)),
+            };
+            api::on_llm_result(&self.lua, result.id, body, error)?;
         }
         Ok(())
     }
@@ -341,5 +381,32 @@ impl PathOfBuilding {
     #[inline]
     fn ctx_mut(&self) -> AppDataRefMut<'_, Context> {
         self.lua.app_data_mut().unwrap()
+    }
+}
+
+/// Returns `true` for non-ASCII characters that can be typed into a text field.
+///
+/// Control characters and the private use area are excluded. macOS reports function and arrow
+/// keys as private use characters, which must not end up in text fields.
+fn is_printable_unicode(ch: char) -> bool {
+    !ch.is_control() && !('\u{E000}'..='\u{F8FF}').contains(&ch)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_printable_unicode;
+
+    #[test]
+    fn accepts_accented_letters() {
+        for ch in ['á', 'ã', 'ç', 'é', 'Ó', 'ü', '€', '日'] {
+            assert!(is_printable_unicode(ch), "{ch}");
+        }
+    }
+
+    #[test]
+    fn rejects_control_and_private_use_characters() {
+        for ch in ['\u{80}', '\u{9f}', '\u{F700}', '\u{E000}'] {
+            assert!(!is_printable_unicode(ch), "{ch:?}");
+        }
     }
 }
