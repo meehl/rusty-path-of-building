@@ -1,4 +1,4 @@
-use crate::util::append_lua_package_dir;
+use crate::{pob::modules::luasocket, util::append_lua_package_dir};
 use anyhow::{Result, anyhow};
 use mlua::{Integer, IntoLuaMulti, Lua, MultiValue, Number, Value};
 use std::{
@@ -141,8 +141,9 @@ impl Subscript {
             let lua = unsafe { Lua::unsafe_new() };
             append_lua_package_dir(&lua, &script_dir.join("lua"))?;
 
-            // register Rust port of `luautf8` as module
+            // register modules
             lua.register_module("lua-utf8", luautf8::create_module(&lua)?)?;
+            lua.register_module("socket", luasocket::create_module(&lua)?)?;
 
             // register a proxy for each allowed blocking call.
             // forwards the call to the main thread and blocks on `reply_rx` until the main thread

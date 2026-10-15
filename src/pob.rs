@@ -10,7 +10,10 @@ use crate::{
     draw_commands::DrawCommandRecorder,
     fonts::Fonts,
     input::InputState,
-    pob::subscript::{NativeMultiValue, SubscriptEvent, SubscriptManager},
+    pob::{
+        modules::luasocket,
+        subscript::{NativeMultiValue, SubscriptEvent, SubscriptManager},
+    },
     renderer::textures::TextureManager,
     stage::{StageEvent, StageFrameOutput, StageTransition},
     util::{append_lua_package_dir, change_working_directory},
@@ -24,6 +27,7 @@ use std::{
 };
 
 mod api;
+mod modules;
 mod subscript;
 
 /// Holds all state shared between Rust and the API functions exposed to Lua.
@@ -123,8 +127,9 @@ impl PathOfBuilding {
         // register API functions
         api::register_globals(&lua)?;
 
-        // register Rust port of `luautf8` as module
+        // register modules
         lua.register_module("lua-utf8", luautf8::create_module(&lua)?)?;
+        lua.register_module("socket", luasocket::create_module(&lua)?)?;
 
         Ok(lua)
     }
