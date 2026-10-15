@@ -10,7 +10,7 @@ use crate::{
     draw_commands::DrawCommandRecorder,
     fonts::Fonts,
     input::InputState,
-    pob::subscript::{SubscriptManager, SubscriptResult},
+    pob::subscript::{NativeMultiValue, SubscriptEvent, SubscriptManager},
     renderer::textures::TextureManager,
     stage::{StageEvent, StageFrameOutput, StageTransition},
     util::{append_lua_package_dir, change_working_directory},
@@ -36,7 +36,6 @@ pub struct Context {
     pub recorder: DrawCommandRecorder,
     pub fonts: Rc<RefCell<Fonts>>,
     pub texture_manager: Rc<RefCell<TextureManager>>,
-    pub subscript_manager: RefCell<SubscriptManager>,
     /// Directory containing the PoB Lua scripts
     pub script_dir: PathBuf,
     pub current_working_dir: PathBuf,
@@ -59,7 +58,6 @@ impl Context {
             recorder: DrawCommandRecorder::default(),
             fonts,
             texture_manager,
-            subscript_manager: RefCell::new(SubscriptManager::default()),
             script_dir: script_dir.to_owned(),
             current_working_dir: PathBuf::default(),
             needs_restart: false,
@@ -97,7 +95,7 @@ impl PathOfBuilding {
         texture_manager: Rc<RefCell<TextureManager>>,
     ) -> anyhow::Result<Self> {
         let ctx = Context::new(script_dir, fonts, texture_manager);
-        let lua = Self::create_lua(ctx)?;
+        let lua = Self::create_lua(ctx, SubscriptManager::default())?;
 
         Self::launch(&lua, script_dir)?;
 
@@ -108,7 +106,7 @@ impl PathOfBuilding {
     }
 
     /// Builds a `Lua` state with package paths, context, and all API functions registered.
-    fn create_lua(ctx: Context) -> LuaResult<Lua> {
+    fn create_lua(ctx: Context, subscript_manager: SubscriptManager) -> LuaResult<Lua> {
         // `unsafe_new` needed to allow loading of C modules
         let lua = unsafe { Lua::unsafe_new() };
         append_lua_package_dir(&lua, &ctx.script_dir.join("lua"))?;
@@ -118,8 +116,9 @@ impl PathOfBuilding {
         let args_table = lua.create_sequence_from(std::iter::once(args.import_url))?;
         lua.globals().set("arg", args_table)?;
 
-        // make context accessible to API functions
+        // make context and subscript manager accessible to API functions
         lua.set_app_data(ctx);
+        lua.set_app_data(subscript_manager);
 
         // register API functions
         api::register_globals(&lua)?;
@@ -143,13 +142,18 @@ impl PathOfBuilding {
 
     /// Rebuilds the Lua instance from scratch. Preserves the current `Context`.
     fn restart(&mut self) -> LuaResult<()> {
-        // move context out of current lua instance...
+        // move context and subscript manager out of current lua instance
         let mut ctx = self.lua.remove_app_data::<Context>().unwrap();
         let script_dir = ctx.script_dir.clone();
         ctx.needs_restart = false;
 
-        // and move it into new instance
-        self.lua = Self::create_lua(ctx)?;
+        let subscript_manager = self
+            .lua
+            .remove_app_data::<SubscriptManager>()
+            .unwrap_or_default();
+
+        // and move both into the new instance
+        self.lua = Self::create_lua(ctx, subscript_manager)?;
         Self::launch(&self.lua, &script_dir)?;
 
         Ok(())
@@ -267,7 +271,7 @@ impl PathOfBuilding {
         // this mirrors SimpleGraphic's behavior.
         let is_focused = ctx.window_state.is_focused;
         let is_hovered = ctx.window_state.is_hovered;
-        let has_active_subscript = ctx.subscript_manager.borrow().has_running_subscripts();
+        let has_active_subscript = self.has_active_subscript();
         let has_active_coroutine = self.has_active_coroutine();
         let request_redraw =
             is_focused || is_hovered || has_active_subscript || has_active_coroutine;
@@ -285,20 +289,46 @@ impl PathOfBuilding {
     fn handle_subscripts(&self) -> LuaResult<()> {
         profiling::scope!("handle_subscripts");
 
-        let subscript_events = self.ctx().subscript_manager.borrow_mut().process(&self.lua);
+        // advance the subscripts and collect the work they produced
+        let subscript_events = self
+            .lua
+            .app_data_mut::<SubscriptManager>()
+            .unwrap()
+            .process();
 
-        // Handle finished/errored subscripts.
         for event in subscript_events {
             match event {
-                SubscriptResult::SubscriptFinished { id, return_values } => {
+                SubscriptEvent::Call {
+                    function_name,
+                    arguments,
+                    reply_tx,
+                } => {
+                    let result = api::on_sub_call(&self.lua, function_name, arguments)
+                        .map_err(anyhow::Error::from)
+                        .and_then(NativeMultiValue::try_from);
+                    // non-blocking calls have no reply channel and discard their result
+                    if let Some(reply_tx) = reply_tx {
+                        // if the subscript's thread has already gone away, there's nowhere to send
+                        // the result, so ignore the error
+                        let _ = reply_tx.send(result);
+                    }
+                }
+                SubscriptEvent::Finished { id, return_values } => {
                     api::on_sub_finished(&self.lua, id, return_values)?;
                 }
-                SubscriptResult::SubscriptError { id, error } => {
+                SubscriptEvent::Error { id, error } => {
                     api::on_sub_error(&self.lua, id, error)?;
                 }
             }
         }
         Ok(())
+    }
+
+    fn has_active_subscript(&self) -> bool {
+        self.lua
+            .app_data_ref::<SubscriptManager>()
+            .unwrap()
+            .has_running_subscripts()
     }
 
     fn has_active_coroutine(&self) -> bool {

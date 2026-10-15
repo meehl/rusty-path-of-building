@@ -1,6 +1,6 @@
 use mlua::{Lua, MultiValue, Result as LuaResult};
 
-use crate::pob::Context;
+use crate::pob::{Context, subscript::SubscriptManager};
 
 pub fn launch_subscript(
     l: &Lua,
@@ -20,9 +20,8 @@ pub fn launch_subscript(
         .collect();
     let arguments = args.try_into()?;
 
-    let ctx = l.app_data_ref::<Context>().unwrap();
-    let script_dir = ctx.script_dir.clone();
-    let subscript_id = ctx.subscript_manager.borrow_mut().push(
+    let script_dir = l.app_data_ref::<Context>().unwrap().script_dir.clone();
+    let subscript_id = l.app_data_mut::<SubscriptManager>().unwrap().push(
         script_dir,
         script_text,
         blocking_calls,
@@ -34,8 +33,8 @@ pub fn launch_subscript(
 }
 
 pub fn is_subscript_running(l: &Lua, subscript_id: u64) -> LuaResult<bool> {
-    let ctx = l.app_data_ref::<Context>().unwrap();
-    Ok(ctx.subscript_manager.borrow().is_running(subscript_id))
+    let manager = l.app_data_ref::<SubscriptManager>().unwrap();
+    Ok(manager.is_running(subscript_id))
 }
 
 pub fn abort_subscript(_: &Lua, _subscript_id: u64) -> LuaResult<()> {

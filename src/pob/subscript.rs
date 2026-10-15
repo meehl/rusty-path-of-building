@@ -1,4 +1,4 @@
-use crate::{pob::api, util::append_lua_package_dir};
+use crate::util::append_lua_package_dir;
 use anyhow::{Result, anyhow};
 use mlua::{Integer, IntoLuaMulti, Lua, MultiValue, Number, Value};
 use std::{
@@ -7,17 +7,22 @@ use std::{
     thread::JoinHandle,
 };
 
-/// The outcome of a [`Subscript`] that has finished.
-#[derive(Debug)]
-pub enum SubscriptResult {
-    SubscriptFinished {
+/// A unit of work produced by advancing the running subscripts.
+pub enum SubscriptEvent {
+    /// A subscript requested that a function in the main Lua instance be called on its behalf.
+    Call {
+        function_name: String,
+        arguments: NativeMultiValue,
+        /// Present for blocking calls. The return values of the callback must be sent back over it.
+        reply_tx: Option<Sender<Result<NativeMultiValue>>>,
+    },
+    /// A subscript finished successfully.
+    Finished {
         id: u64,
         return_values: NativeMultiValue,
     },
-    SubscriptError {
-        id: u64,
-        error: String,
-    },
+    /// A subscript errored or panicked.
+    Error { id: u64, error: String },
 }
 
 #[derive(Default)]
@@ -53,20 +58,20 @@ impl SubscriptManager {
     }
 
     /// Advances all running subscripts by one step.
-    pub fn process(&mut self, lua: &Lua) -> Vec<SubscriptResult> {
-        let mut results = vec![];
+    pub fn process(&mut self) -> Vec<SubscriptEvent> {
+        let mut events = vec![];
 
         self.scripts.retain_mut(|subscript| {
-            subscript.handle_calls(lua);
+            subscript.take_call(&mut events);
 
             subscript.try_join().is_none_or(|event| {
-                results.push(event);
+                events.push(event);
                 // subscript has finished or errored, remove it
                 false
             })
         });
 
-        results
+        events
     }
 
     /// Returns `true` if at least one subscript is running.
@@ -190,56 +195,54 @@ impl Subscript {
         }
     }
 
-    /// Handles pending `SubscriptCall`s.
+    /// Collects a pending `SubscriptCall` into `events`.
     ///
     /// Does nothing if there is no pending call.
-    fn handle_calls(&self, lua: &Lua) {
+    fn take_call(&self, events: &mut Vec<SubscriptEvent>) {
         let Ok(call) = self.call_rx.try_recv() else {
             // no pending call, or thread disconnected which is handled on join
             return;
         };
 
-        match call {
+        events.push(match call {
             SubscriptCall::Blocking {
                 function_name,
                 arguments,
-                reply_tx: return_values_sender,
-            } => {
-                let result = api::on_sub_call(lua, function_name, arguments)
-                    .map_err(anyhow::Error::from)
-                    .and_then(NativeMultiValue::try_from);
-                // if the subscript's thread has already gone away, there's nowhere to send the
-                // result, so ignore the error
-                let _ = return_values_sender.send(result);
-            }
+                reply_tx,
+            } => SubscriptEvent::Call {
+                function_name,
+                arguments,
+                reply_tx: Some(reply_tx),
+            },
             SubscriptCall::NonBlocking {
                 function_name,
                 arguments,
-            } => {
-                // return values and errors of non-blocking calls are discarded
-                let _ = api::on_sub_call(lua, function_name, arguments);
-            }
-        }
+            } => SubscriptEvent::Call {
+                function_name,
+                arguments,
+                reply_tx: None,
+            },
+        });
     }
 
     /// If the subscript's thread has finished, joins it and returns the resulting
-    /// `SubscriptResult`.
-    fn try_join(&mut self) -> Option<SubscriptResult> {
+    /// `SubscriptEvent`.
+    fn try_join(&mut self) -> Option<SubscriptEvent> {
         if !self.handle.as_ref().is_some_and(JoinHandle::is_finished) {
             return None;
         }
 
         let event = match self.handle.take().unwrap().join() {
-            Ok(Ok(return_values)) => SubscriptResult::SubscriptFinished {
+            Ok(Ok(return_values)) => SubscriptEvent::Finished {
                 id: self.id,
                 return_values,
             },
-            Ok(Err(err)) => SubscriptResult::SubscriptError {
+            Ok(Err(err)) => SubscriptEvent::Error {
                 id: self.id,
                 error: err.to_string(),
             },
             // the thread panicked
-            Err(_) => SubscriptResult::SubscriptError {
+            Err(_) => SubscriptEvent::Error {
                 id: self.id,
                 error: String::from("Subscript thread panicked!"),
             },
