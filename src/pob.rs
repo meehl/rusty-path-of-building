@@ -11,7 +11,7 @@ use crate::{
     fonts::Fonts,
     input::InputState,
     pob::{
-        modules::luasocket,
+        modules::{luacurl, luasocket},
         subscript::{NativeMultiValue, SubscriptEvent, SubscriptManager},
     },
     renderer::textures::TextureManager,
@@ -130,6 +130,7 @@ impl PathOfBuilding {
         // register modules
         lua.register_module("lua-utf8", luautf8::create_module(&lua)?)?;
         lua.register_module("socket", luasocket::create_module(&lua)?)?;
+        lua.register_module("lcurl.safe", luacurl::create_module(&lua)?)?;
 
         Ok(lua)
     }
