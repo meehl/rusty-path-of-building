@@ -195,13 +195,11 @@ impl UserData for LuaTcpClient {
                         Ok(_) => {
                             unimplemented!()
                         }
-                        Err(_) => {
-                            return Err(bad_argument(
-                                "receive",
-                                1,
-                                mlua::Error::external("invalid receive pattern"),
-                            ));
-                        }
+                        Err(_) => Err(bad_argument(
+                            "receive",
+                            1,
+                            mlua::Error::external("invalid receive pattern"),
+                        )),
                     },
                 }
             },
