@@ -10,10 +10,7 @@ use crate::{
     draw_commands::DrawCommandRecorder,
     fonts::Fonts,
     input::InputState,
-    pob::{
-        modules::{luacurl, luasocket},
-        subscript::{NativeMultiValue, SubscriptEvent, SubscriptManager},
-    },
+    pob::subscript::{NativeMultiValue, SubscriptEvent, SubscriptManager},
     renderer::textures::TextureManager,
     stage::{StageEvent, StageFrameOutput, StageTransition},
     util::{append_lua_package_dir, change_working_directory},
@@ -128,9 +125,7 @@ impl PathOfBuilding {
         api::register_globals(&lua)?;
 
         // register modules
-        lua.register_module("lua-utf8", luautf8::create_module(&lua)?)?;
-        lua.register_module("socket", luasocket::create_module(&lua)?)?;
-        lua.register_module("lcurl.safe", luacurl::create_module(&lua)?)?;
+        modules::register(&lua)?;
 
         Ok(lua)
     }

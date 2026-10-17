@@ -1,7 +1,4 @@
-use crate::{
-    pob::modules::{luacurl, luasocket},
-    util::append_lua_package_dir,
-};
+use crate::{pob::modules, util::append_lua_package_dir};
 use anyhow::{Result, anyhow};
 use mlua::{Integer, IntoLuaMulti, Lua, MultiValue, Number, Value};
 use std::{
@@ -145,9 +142,7 @@ impl Subscript {
             append_lua_package_dir(&lua, &script_dir.join("lua"))?;
 
             // register modules
-            lua.register_module("lua-utf8", luautf8::create_module(&lua)?)?;
-            lua.register_module("socket", luasocket::create_module(&lua)?)?;
-            lua.register_module("lcurl.safe", luacurl::create_module(&lua)?)?;
+            modules::register(&lua)?;
 
             // register a proxy for each allowed blocking call.
             // forwards the call to the main thread and blocks on `reply_rx` until the main thread
