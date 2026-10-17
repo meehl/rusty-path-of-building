@@ -95,6 +95,24 @@ impl UserData for LuaTcpIp4Server {
             Ok(())
         });
 
+        methods.add_method_mut(
+            "setoption",
+            |_, _this, (name, _value): (String, mlua::Value)| {
+                match name.as_str() {
+                    "reuseaddr" => {
+                        // NOTE: ignore for now. not sure why this is even set by PoB.
+                        // `TcpListener` doesn't give access to this options so if this
+                        // turns out to be important, switch to `socket2` crate which
+                        // offers more advanced configurations options.
+                        Ok(1)
+                    }
+                    _ => Err(mlua::Error::external(format!(
+                        "unsupported socket option `{name}`"
+                    ))),
+                }
+            },
+        );
+
         methods.add_method_mut("accept", |lua, this, ()| {
             let Some(listener) = &this.listener else {
                 return Err(mlua::Error::external("socket is not bound"));
