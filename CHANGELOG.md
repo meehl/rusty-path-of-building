@@ -2,6 +2,25 @@
 
 ## [Unreleased] - ReleaseDate
 
+### Added
+
+- Add `bundled-lua-modules` feature (enabled by default) for registering Rust implementations of required C libaries. Enabling this features removes the runtime dependencies on `Lua-cURLv3`, `luautf8`, `luasocket`, and `lzip`. Disable it use the original C libraries like before.
+- Add `vendored-lua` feature for building LuaJIT from source
+- Add support for gzip compression to `inflate`/`deflate` API functions
+
+### Changed
+
+- Rework renderer for significantly improved render performance
+- Rework context handling
+- Improve performance of image handle access in draw API
+- Remove blend mode and mask index from draw API
+- Bump dependencies
+
+### Fixed
+
+- Fix color escape regex
+- Fix Windows canonical path handling
+
 ## [0.2.18] - 2026-05-29
 
 ### Changed
@@ -209,8 +228,8 @@
 - First release
 
 <!-- next-url -->
-[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.18...HEAD
 
+[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.18...HEAD
 [0.2.18]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.17...v0.2.18
 [0.2.17]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.16...v0.2.17
 [0.2.16]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.15...v0.2.16
