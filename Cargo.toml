@@ -51,4 +51,6 @@ default = ["bundled-lua-modules"]
 # Register Rust implementations of the Lua modules required by PoB's Lua code.
 # Disable this to use the original C libraries.
 bundled-lua-modules = ["dep:curl", "dep:luautf8-rs"]
+# Build LuaJIT from source instead of linking against a system installation.
+vendored-lua = ["mlua/vendored"]
 profile-with-puffin = ["profiling/profile-with-puffin", "dep:puffin_http"]
