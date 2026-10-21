@@ -1,4 +1,7 @@
-use crate::{pob::Context, util::change_working_directory};
+use crate::{
+    pob::Context,
+    util::{change_working_directory, load_lua_file},
+};
 use mlua::{Function, IntoLuaMulti, Lua, MultiValue, Result as LuaResult, Value};
 use std::env;
 
@@ -23,7 +26,7 @@ pub fn load_module(l: &Lua, (name, args): (String, MultiValue)) -> LuaResult<Mul
 
     let current_dir = env::current_dir()?;
     change_working_directory(script_dir.as_path())?;
-    let result = l.load(module_path).call::<MultiValue>(args);
+    let result = load_lua_file(l, &module_path).and_then(|chunk| chunk.call::<MultiValue>(args));
     change_working_directory(current_dir)?;
     result
 }
@@ -40,12 +43,13 @@ pub fn protected_load_module(l: &Lua, (name, args): (String, MultiValue)) -> Lua
 
     let current_dir = env::current_dir()?;
     change_working_directory(script_dir.as_path())?;
-    let result = match l.load(module_path).call::<MultiValue>(args) {
-        // on success, callers expect a Nil followed by return values
-        Ok(res) => Ok(std::iter::once(Value::Nil).chain(res).collect()),
-        // otherwise it is set to error message.
-        Err(err) => err.to_string().into_lua_multi(l),
-    };
+    let result =
+        match load_lua_file(l, &module_path).and_then(|chunk| chunk.call::<MultiValue>(args)) {
+            // on success, callers expect a Nil followed by return values
+            Ok(res) => Ok(std::iter::once(Value::Nil).chain(res).collect()),
+            // otherwise it is set to error message.
+            Err(err) => err.to_string().into_lua_multi(l),
+        };
     change_working_directory(current_dir)?;
     result
 }

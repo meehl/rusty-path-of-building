@@ -13,7 +13,7 @@ use crate::{
     pob::subscript::{NativeMultiValue, SubscriptEvent, SubscriptManager},
     renderer::textures::TextureManager,
     stage::{StageEvent, StageFrameOutput, StageTransition},
-    util::{append_lua_package_dir, change_working_directory},
+    util::{append_lua_package_dir, change_working_directory, load_lua_file},
     window::WindowState,
 };
 use std::{
@@ -133,7 +133,7 @@ impl PathOfBuilding {
     /// Loads and runs `Launch.lua`, then calls PoB's `OnInit` handler.
     fn launch(lua: &Lua, script_dir: &Path) -> LuaResult<()> {
         change_working_directory(script_dir)?;
-        lua.load(script_dir.join("Launch.lua")).exec()?;
+        load_lua_file(lua, &script_dir.join("Launch.lua"))?.exec()?;
         {
             profiling::scope!("OnInit");
             api::on_init(lua)?;

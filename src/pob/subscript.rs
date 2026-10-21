@@ -1,4 +1,7 @@
-use crate::{pob::modules, util::append_lua_package_dir};
+use crate::{
+    pob::modules,
+    util::{append_lua_package_dir, fix_script_header},
+};
 use anyhow::{Result, anyhow};
 use mlua::{Integer, IntoLuaMulti, Lua, MultiValue, Number, Value};
 use std::{
@@ -184,6 +187,8 @@ impl Subscript {
                 )?;
             }
 
+            let mut script_text = script_text.into_bytes();
+            fix_script_header(&mut script_text);
             let result = lua.load(script_text).call::<MultiValue>(arguments)?;
             result.try_into()
         });
