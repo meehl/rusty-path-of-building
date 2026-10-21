@@ -41,7 +41,7 @@ swash = "0.2.5"
 tar = "0.4.44"
 wgpu = { version = "30.0.0", default-features = false, features = ["std", "parking_lot", "vulkan", "metal", "wgsl"] }
 winit = "0.30"
-zstd = "0.13.3"
+zstd = "0.14"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 smithay-clipboard = "0.7.3"
