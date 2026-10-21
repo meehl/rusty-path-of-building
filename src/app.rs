@@ -323,37 +323,37 @@ fn pob_font_definitions() -> FontDefinitions {
     definitions.font_data.insert(
         "bitstream-vera-sans-mono".to_owned(),
         Arc::new(FontData::from_static(include_bytes!(
-            "../fonts/VeraMono.ttf"
+            "../assets/fonts/VeraMono.ttf"
         ))),
     );
     definitions.font_data.insert(
         "liberation-sans".to_owned(),
         Arc::new(FontData::from_static(include_bytes!(
-            "../fonts/LiberationSans-Regular.ttf"
+            "../assets/fonts/LiberationSans-Regular.ttf"
         ))),
     );
     definitions.font_data.insert(
         "liberation-sans-bold".to_owned(),
         Arc::new(FontData::from_static(include_bytes!(
-            "../fonts/LiberationSans-Bold.ttf"
+            "../assets/fonts/LiberationSans-Bold.ttf"
         ))),
     );
     definitions.font_data.insert(
         "fontin-regular".to_owned(),
         Arc::new(FontData::from_static(include_bytes!(
-            "../fonts/fontin-regular.ttf"
+            "../assets/fonts/fontin-regular.ttf"
         ))),
     );
     definitions.font_data.insert(
         "fontin-italic".to_owned(),
         Arc::new(FontData::from_static(include_bytes!(
-            "../fonts/fontin-italic.ttf"
+            "../assets/fonts/fontin-italic.ttf"
         ))),
     );
     definitions.font_data.insert(
         "fontin-smallcaps".to_owned(),
         Arc::new(FontData::from_static(include_bytes!(
-            "../fonts/fontin-smallcaps.ttf"
+            "../assets/fonts/fontin-smallcaps.ttf"
         ))),
     );
 
