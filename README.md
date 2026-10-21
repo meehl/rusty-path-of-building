@@ -20,15 +20,18 @@ rusty-path-of-building [poe1|poe2]
 
 ### Homebrew
 
-See the [tap available here](https://github.com/meehl/homebrew-rusty-path-of-building). NOTE: This has been tested on macOS only.
+[Homebrew Tap](https://github.com/meehl/homebrew-rusty-path-of-building). NOTE: This has been tested on macOS only.
 
 ### Building from source
-
-`LuaJIT` needs to be installed for the `mlua` crate to compile.
 
 ```bash
 cargo build --release
 ```
+
+#### Build Dependencies
+
+- `LuaJIT` - Required by the `mlua` crate. Alternatively, enable the `vendored-lua` feature to build LuaJIT from source instead of using a system installation.
+- `libcurl` - Required when the `bundled-lua-modules` feature (enabled by default) is used.
 
 ## Runtime Dependencies
 
@@ -37,13 +40,13 @@ Path of Building's Lua code requires the following C libraries:
 - [Lua-cURLv3](https://github.com/Lua-cURL/Lua-cURLv3)
 - [luautf8](https://github.com/starwing/luautf8)
 - [luasocket](https://github.com/lunarmodules/luasocket)
-- `lzip` - The source is included in this repo under `lua/libs/lzip` and requires [zlib](https://www.zlib.net/) to compile. Build it with `make LUA_IMPL=luajit`. [^1]
+- [lzip](https://github.com/PathOfBuildingCommunity/PathOfBuilding-SimpleGraphic/tree/master/libs/LZip)
 
-Please refer to the [Lua documentation](https://www.lua.org/manual/5.1/manual.html#pdf-package.cpath) for details on how it locates libraries.
+By default, the `bundled-lua-modules` feature is enabled and registers Rust implementations of these libraries with the Lua runtime. The original C libraries don't need to be installed if this feature is enabled.
+
+To use the original C libraries instead, disable the feature and make sure Lua can locate them. Please refer to the [Lua documentation](https://www.lua.org/manual/5.1/manual.html#pdf-package.cpath) for details on that.
 
 ## Known Issues
 
 - If automatic updates fail, navigate to `~/.local/share/RustyPathOfBuilding{1,2}/` and delete the `rpob.version` file and the `Update` directory. This will force a complete re-download of PoB's latest assets and Lua code on the next startup.
 - Automatic updates for weekly beta builds are supported, but compatibility is not checked. If you run into problems with a beta version, please don't open an issue for it.
-
-[^1]: The lzip source was copied from [SimpleGraphic's LZip library](https://github.com/PathOfBuildingCommunity/PathOfBuilding-SimpleGraphic/tree/master/libs/LZip).
