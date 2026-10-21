@@ -83,7 +83,8 @@ impl GlyphRasterizer {
         let run = glyph_run.run();
         let color = glyph_run.style().brush;
         let font_size = run.font_size();
-        let normalized_coords = run.normalized_coords();
+        let normalized_coords =
+            &Vec::from_iter(run.normalized_coords().iter().map(|c| c.to_bits()));
         let skew = run.synthesis().skew(); // skew angle for faux italic
 
         let font_ref = self.get_font_ref(run.font());
