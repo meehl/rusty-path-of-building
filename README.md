@@ -20,7 +20,7 @@ rusty-path-of-building [poe1|poe2]
 
 ### Homebrew
 
-[Homebrew Tap](https://github.com/meehl/homebrew-rusty-path-of-building). NOTE: This has been tested on macOS only.
+[Homebrew Tap](https://github.com/meehl/homebrew-rusty-path-of-building) (NOTE: This has been tested on macOS only)
 
 ### Building from source
 
