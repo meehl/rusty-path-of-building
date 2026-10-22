@@ -2,6 +2,10 @@
 
 ## [Unreleased] - ReleaseDate
 
+### Changed
+
+- Refactor surface format selection
+
 ### Fixed
 
 - Render tab characters as 4 spaces to match SimpleGraphic (#53)
@@ -240,8 +244,8 @@
 - First release
 
 <!-- next-url -->
-[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.3.1...HEAD
 
+[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.3.1...HEAD
 [0.3.1]: https://github.com/meehl/rusty-path-of-building/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.18...v0.3.0
 [0.2.18]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.17...v0.2.18
