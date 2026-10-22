@@ -2,6 +2,8 @@
 
 ## [Unreleased] - ReleaseDate
 
+## [0.3.2] - 2026-10-22
+
 ### Changed
 
 - Refactor surface format selection
@@ -244,8 +246,9 @@
 - First release
 
 <!-- next-url -->
+[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.3.2...HEAD
 
-[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.3.1...HEAD
+[0.3.2]: https://github.com/meehl/rusty-path-of-building/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/meehl/rusty-path-of-building/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.18...v0.3.0
 [0.2.18]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.17...v0.2.18
