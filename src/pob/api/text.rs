@@ -160,11 +160,10 @@ pub fn get_index_at_cur(
         .borrow_mut()
         .layout(job, ctx.window_state.scale_factor());
 
-    // `cursor_index_at` returns an offset into the **stripped** text, but PoB expects on offset
-    // into the original, **unstripped** text. A `StrippedToOriginalOffsetMap` is used to do the
-    // conversion.
-    let stripped_index = layout.cursor_index_at(Point::new(cur_x, cur_y));
-    let original_index = offset_map.to_original(stripped_index);
+    // `cursor_index_at` returns an offset into the layout text, but PoB expects an offset into
+    // the original text. A `LayoutTextToOriginalOffsetMap` handles the conversion.
+    let layout_text_index = layout.cursor_index_at(Point::new(cur_x, cur_y));
+    let original_index = offset_map.to_original(layout_text_index);
 
     // convert to lua's 1-based indexing
     Ok(original_index + 1)
@@ -249,13 +248,10 @@ fn build_layout_job<'a>(
     job
 }
 
-/// Width of a tab in spaces. Matches SimpleGraphic's behavior.
-const TAB_WIDTH: usize = 4;
+/// Tabs are replaced with four spaces to match SimpleGraphic's behavior.
 const TAB_REPLACEMENT: &str = "    ";
 
 /// A piece of text with tabs split out.
-///
-/// `parley` doesn't support tab characters so they are replaced with spaces before layout.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 enum TextPiece<'a> {
     Text(&'a str),
@@ -286,65 +282,63 @@ fn split_tabs(text: &str) -> impl Iterator<Item = (usize, TextPiece<'_>)> {
 
 #[derive(Debug, Clone, Copy)]
 struct OffsetSegment {
-    stripped_start: usize,
+    layout_text_start: usize,
     original_start: usize,
-    /// Tabs span `TAB_WIDTH` bytes in the stripped text but only one byte in the original text
     is_tab: bool,
 }
 
-/// Maps byte offset in stripped text back to offset in original text.
+/// Maps a byte offset in the layout text back to an offset in the original text.
 ///
-/// Stripped text is the text passed to the layout, i.e. without color escapes and with tabs
+/// The layout text is the text passed to `parley`, i.e. without color escapes and with tabs
 /// replaced by spaces.
 #[derive(Debug, Default, Clone)]
-struct StrippedToOriginalOffsetMap {
+struct LayoutTextToOriginalOffsetMap {
     segments: Vec<OffsetSegment>,
 }
 
-impl StrippedToOriginalOffsetMap {
-    fn push_segment(&mut self, stripped_start: usize, original_start: usize) {
+impl LayoutTextToOriginalOffsetMap {
+    fn push_segment(&mut self, layout_text_start: usize, original_start: usize) {
         self.segments.push(OffsetSegment {
-            stripped_start,
+            layout_text_start,
             original_start,
             is_tab: false,
         });
     }
 
-    fn push_tab(&mut self, stripped_start: usize, original_start: usize) {
+    fn push_tab(&mut self, layout_text_start: usize, original_start: usize) {
         self.segments.push(OffsetSegment {
-            stripped_start,
+            layout_text_start,
             original_start,
             is_tab: true,
         });
     }
 
-    fn to_original(&self, stripped_index: usize) -> usize {
+    fn to_original(&self, layout_text_index: usize) -> usize {
         assert!(!self.segments.is_empty());
         let i = self
             .segments
-            .partition_point(|seg| seg.stripped_start <= stripped_index);
+            .partition_point(|seg| seg.layout_text_start <= layout_text_index);
         let seg = self.segments[i - 1];
-        let offset = stripped_index - seg.stripped_start;
         if seg.is_tab {
-            // snap to whichever side of the tab is closer
-            seg.original_start + usize::from(offset > TAB_WIDTH / 2)
+            // map any cursor position within a tab to the start of it like SG
+            seg.original_start
         } else {
-            seg.original_start + offset
+            seg.original_start + (layout_text_index - seg.layout_text_start)
         }
     }
 }
 
-/// Returns a `StrippedToOriginalOffsetMap` alongside the `LayoutJob`.
+/// Returns a `LayoutTextToOriginalOffsetMap` alongside the `LayoutJob`.
 fn build_layout_job_with_offsets<'a>(
     text: &'a str,
     current_color: Srgba,
     font_type: PoBFontType,
     line_height: i32,
     alignment: Option<Alignment>,
-) -> (LayoutJob<'a>, StrippedToOriginalOffsetMap) {
+) -> (LayoutJob<'a>, LayoutTextToOriginalOffsetMap) {
     let mut job = new_layout_job(font_type, line_height, alignment);
-    let mut offset_map = StrippedToOriginalOffsetMap::default();
-    let mut stripped_offset = 0;
+    let mut offset_map = LayoutTextToOriginalOffsetMap::default();
+    let mut layout_text_offset = 0;
 
     for ColoredSegment {
         color,
@@ -356,13 +350,13 @@ fn build_layout_job_with_offsets<'a>(
         for (offset, piece) in split_tabs(text) {
             match piece {
                 TextPiece::Text(_) => {
-                    offset_map.push_segment(stripped_offset, original_start + offset);
+                    offset_map.push_segment(layout_text_offset, original_start + offset);
                 }
-                TextPiece::Tab => offset_map.push_tab(stripped_offset, original_start + offset),
+                TextPiece::Tab => offset_map.push_tab(layout_text_offset, original_start + offset),
             }
             let layout_text = piece.layout_text();
             job.append(layout_text, color);
-            stripped_offset += layout_text.len();
+            layout_text_offset += layout_text.len();
         }
     }
 
@@ -393,7 +387,7 @@ impl<'a> IntoIterator for PoBString<'a> {
 pub struct ColoredSegment<'a> {
     pub color: Option<Srgba>,
     pub text: &'a str,
-    /// The byte offset of `text` within the **original**, unstripped string.
+    /// The byte offset of `text` within the **original** string.
     pub original_start: usize,
 }
 
@@ -601,7 +595,7 @@ mod tests {
 
     #[test]
     fn cursor_offset_empty() {
-        let mut offset_map = StrippedToOriginalOffsetMap::default();
+        let mut offset_map = LayoutTextToOriginalOffsetMap::default();
         for seg in PoBString("") {
             offset_map.push_segment(0, seg.original_start);
         }
@@ -610,11 +604,11 @@ mod tests {
 
     #[test]
     fn cursor_offset_no_escape() {
-        let mut offset_map = StrippedToOriginalOffsetMap::default();
-        let mut stripped_offset = 0;
+        let mut offset_map = LayoutTextToOriginalOffsetMap::default();
+        let mut layout_text_offset = 0;
         for seg in PoBString("Hello, World!") {
-            offset_map.push_segment(stripped_offset, seg.original_start);
-            stripped_offset += seg.text.len();
+            offset_map.push_segment(layout_text_offset, seg.original_start);
+            layout_text_offset += seg.text.len();
         }
         assert_eq!(offset_map.to_original(0), 0);
         assert_eq!(offset_map.to_original(3), 3);
@@ -623,11 +617,11 @@ mod tests {
 
     #[test]
     fn cursor_offset() {
-        let mut offset_map = StrippedToOriginalOffsetMap::default();
-        let mut stripped_offset = 0;
+        let mut offset_map = LayoutTextToOriginalOffsetMap::default();
+        let mut layout_text_offset = 0;
         for seg in PoBString("^1Hello^xFF0000World^3!") {
-            offset_map.push_segment(stripped_offset, seg.original_start);
-            stripped_offset += seg.text.len();
+            offset_map.push_segment(layout_text_offset, seg.original_start);
+            layout_text_offset += seg.text.len();
         }
         assert_eq!(offset_map.to_original(0), 2);
         assert_eq!(offset_map.to_original(3), 5);
@@ -689,15 +683,35 @@ mod tests {
 
         // 'a'
         assert_eq!(offset_map.to_original(0), 2);
-        // first tab: snaps to whichever side is closer
+        // first tab: any position within the tab maps to the tab start
         assert_eq!(offset_map.to_original(1), 3);
-        assert_eq!(offset_map.to_original(3), 3);
-        assert_eq!(offset_map.to_original(4), 4);
+        assert_eq!(offset_map.to_original(2), 3);
+        assert_eq!(offset_map.to_original(4), 3);
         // 'b'
         assert_eq!(offset_map.to_original(5), 4);
-        // trailing tab
+        // trailing tab: any position within the tab maps to the tab start
         assert_eq!(offset_map.to_original(6), 5);
-        assert_eq!(offset_map.to_original(9), 6);
+        assert_eq!(offset_map.to_original(9), 5);
+        // end of text is after the trailing tab
         assert_eq!(offset_map.to_original(10), 6);
+    }
+
+    #[test]
+    fn cursor_offset_with_consecutive_tabs() {
+        let (job, offset_map) =
+            build_layout_job_with_offsets("a\t\tb", Srgba::WHITE, PoBFontType::Var, 16, None);
+        assert_eq!(layout_text(&job), "a        b");
+        assert_eq!(offset_map.to_original(0), 0);
+
+        // first tab
+        for layout_text_index in 1..=4 {
+            assert_eq!(offset_map.to_original(layout_text_index), 1);
+        }
+
+        // second tab, which starts immediately after the first one
+        for layout_text_index in 5..=8 {
+            assert_eq!(offset_map.to_original(layout_text_index), 2);
+        }
+        assert_eq!(offset_map.to_original(9), 3);
     }
 }
