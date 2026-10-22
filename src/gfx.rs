@@ -91,16 +91,40 @@ impl GraphicsContext {
 
         let surface_caps = surface.get_capabilities(&adapter);
 
-        // NOTE: PoB incorrectly performs mixing and blending in sRGB space.
-        // To get a similar visual outcome, we need to do the same.
-        // Select a non-sRGB format so that no automatic linear -> sRGB conversion
-        // is performed.
-        let surface_format = surface_caps
-            .formats
+        log::debug!(
+            "surface format capabilities: {:#?}",
+            surface_caps.format_capabilities
+        );
+
+        // NOTE: PoB blends in non-linear space, so we want a plain UNORM format with
+        // no automatic linear -> non-linear conversion to get the same visual result.
+        const PREFERRED: [wgpu::TextureFormat; 2] = [
+            wgpu::TextureFormat::Bgra8Unorm,
+            wgpu::TextureFormat::Rgba8Unorm,
+        ];
+
+        let surface_format = PREFERRED
             .iter()
-            .find(|f| !f.is_srgb() && f.required_features().is_empty())
             .copied()
-            .unwrap_or(surface_caps.formats[0]);
+            .find(|f| surface_caps.formats.contains(f))
+            .unwrap_or_else(|| {
+                // fallback: any non-sRGB format that isn't floating point
+                surface_caps
+                    .formats
+                    .iter()
+                    .copied()
+                    .find(|f| {
+                        !f.is_srgb()
+                            && !matches!(
+                                f,
+                                wgpu::TextureFormat::Rgba16Float | wgpu::TextureFormat::Rgba32Float
+                            )
+                            && f.required_features().is_empty()
+                    })
+                    .unwrap_or(surface_caps.formats[0])
+            });
+
+        log::debug!("selected format: {:?}", surface_format);
 
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -111,7 +135,7 @@ impl GraphicsContext {
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
-            color_space: wgpu::SurfaceColorSpace::Auto,
+            color_space: wgpu::SurfaceColorSpace::Srgb,
         };
 
         let (blit_texture, blit_texture_view) =
