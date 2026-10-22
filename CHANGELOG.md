@@ -2,6 +2,10 @@
 
 ## [Unreleased] - ReleaseDate
 
+### Fixed
+
+- Render tab characters as 4 spaces to match SimpleGraphic (#53)
+
 ## [0.3.1] - 2026-10-21
 
 ### Fixed
