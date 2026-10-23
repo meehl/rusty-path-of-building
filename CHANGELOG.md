@@ -2,6 +2,10 @@
 
 ## [Unreleased] - ReleaseDate
 
+### Fixed
+
+- Fix error in built-in updater with new `bundled-lua-modules` feature
+
 ## [0.3.2] - 2026-10-22
 
 ### Changed
@@ -246,8 +250,8 @@
 - First release
 
 <!-- next-url -->
-[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.3.2...HEAD
 
+[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.3.2...HEAD
 [0.3.2]: https://github.com/meehl/rusty-path-of-building/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/meehl/rusty-path-of-building/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/meehl/rusty-path-of-building/compare/v0.2.18...v0.3.0
