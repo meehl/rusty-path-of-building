@@ -1,7 +1,7 @@
 use crate::{
     color::Srgba,
-    dpi::{LogicalPoint, LogicalVector},
-    fonts::{Alignment, FontStyle, LayoutJob, LayoutToLogical},
+    dpi::LogicalPoint,
+    fonts::{Alignment, FontStyle, LayoutJob},
     math::Point,
     pob::Context,
 };
@@ -101,25 +101,10 @@ pub unsafe extern "C-unwind" fn draw_string(state: *mut ffi::lua_State) -> c_int
     let layout = ctx.fonts.borrow_mut().layout(job, scale_factor);
 
     // apply offset to account for anchor position
-    let position = position + layout.anchor_offset(halign);
-    // align layout anchor with the physical pixel grid to reduce blurriness
-    let viewport_offset = if is_absolute_position {
-        LogicalVector::zero()
-    } else {
-        ctx.recorder.get_viewport().min.to_vector()
-    };
-    let position =
-        ((position + viewport_offset) * scale_factor).round() / scale_factor - viewport_offset;
+    let layout_origin = position + layout.anchor_offset(halign);
 
-    for glyph in &layout.glyphs {
-        ctx.recorder.draw_glyph(
-            LayoutToLogical::new(position.x, position.y).transform_box(&glyph.rect),
-            glyph.uv,
-            glyph.color,
-            glyph.layer_idx,
-            is_absolute_position,
-        );
-    }
+    ctx.recorder
+        .draw_glyphs(&layout, layout_origin, is_absolute_position, scale_factor);
 
     0
 }

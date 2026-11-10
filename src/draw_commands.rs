@@ -4,7 +4,8 @@ use ahash::AHasher;
 
 use crate::{
     color::Srgba,
-    dpi::{LogicalQuad, LogicalRect, LogicalSize},
+    dpi::{LogicalPoint, LogicalQuad, LogicalRect, LogicalSize, ScaleFactor},
+    fonts::{Layout, LayoutToLogical},
     math::Size,
     renderer::textures::TextureId,
     uv::{UvConstructors, UvQuad, UvRect},
@@ -55,10 +56,6 @@ impl DrawCommandRecorder {
 
     pub fn set_viewport(&mut self, viewport: LogicalRect<f32>) {
         self.current_viewport = viewport;
-    }
-
-    pub fn get_viewport(&self) -> LogicalRect<f32> {
-        self.current_viewport
     }
 
     pub fn set_viewport_from_size(&mut self, size: LogicalSize<f32>) {
@@ -147,20 +144,36 @@ impl DrawCommandRecorder {
         });
     }
 
-    pub fn draw_glyph(
+    /// Records a laid-out string whose top-left corner is at `layout_origin`.
+    pub fn draw_glyphs(
         &mut self,
-        rect: LogicalRect<f32>,
+        layout: &Layout,
+        layout_origin: LogicalPoint<f32>,
+        is_absolute_position: bool,
+        scale_factor: ScaleFactor<f32>,
+    ) {
+        // resolve the layout origin to screen space
+        let origin = if is_absolute_position {
+            layout_origin
+        } else {
+            layout_origin + self.current_viewport.min.to_vector()
+        };
+        // align the layout origin with the physical pixel grid to reduce blurriness
+        let origin = (origin * scale_factor).round() / scale_factor;
+
+        for glyph in &layout.glyphs {
+            let rect = LayoutToLogical::new(origin.x, origin.y).transform_box(&glyph.rect);
+            self.draw_glyph(rect, glyph.uv, glyph.color, glyph.layer_idx);
+        }
+    }
+
+    fn draw_glyph(
+        &mut self,
+        positions: LogicalRect<f32>,
         uv: UvRect,
         color: Srgba,
         layer_idx: u32,
-        is_absolute_position: bool,
     ) {
-        let positions = if is_absolute_position {
-            rect
-        } else {
-            rect.translate(self.current_viewport.min.to_vector())
-        };
-
         // cull if outside of viewport
         if !positions.intersects(&self.current_viewport) {
             return;
