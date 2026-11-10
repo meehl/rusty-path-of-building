@@ -57,6 +57,10 @@ impl DrawCommandRecorder {
         self.current_viewport = viewport;
     }
 
+    pub fn get_viewport(&self) -> LogicalRect<f32> {
+        self.current_viewport
+    }
+
     pub fn set_viewport_from_size(&mut self, size: LogicalSize<f32>) {
         self.set_viewport(LogicalRect::from_size(size));
     }

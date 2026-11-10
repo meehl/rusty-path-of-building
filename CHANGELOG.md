@@ -2,6 +2,10 @@
 
 ## [Unreleased] - ReleaseDate
 
+### Fixed
+
+- Fix blurry text inside viewports with fractional scale factors
+
 ## [0.3.3] - 2026-10-23
 
 ### Fixed
