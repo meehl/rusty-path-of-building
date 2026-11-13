@@ -174,7 +174,16 @@ impl GraphicsContext {
     pub fn render(&mut self, render_job: Option<RenderJob>) -> anyhow::Result<()> {
         profiling::scope!("render");
 
+        // apply textures delta
+        if let Some(render_job) = &render_job {
+            self.renderer
+                .update_textures(&self.device, &self.queue, &render_job.textures_delta);
+        }
+
         if !self.is_surface_configured {
+            if let Some(render_job) = &render_job {
+                self.renderer.free_textures(&render_job.textures_delta);
+            }
             return Ok(());
         }
 
@@ -185,10 +194,16 @@ impl GraphicsContext {
             | wgpu::CurrentSurfaceTexture::Occluded
             | wgpu::CurrentSurfaceTexture::Validation => {
                 // Skip frame
+                if let Some(render_job) = &render_job {
+                    self.renderer.free_textures(&render_job.textures_delta);
+                }
                 return Ok(());
             }
             wgpu::CurrentSurfaceTexture::Outdated | wgpu::CurrentSurfaceTexture::Lost => {
                 self.surface.configure(&self.device, &self.config);
+                if let Some(render_job) = &render_job {
+                    self.renderer.free_textures(&render_job.textures_delta);
+                }
                 return Ok(());
             }
         };
@@ -207,10 +222,6 @@ impl GraphicsContext {
         // of the previous frame onto the surface texture.
         if let Some(render_job) = render_job {
             let screen_size = PhysicalSize::new(self.config.width, self.config.height);
-
-            // upload new textures
-            self.renderer
-                .update_textures(&self.device, &self.queue, &render_job.textures_delta);
 
             // upload vertex, index, and uniform buffers
             self.renderer.update_buffers(
