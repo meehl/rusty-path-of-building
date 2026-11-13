@@ -2,6 +2,8 @@
 
 ## [Unreleased] - ReleaseDate
 
+## [0.3.4] - 2026-11-13
+
 ### Fixed
 
 - Fix blurry text inside viewports with fractional scale factors
@@ -257,8 +259,9 @@
 - First release
 
 <!-- next-url -->
+[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.3.4...HEAD
 
-[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.3.3...HEAD
+[0.3.4]: https://github.com/meehl/rusty-path-of-building/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/meehl/rusty-path-of-building/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/meehl/rusty-path-of-building/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/meehl/rusty-path-of-building/compare/v0.3.0...v0.3.1
