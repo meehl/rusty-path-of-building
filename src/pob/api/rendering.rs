@@ -41,24 +41,24 @@ pub unsafe extern "C-unwind" fn set_draw_color(state: *mut ffi::lua_State) -> c_
     match nargs {
         // escape_code
         1 => {
-            let esc_str = str_from_stack!(state, -nargs);
+            let esc_str = str_from_stack!(state, 1);
             let color = Srgba::from_escape_code(esc_str);
             ctx.recorder.set_draw_color(color);
         }
         // rgb
         3 => {
-            let r = f32_from_stack!(state, -nargs);
-            let g = f32_from_stack!(state, -nargs + 1);
-            let b = f32_from_stack!(state, -nargs + 2);
+            let r = f32_from_stack!(state, 1);
+            let g = f32_from_stack!(state, 2);
+            let b = f32_from_stack!(state, 3);
             let color = Srgba::new_f32(r, g, b, 1.0);
             ctx.recorder.set_draw_color(color);
         }
         // rgba
         4 => {
-            let r = f32_from_stack!(state, -nargs);
-            let g = f32_from_stack!(state, -nargs + 1);
-            let b = f32_from_stack!(state, -nargs + 2);
-            let a = f32_from_stack!(state, -nargs + 3);
+            let r = f32_from_stack!(state, 1);
+            let g = f32_from_stack!(state, 2);
+            let b = f32_from_stack!(state, 3);
+            let a = f32_from_stack!(state, 4);
             let color = Srgba::new_f32(r, g, b, a);
             ctx.recorder.set_draw_color(color);
         }
@@ -91,10 +91,10 @@ pub unsafe extern "C-unwind" fn set_viewport(state: *mut ffi::lua_State) -> c_in
     match nargs {
         0 => ctx.set_recorder_viewport_to_window_size(),
         4 => {
-            let x = f32_from_stack!(state, -nargs);
-            let y = f32_from_stack!(state, -nargs + 1);
-            let w = f32_from_stack!(state, -nargs + 2);
-            let h = f32_from_stack!(state, -nargs + 3);
+            let x = f32_from_stack!(state, 1);
+            let y = f32_from_stack!(state, 2);
+            let w = f32_from_stack!(state, 3);
+            let h = f32_from_stack!(state, 4);
             let rect = Rect::from_origin_and_size(Point::new(x, y), Size::new(w, h));
             ctx.recorder.set_viewport(rect);
         }
@@ -113,19 +113,19 @@ pub unsafe extern "C-unwind" fn set_draw_layer(state: *mut ffi::lua_State) -> c_
 
     match nargs {
         1 => {
-            let layer = i32_from_stack!(state, -nargs);
+            let layer = i32_from_stack!(state, 1);
             ctx.recorder.set_draw_layer(layer, 0);
         }
         2 => {
-            let layer = match unsafe { ffi::lua_type(state, -nargs) } {
+            let layer = match unsafe { ffi::lua_type(state, 1) } {
                 ffi::LUA_TNIL => None,
                 ffi::LUA_TNUMBER => {
-                    let layer = i32_from_stack!(state, -nargs);
+                    let layer = i32_from_stack!(state, 1);
                     Some(layer)
                 }
                 t => panic!("Expected Nil or Number, got {t:?}"),
             };
-            let sublayer = i32_from_stack!(state, -nargs + 1);
+            let sublayer = i32_from_stack!(state, 2);
             if let Some(layer) = layer {
                 ctx.recorder.set_draw_layer(layer, sublayer);
             } else {
@@ -153,22 +153,22 @@ pub unsafe extern "C-unwind" fn draw_image(state: *mut ffi::lua_State) -> c_int 
     let parse_uv = matches!(nargs, 9 | 10);
     let parse_layer_idx = matches!(nargs, 6 | 10);
 
-    let texture_id = unsafe { image_handle_texture_id(state, -nargs) };
+    let texture_id = unsafe { image_handle_texture_id(state, 1) };
 
     // left, top, width, height
-    let x = f32_from_stack!(state, -nargs + 1);
-    let y = f32_from_stack!(state, -nargs + 2);
-    let w = f32_from_stack!(state, -nargs + 3);
-    let h = f32_from_stack!(state, -nargs + 4);
+    let x = f32_from_stack!(state, 2);
+    let y = f32_from_stack!(state, 3);
+    let w = f32_from_stack!(state, 4);
+    let h = f32_from_stack!(state, 5);
     let rect = Rect::from_origin_and_size(Point::new(x, y), Size::new(w, h));
 
     // u1, v1, u2, v2
-    let mut i = 5;
+    let mut i = 6;
     let uv = if parse_uv {
-        let u1 = f32_from_stack!(state, -nargs + i);
-        let v1 = f32_from_stack!(state, -nargs + i + 1);
-        let u2 = f32_from_stack!(state, -nargs + i + 2);
-        let v2 = f32_from_stack!(state, -nargs + i + 3);
+        let u1 = f32_from_stack!(state, i);
+        let v1 = f32_from_stack!(state, i + 1);
+        let u2 = f32_from_stack!(state, i + 2);
+        let v2 = f32_from_stack!(state, i + 3);
         i += 4;
         Some(Rect::new(Point::new(u1, v1), Point::new(u2, v2)))
     } else {
@@ -176,7 +176,7 @@ pub unsafe extern "C-unwind" fn draw_image(state: *mut ffi::lua_State) -> c_int 
     };
 
     let layer_idx = if parse_layer_idx {
-        let layer_idx = i32_from_stack!(state, -nargs + i);
+        let layer_idx = i32_from_stack!(state, i);
         (layer_idx - 1) as u32
     } else {
         0
@@ -202,17 +202,17 @@ pub unsafe extern "C-unwind" fn draw_image_quad(state: *mut ffi::lua_State) -> c
     let parse_uv = matches!(nargs, 17 | 18);
     let parse_layer_idx = matches!(nargs, 10 | 18);
 
-    let texture_id = unsafe { image_handle_texture_id(state, -nargs) };
+    let texture_id = unsafe { image_handle_texture_id(state, 1) };
 
     // x1, y1, x2, y2, ...
-    let x1 = f32_from_stack!(state, -nargs + 1);
-    let y1 = f32_from_stack!(state, -nargs + 2);
-    let x2 = f32_from_stack!(state, -nargs + 3);
-    let y2 = f32_from_stack!(state, -nargs + 4);
-    let x3 = f32_from_stack!(state, -nargs + 5);
-    let y3 = f32_from_stack!(state, -nargs + 6);
-    let x4 = f32_from_stack!(state, -nargs + 7);
-    let y4 = f32_from_stack!(state, -nargs + 8);
+    let x1 = f32_from_stack!(state, 2);
+    let y1 = f32_from_stack!(state, 3);
+    let x2 = f32_from_stack!(state, 4);
+    let y2 = f32_from_stack!(state, 5);
+    let x3 = f32_from_stack!(state, 6);
+    let y3 = f32_from_stack!(state, 7);
+    let x4 = f32_from_stack!(state, 8);
+    let y4 = f32_from_stack!(state, 9);
     let quad = Quad::new(
         Point::new(x1, y1),
         Point::new(x2, y2),
@@ -221,16 +221,16 @@ pub unsafe extern "C-unwind" fn draw_image_quad(state: *mut ffi::lua_State) -> c
     );
 
     // u1, v1, u2, v2, ...
-    let mut i = 9;
+    let mut i = 10;
     let uv = if parse_uv {
-        let u1 = f32_from_stack!(state, -nargs + i);
-        let v1 = f32_from_stack!(state, -nargs + i + 1);
-        let u2 = f32_from_stack!(state, -nargs + i + 2);
-        let v2 = f32_from_stack!(state, -nargs + i + 3);
-        let u3 = f32_from_stack!(state, -nargs + i + 4);
-        let v3 = f32_from_stack!(state, -nargs + i + 5);
-        let u4 = f32_from_stack!(state, -nargs + i + 6);
-        let v4 = f32_from_stack!(state, -nargs + i + 7);
+        let u1 = f32_from_stack!(state, i);
+        let v1 = f32_from_stack!(state, i + 1);
+        let u2 = f32_from_stack!(state, i + 2);
+        let v2 = f32_from_stack!(state, i + 3);
+        let u3 = f32_from_stack!(state, i + 4);
+        let v3 = f32_from_stack!(state, i + 5);
+        let u4 = f32_from_stack!(state, i + 6);
+        let v4 = f32_from_stack!(state, i + 7);
         i += 8;
         Some(Quad::new(
             Point::new(u1, v1),
@@ -243,7 +243,7 @@ pub unsafe extern "C-unwind" fn draw_image_quad(state: *mut ffi::lua_State) -> c
     };
 
     let layer_idx = if parse_layer_idx {
-        let layer_idx = i32_from_stack!(state, -nargs + i);
+        let layer_idx = i32_from_stack!(state, i);
         (layer_idx - 1) as u32
     } else {
         0

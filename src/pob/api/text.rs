@@ -46,18 +46,16 @@ pub unsafe extern "C-unwind" fn draw_string(state: *mut ffi::lua_State) -> c_int
     let lua_instance = unsafe { Lua::get_or_init_from_ptr(state) };
     let mut ctx = lua_instance.app_data_mut::<Context>().unwrap();
 
-    let nargs = unsafe { ffi::lua_gettop(state) };
-
-    let x = f32_from_stack!(state, -nargs);
-    let y = f32_from_stack!(state, -nargs + 1);
-    let alignment = if unsafe { ffi::lua_isnil(state, -nargs + 2) } != 0 {
+    let x = f32_from_stack!(state, 1);
+    let y = f32_from_stack!(state, 2);
+    let alignment = if unsafe { ffi::lua_isnil(state, 3) } != 0 {
         "LEFT"
     } else {
-        str_from_stack!(state, -nargs + 2)
+        str_from_stack!(state, 3)
     };
-    let line_height = i32_from_stack!(state, -nargs + 3);
-    let font_type = str_from_stack!(state, -nargs + 4);
-    let text = str_from_stack!(state, -nargs + 5);
+    let line_height = i32_from_stack!(state, 4);
+    let font_type = str_from_stack!(state, 5);
+    let text = str_from_stack!(state, 6);
 
     let Ok(alignment) = alignment.parse::<PoBTextAlignment>() else {
         panic!("Invalid alignment");
@@ -118,11 +116,9 @@ pub unsafe extern "C-unwind" fn get_string_width(state: *mut ffi::lua_State) -> 
     let lua_instance = unsafe { Lua::get_or_init_from_ptr(state) };
     let ctx = lua_instance.app_data_ref::<Context>().unwrap();
 
-    let nargs = unsafe { ffi::lua_gettop(state) };
-
-    let line_height = i32_from_stack!(state, -nargs);
-    let font_type = str_from_stack!(state, -nargs + 1);
-    let text = str_from_stack!(state, -nargs + 2);
+    let line_height = i32_from_stack!(state, 1);
+    let font_type = str_from_stack!(state, 2);
+    let text = str_from_stack!(state, 3);
 
     let Ok(font_type) = font_type.parse::<PoBFontType>() else {
         panic!("Invalid font type");
