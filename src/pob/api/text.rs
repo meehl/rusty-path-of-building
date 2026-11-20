@@ -50,7 +50,11 @@ pub unsafe extern "C-unwind" fn draw_string(state: *mut ffi::lua_State) -> c_int
 
     let x = f32_from_stack!(state, -nargs);
     let y = f32_from_stack!(state, -nargs + 1);
-    let alignment = str_from_stack!(state, -nargs + 2);
+    let alignment = if unsafe { ffi::lua_isnil(state, -nargs + 2) } != 0 {
+        "LEFT"
+    } else {
+        str_from_stack!(state, -nargs + 2)
+    };
     let line_height = i32_from_stack!(state, -nargs + 3);
     let font_type = str_from_stack!(state, -nargs + 4);
     let text = str_from_stack!(state, -nargs + 5);
