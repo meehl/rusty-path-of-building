@@ -2,6 +2,8 @@
 
 ## [Unreleased] - ReleaseDate
 
+## [0.3.5] - 2026-11-20
+
 ### Fixed
 
 - Fix a crash when filtering nodes in the Timeless Jewel Finder
@@ -263,8 +265,9 @@
 - First release
 
 <!-- next-url -->
+[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.3.5...HEAD
 
-[Unreleased]: https://github.com/meehl/rusty-path-of-building/compare/v0.3.4...HEAD
+[0.3.5]: https://github.com/meehl/rusty-path-of-building/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/meehl/rusty-path-of-building/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/meehl/rusty-path-of-building/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/meehl/rusty-path-of-building/compare/v0.3.1...v0.3.2
